@@ -1,0 +1,6 @@
+[submodule "third_party/polygon-edge"]
+	path = third_party/polygon-edge
+	url = https://github.com/0xPolygon/polygon-edge.git
+[submodule "third_party/go-substrate-rpc-client"]
+	path = third_party/go-substrate-rpc-client
+	url = https://github.com/prabal-banerjee/go-substrate-rpc-client.git

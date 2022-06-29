@@ -21,4 +21,15 @@ func main() {
 	}
 
 	log.Printf("Got the header number: %s", header.Number.String())
+
+	block, err := client.BlockByNumber(context.Background(), header.Number)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Block number: %v", block.Number().Uint64())
+	log.Printf("Block time: %v", block.Time())
+	log.Printf("Block difficulty: %v", block.Difficulty().Uint64())
+	log.Printf("Block hash (hex): %v", block.Hash().Hex())
+	log.Printf("Block transactions length: %v", len(block.Transactions()))
 }

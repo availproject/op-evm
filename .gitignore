@@ -29,6 +29,7 @@ go.work
 /Godeps/
 
 ### VisualStudioCode ###
+.vscode/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -54,3 +55,8 @@ go.work
 *.code-workspace
 
 # End of https://www.toptal.com/developers/gitignore/api/go,visualstudiocode
+
+
+# Common binaries
+server/server
+client/client

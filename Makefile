@@ -25,6 +25,15 @@ bootstrap-genesis:
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
+
+build-server:
+	cd server && go build -o server
+
+build-client:
+	cd client && go build -o client
+
+build: build-server build-client
+
 deps:
 ifeq (, $(shell which polygon-edge))
 	git submodule update --init third_party/polygon-edge

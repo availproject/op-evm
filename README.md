@@ -42,7 +42,7 @@ rpc :10002 --seal
 ```
 
 ```
-go build && ./avail-settlement -config-file="./configs/bootnode.yaml"
+make build && ./server/server -config-file="./configs/bootnode.yaml"
 ```
 
 ## Node (non seal)
@@ -52,5 +52,14 @@ rpc :20002
 ```
 
 ```
-go build && ./avail-settlement -config-file="./configs/node-1.yaml"
+make build && ./server/server -config-file="./configs/node-1.yaml"
+```
+
+# Client
+
+```
+cortex@rij01-data01:~/eq/settlement$ make build-client && ./client/client 
+cd client && go build -o client
+2022/06/29 15:09:54 client: &ethclient.Client{c:(*rpc.Client)(0xc0001be100)}
+2022/06/29 15:09:54 Got the header number: 0
 ```

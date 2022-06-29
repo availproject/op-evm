@@ -1,0 +1,31 @@
+=============== Jun 29, 2022 (CEST) ===============
+11:15:24.889066 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+11:15:24.897552 db@open opening
+11:15:24.898692 version@stat F·[] S·0B[] Sc·[]
+11:15:24.901891 db@janitor F·2 G·0
+11:15:24.901937 db@open done T·4.372932ms
+14:35:12.305554 db@close closing
+14:35:12.305634 db@close done T·79.951µs
+=============== Jun 29, 2022 (CEST) ===============
+14:44:08.472445 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+14:44:08.472506 version@stat F·[] S·0B[] Sc·[]
+14:44:08.472517 db@open opening
+14:44:08.472537 journal@recovery F·1
+14:44:08.472781 journal@recovery recovering @1
+14:44:08.476356 memdb@flush created L0@2 N·5 S·339B "c\x00\x00..\x00\x00\x00,v4":"onumber,v3"
+14:44:08.477144 version@stat F·[1] S·339B[339B] Sc·[0.25]
+14:44:08.488150 db@janitor F·3 G·0
+14:44:08.488169 db@open done T·15.64686ms
+14:44:20.507418 db@close closing
+14:44:20.507524 db@close done T·103.753µs
+=============== Jun 29, 2022 (CEST) ===============
+14:44:25.216554 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+14:44:25.216618 version@stat F·[1] S·339B[339B] Sc·[0.25]
+14:44:25.216630 db@open opening
+14:44:25.216659 journal@recovery F·1
+14:44:25.217562 journal@recovery recovering @3
+14:44:25.221265 version@stat F·[1] S·339B[339B] Sc·[0.25]
+14:44:25.232689 db@janitor F·3 G·0
+14:44:25.232705 db@open done T·16.070049ms
+14:44:34.583559 db@close closing
+14:44:34.583656 db@close done T·96.402µs

@@ -45,10 +45,10 @@ rpc :10002 --seal
 go build && ./avail-settlement -config-file="./configs/bootnode.yaml"
 ```
 
-## Node 1 (non seal)
+## Node (non seal)
 ```
 polygon-edge server --data-dir ./data/node-1 --chain ./configs/genesis.json --grpc-address :20000 --libp2p :20001 --json
-rpc :20002 --seal
+rpc :20002
 ```
 
 ```

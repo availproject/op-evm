@@ -87,9 +87,9 @@ func NewServerConfig(path string) (*server.Config, error) {
 
 			return nil
 		}(rawConfig),
-		BlockTime:       rawConfig.BlockTime,
-		IBFTBaseTimeout: rawConfig.IBFTBaseTimeout,
-		LogLevel:        hclog.LevelFromString(rawConfig.LogLevel),
-		LogFilePath:     rawConfig.LogFilePath,
+		BlockTime: rawConfig.BlockTime,
+		//IBFTBaseTimeout: rawConfig.IBFTBaseTimeout,
+		LogLevel:    hclog.LevelFromString(rawConfig.LogLevel),
+		LogFilePath: rawConfig.LogFilePath,
 	}, nil
 }

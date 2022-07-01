@@ -23,6 +23,8 @@ func main() {
 		log.Fatalf("failure to get node configuration: %s", err)
 	}
 
+	log.Printf("Server config: %+v", config)
+
 	serverInstance, err := server.NewServer(config)
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)

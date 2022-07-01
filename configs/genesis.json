@@ -8,7 +8,11 @@
         "difficulty": "0x1",
         "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "coinbase": "0x0000000000000000000000000000000000000000",
-        "alloc": {},
+        "alloc": {
+            "0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031": {
+                "balance": "0x3635c9adc5dea00000"
+            }
+        },
         "number": "0x0",
         "gasUsed": "0x70000",
         "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -34,6 +38,7 @@
         "blockGasTarget": 0
     },
     "bootnodes": [
-        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmLRftAwcbtdhkVHkP9N81vhKUHR5X7yigEhdvB87whpMX"
+        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmUUNRnZLKRitXN9waugxMeqLYZ6PnwA8iPoiLMqRVZwQf",
+        "/ip4/127.0.0.1/tcp/20001/p2p/16Uiu2HAmSg1YmxfdEBDgGBwmHW3xDnndo5ooPzEarbCtJmMhmiJZ"
     ]
 }

@@ -1,0 +1,61 @@
+=============== Jul 5, 2022 (CEST) ===============
+12:23:52.563654 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:23:52.574761 db@open opening
+12:23:52.574890 version@stat F·[] S·0B[] Sc·[]
+12:23:52.577605 db@janitor F·2 G·0
+12:23:52.577650 db@open done T·2.877451ms
+12:24:29.463586 db@close closing
+12:24:29.463627 db@close done T·40.661µs
+=============== Jul 5, 2022 (CEST) ===============
+12:24:37.374649 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:24:37.374812 version@stat F·[] S·0B[] Sc·[]
+12:24:37.374828 db@open opening
+12:24:37.374856 journal@recovery F·1
+12:24:37.375864 journal@recovery recovering @1
+12:24:37.381682 memdb@flush created L0@2 N·1 S·266B "ɩ\xe1..T\x13v,v1":"ɩ\xe1..T\x13v,v1"
+12:24:37.381902 version@stat F·[1] S·266B[266B] Sc·[0.25]
+12:24:37.392865 db@janitor F·3 G·0
+12:24:37.392887 db@open done T·18.045422ms
+12:24:53.597541 db@close closing
+12:24:53.597596 db@close done T·53.731µs
+=============== Jul 5, 2022 (CEST) ===============
+12:24:59.854708 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:24:59.854840 version@stat F·[1] S·266B[266B] Sc·[0.25]
+12:24:59.854859 db@open opening
+12:24:59.854889 journal@recovery F·1
+12:24:59.854979 journal@recovery recovering @3
+12:24:59.865276 memdb@flush created L0@5 N·1 S·266B "ɩ\xe1..T\x13v,v3":"ɩ\xe1..T\x13v,v3"
+12:24:59.865389 version@stat F·[2] S·532B[532B] Sc·[0.50]
+12:24:59.876259 db@janitor F·4 G·0
+12:24:59.876283 db@open done T·21.414473ms
+12:30:02.453755 db@close closing
+12:30:02.453846 db@close done T·89.602µs
+=============== Jul 5, 2022 (CEST) ===============
+12:30:05.944290 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:30:05.944455 version@stat F·[2] S·532B[532B] Sc·[0.50]
+12:30:05.944470 db@open opening
+12:30:05.944506 journal@recovery F·1
+12:30:05.944597 journal@recovery recovering @6
+12:30:05.954155 memdb@flush created L0@8 N·1 S·266B "ɩ\xe1..T\x13v,v5":"ɩ\xe1..T\x13v,v5"
+12:30:05.954303 version@stat F·[3] S·798B[798B] Sc·[0.75]
+12:30:05.965817 db@janitor F·5 G·0
+12:30:05.965837 db@open done T·21.360886ms
+12:32:34.898267 db@close closing
+12:32:34.898367 db@close done T·94.142µs
+=============== Jul 5, 2022 (CEST) ===============
+12:32:36.902316 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:32:36.902544 version@stat F·[3] S·798B[798B] Sc·[0.75]
+12:32:36.902562 db@open opening
+12:32:36.902605 journal@recovery F·1
+12:32:36.902874 journal@recovery recovering @9
+12:32:36.912591 memdb@flush created L0@11 N·25 S·1KiB "\x1d\x1d\xc0..*\xd8\xc2,v29":"\xf4\xf4\xf4.._ \xad,v21"
+12:32:36.912767 version@stat F·[4] S·1KiB[1KiB] Sc·[1.00]
+12:32:36.923688 db@janitor F·6 G·0
+12:32:36.923719 db@open done T·21.144122ms
+12:32:36.923796 table@compaction L0·4 -> L1·0 S·1KiB Q·32
+12:32:36.930565 table@build created L1@14 N·13 S·1003B "\x1d\x1d\xc0..*\xd8\xc2,v29":"\xf4\xf4\xf4.._ \xad,v24"
+12:32:36.930639 version@stat F·[0 1] S·1003B[0B 1003B] Sc·[0.00 0.00]
+12:32:36.938487 table@compaction committed F-3 S-913B Ke·0 D·15 T·14.656195ms
+12:32:36.938593 table@remove removed @8
+12:32:36.938624 table@remove removed @5
+12:32:36.938783 table@remove removed @2

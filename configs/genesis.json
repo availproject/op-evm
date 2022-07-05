@@ -1,9 +1,9 @@
 {
-    "name": "polygon-avail",
+    "name": "polygon-edge",
     "genesis": {
         "nonce": "0x0000000000000000",
         "timestamp": "0x0",
-        "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000c3c080c0",
+        "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000d8d5941bc763b9c36bb679b17fc9ed01ec5e27af14586480c0",
         "gasLimit": "0x500000",
         "difficulty": "0x1",
         "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -38,7 +38,6 @@
         "blockGasTarget": 0
     },
     "bootnodes": [
-        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmUUNRnZLKRitXN9waugxMeqLYZ6PnwA8iPoiLMqRVZwQf",
-        "/ip4/127.0.0.1/tcp/20001/p2p/16Uiu2HAmSg1YmxfdEBDgGBwmHW3xDnndo5ooPzEarbCtJmMhmiJZ"
+        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa"
     ]
 }

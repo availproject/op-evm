@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	golog "github.com/ipfs/go-log/v2"
 )
 
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
@@ -32,7 +33,9 @@ func createKs() {
 }
 
 func main() {
-	client, err := ethclient.Dial("http://127.0.0.1:20002")
+	golog.SetAllLoggers(golog.LevelDebug)
+
+	client, err := ethclient.Dial("http://127.0.0.1:10002")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,27 +64,27 @@ func main() {
 	}
 
 	accounts := accKeystore.Accounts()
-	baseAddress := accounts[0]
-	testAddress := accounts[1]
+	genesisAddress := accounts[0]
+	ownerAddress := accounts[1]
 
-	log.Printf("Preminted account hex: %s", baseAddress.Address.Hex())
+	log.Printf("Preminted account hex: %s", genesisAddress.Address.Hex())
 
-	balanceBaseAcc, err := client.BalanceAt(context.Background(), baseAddress.Address, nil)
+	balanceBaseAcc, err := client.BalanceAt(context.Background(), genesisAddress.Address, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	eth := big.NewInt(1000000000000000)
+	eth := big.NewInt(1000000000000000000)
 	log.Printf("Preminted account balance: %v ETH", big.NewInt(0).Div(balanceBaseAcc, eth))
 
-	log.Printf("Test account hex: %s", testAddress.Address.Hex())
+	log.Printf("Test account hex: %s", ownerAddress.Address.Hex())
 
 	//for i := 0; i < 100; i++ {
 	tx, err := transferEth(
 		client,
 		accKeystore,
-		baseAddress,
-		testAddress,
+		genesisAddress,
+		ownerAddress,
 		eth.Int64(), // Send 1 ETH
 	)
 	if err != nil {
@@ -90,7 +93,7 @@ func main() {
 	log.Printf("Test transfer of 1 ETH. Tx hash: %v", tx.Hash().String())
 	//}
 
-	balanceTestAcc, err := client.BalanceAt(context.Background(), testAddress.Address, nil)
+	balanceTestAcc, err := client.BalanceAt(context.Background(), ownerAddress.Address, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

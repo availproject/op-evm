@@ -6,23 +6,23 @@ Polygon Avail Settlement provides a settlement layer for Polygon Avail.
 # Node Secrets
 
 ```
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/bootnode-1
+/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-bootnode-1
 
 [SECRETS INIT]
-Public key (address) = 0xaDE7EE1e3b98A1Eb8E4D8E6c52fd073dB1a1304B
-Node ID              = 16Uiu2HAmUUNRnZLKRitXN9waugxMeqLYZ6PnwA8iPoiLMqRVZwQf
+Public key (address) = 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
+Node ID              = 16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa
 
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/node-1
-
-[SECRETS INIT]
-Public key (address) = 0x8A96444859cE76d3F13D044F3962cb25795F32D6
-Node ID              = 16Uiu2HAmSg1YmxfdEBDgGBwmHW3xDnndo5ooPzEarbCtJmMhmiJZ
-
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/node-2
+/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-node-1
 
 [SECRETS INIT]
-Public key (address) = 0x7201c9c9b1b56b09AB5e1013251270E8F5D023C5
-Node ID              = 16Uiu2HAmUCgwmzn9WiLYvbZSD7zRdMKuhu2BAQnjF9T8H3WbqKM1
+Public key (address) = 0x00D916EFbEeDb102A4D235a1EB525Fa147E5588e
+Node ID              = 16Uiu2HAkwyY1aXwC7o7nrUofsBXwUkxYwsj21LtE9jmhmTuei5mw
+
+/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-node-2
+
+[SECRETS INIT]
+Public key (address) = 0x2734E3c95E2dBD08363f5298247b30a186c48b82
+Node ID              = 16Uiu2HAm1vufDoGrukYQaTCDDE642B45HFLnUo5J2QcPpTosuiYp
 
 ```
 

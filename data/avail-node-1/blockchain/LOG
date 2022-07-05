@@ -1,0 +1,41 @@
+=============== Jul 5, 2022 (CEST) ===============
+12:26:55.626208 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:26:55.634273 db@open opening
+12:26:55.634408 version@stat F·[] S·0B[] Sc·[]
+12:26:55.637124 db@janitor F·2 G·0
+12:26:55.637134 db@open done T·2.853061ms
+12:27:00.848815 db@close closing
+12:27:00.848875 db@close done T·79.291µs
+=============== Jul 5, 2022 (CEST) ===============
+12:27:06.221401 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:27:06.221463 version@stat F·[] S·0B[] Sc·[]
+12:27:06.221476 db@open opening
+12:27:06.221506 journal@recovery F·1
+12:27:06.221580 journal@recovery recovering @1
+12:27:06.224688 memdb@flush created L0@2 N·5 S·397B "c\x00\x00..\x00\x00\x00,v4":"onumber,v3"
+12:27:06.224808 version@stat F·[1] S·397B[397B] Sc·[0.25]
+12:27:06.235799 db@janitor F·3 G·0
+12:27:06.235812 db@open done T·14.329851ms
+12:30:01.238445 db@close closing
+12:30:01.238570 db@close done T·122.912µs
+=============== Jul 5, 2022 (CEST) ===============
+12:30:18.002969 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:30:18.003028 version@stat F·[1] S·397B[397B] Sc·[0.25]
+12:30:18.003038 db@open opening
+12:30:18.003069 journal@recovery F·1
+12:30:18.003235 journal@recovery recovering @3
+12:30:18.003398 version@stat F·[1] S·397B[397B] Sc·[0.25]
+12:30:18.014568 db@janitor F·3 G·0
+12:30:18.014579 db@open done T·11.537939ms
+12:32:20.612769 db@close closing
+12:32:20.612862 db@close done T·92.282µs
+=============== Jul 5, 2022 (CEST) ===============
+12:32:23.534093 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:32:23.534199 version@stat F·[1] S·397B[397B] Sc·[0.25]
+12:32:23.534213 db@open opening
+12:32:23.534248 journal@recovery F·1
+12:32:23.534864 journal@recovery recovering @5
+12:32:23.540210 memdb@flush created L0@7 N·1740 S·125KiB "b\x00\xbc..\xd4HS,v1528":"r\xfd\xb0..\xfe}\x8d,v860"
+12:32:23.540399 version@stat F·[2] S·125KiB[125KiB] Sc·[0.50]
+12:32:23.551344 db@janitor F·4 G·0
+12:32:23.551363 db@open done T·17.144512ms

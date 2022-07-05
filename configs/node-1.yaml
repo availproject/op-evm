@@ -1,6 +1,6 @@
 chain_config: ./configs/genesis.json
 secrets_config: ""
-data_dir: "./data/node-1"
+data_dir: "./data/avail-node-1"
 block_gas_target: "0x0"
 grpc_addr: ":20000"
 jsonrpc_addr: ":20002"

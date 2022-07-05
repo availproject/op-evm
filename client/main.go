@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	golog "github.com/ipfs/go-log/v2"
+	setget "github.com/maticnetwork/avail-settlement/contracts/setget"
 )
 
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
@@ -98,7 +102,55 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("Test account balance: %v ETH", big.NewInt(0).Div(balanceTestAcc, eth))
+	log.Printf("Owner account balance: %v ETH", big.NewInt(0).Div(balanceTestAcc, eth))
+
+	/* 	contractTx, err := deployContract(
+	   		client,
+	   		accKeystore,
+	   		ownerAddress,
+	   	)
+	   	if err != nil {
+	   		log.Fatal(err)
+	   	}
+
+	   	log.Printf("Owner account setget contract tx: %#v", contractTx) */
+
+	contractAddress := common.HexToAddress("0xBEe483807d80fBC3c933CF35FEe2D7CfE2e9d973")
+	// contractTxHash := common.HexToHash("0xdb3e7f0c4ad6cab919944de0929003edc653510b9909f5040d2d4a39f71bf918")
+
+	contract, err := setget.NewSetget(contractAddress, client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	getVal, getErr := contract.Get(nil)
+	if getErr != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Owner -> Contract -> BEFORE SET -> Get() -> Response: %v", getVal)
+
+	setTx, err := writeToContract(
+		client,
+		accKeystore,
+		ownerAddress,
+		contract,
+		big.NewInt(0).Add(getVal, big.NewInt(100)),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Owner -> Contract -> Set() -> Tx Response: %+v", setTx)
+
+	time.Sleep(5 * time.Second)
+
+	getVal, getErr = contract.Get(nil)
+	if getErr != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Owner -> Contract -> AFTER SET -> Get() -> Response: %v", getVal)
 
 }
 
@@ -136,6 +188,89 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		return nil, err
+	}
+
+	return tx, nil
+}
+
+func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*types.Transaction, error) {
+	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Nonce: %v", nonce)
+
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	passpharse := "secret"
+	ks.Unlock(fromAccount, passpharse)
+
+	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
+	if err != nil {
+		return nil, err
+	}
+
+	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
+	if err != nil {
+		return nil, err
+	}
+
+	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)     // in wei
+	auth.GasLimit = uint64(300000) // in units
+	auth.GasPrice = gasPrice
+
+	address, tx, _, err := setget.DeploySetget(auth, client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(address.Hex())
+	fmt.Println(tx.Hash().Hex())
+
+	return tx, nil
+}
+
+func writeToContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account, instance *setget.Setget, val *big.Int) (*types.Transaction, error) {
+	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Nonce: %v", nonce)
+
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	passpharse := "secret"
+	ks.Unlock(fromAccount, passpharse)
+
+	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
+	if err != nil {
+		return nil, err
+	}
+
+	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
+	if err != nil {
+		return nil, err
+	}
+
+	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)     // in wei
+	auth.GasLimit = uint64(300000) // in units
+	auth.GasPrice = gasPrice
+
+	tx, err := instance.Set(auth, val)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return tx, nil

@@ -36,6 +36,10 @@ build-server:
 build-client:
 	cd client && go build -o client
 
+build-contract:
+	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
+	abigen --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
+
 build: build-server build-client
 
 deps:

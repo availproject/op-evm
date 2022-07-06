@@ -16,4 +16,4 @@ TBD.
 
 ## Architecture
 
-![Architecture Diagram](settlement_layer_architecture.svg)
+![Architecture Diagram](docs/settlement_layer_architecture.svg)

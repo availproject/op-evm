@@ -62,3 +62,16 @@
 =============== Jul 7, 2022 (CEST) ===============
 14:14:25.735841 db@close closing
 14:14:25.735901 db@close done T·60.141µs
+=============== Jul 7, 2022 (CEST) ===============
+14:20:58.674749 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+14:20:58.674915 version@stat F·[0 1] S·1003B[0B 1003B] Sc·[0.00 0.00]
+14:20:58.674931 db@open opening
+14:20:58.674973 journal@recovery F·1
+14:20:58.675072 journal@recovery recovering @12
+14:20:58.680013 memdb@flush created L0@15 N·192 S·10KiB "\x00\xd8\xf9..\xfdh\xbc,v74":"\xfeD3..#\xf0\xe2,v123"
+14:20:58.680134 version@stat F·[1 1] S·11KiB[10KiB 1003B] Sc·[0.25 0.00]
+14:20:58.690988 db@janitor F·5 G·1
+14:20:58.690996 db@janitor removing table-11
+14:20:58.691039 db@open done T·16.092137ms
+14:21:05.402433 db@close closing
+14:21:05.402488 db@close done T·55.101µs

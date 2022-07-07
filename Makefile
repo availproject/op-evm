@@ -1,5 +1,5 @@
 
-POLYGON_EDGE_BIN=$(GOPATH)/bin/polygon-edge
+POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/main
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
 
@@ -21,9 +21,11 @@ bootstrap-secrets:
 	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-2
 
 bootstrap-genesis:
+	rm $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json || true
 	$(POLYGON_EDGE_BIN) genesis --dir $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json \
+	--name polygon-avail-settlement \
 	--premine 0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000 \
-	--consensus ibft \
+	--consensus ibft-avail \
 	--bootnode /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa \
 	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
 
@@ -40,6 +42,9 @@ build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
+
+build-edge:
+	cd third_party/polygon-edge && make build
 
 build: build-server build-client
 

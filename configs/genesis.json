@@ -1,5 +1,5 @@
 {
-    "name": "polygon-edge",
+    "name": "polygon-avail-settlement",
     "genesis": {
         "nonce": "0x0000000000000000",
         "timestamp": "0x0",
@@ -30,7 +30,7 @@
         },
         "chainID": 100,
         "engine": {
-            "ibft": {
+            "ibft-avail": {
                 "epochSize": 100000,
                 "type": "PoA"
             }

@@ -14,7 +14,7 @@ const AvailBridgeAppID = uint32(0)
 // Sender provides interface for sending blocks to Avail. It returns a Future
 // to query result of block finalisation.
 type Sender interface {
-	SubmitData(b *Batch) future.Future[Result]
+	SubmitData(bs []byte) future.Future[Result]
 }
 
 // Result contains the final result of block data submission.
@@ -29,9 +29,9 @@ func NewSender(client Client) Sender {
 	return &sender{client: client}
 }
 
-// SubmitData submits a Batch to Avail and returns a Future with Result or an
+// SubmitData submits data to Avail and returns a Future with Result or an
 // error.
-func (s *sender) SubmitData(b *Batch) future.Future[Result] {
+func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 	api := s.client.instance()
 	f := future.New[Result]()
 
@@ -41,10 +41,7 @@ func (s *sender) SubmitData(b *Batch) future.Future[Result] {
 		return f
 	}
 
-	// TODO: Refactor Batch to support Encode and serialize Batch here.
-	bs := types.NewBytes([]byte("hello world"))
-
-	call, err := types.NewCall(meta, "DataAvailability.submit_data", bs)
+	call, err := types.NewCall(meta, "DataAvailability.submit_data", types.NewBytes(bs))
 	if err != nil {
 		f.SetError(err)
 		return f

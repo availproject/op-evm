@@ -6,25 +6,25 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 )
 
-// BatchHandler is a function type for a callback invoked on new block.
-type BatchHandler interface {
-	HandleBatch(b *Batch) error
+// BlockDataHandler is a function type for a callback invoked on new block.
+type BlockDataHandler interface {
+	HandleData(bs []byte) error
 	HandleError(err error)
 }
 
-// BatchWatcher provides an implementation that is watching for new blocks from
+// BlockDataWatcher provides an implementation that is watching for new blocks from
 // Avail and filters extrinsics with embedded Batch data, invoking handler with
 // the decoded Batch.
-type BatchWatcher struct {
+type BlockDataWatcher struct {
 	appID   types.U32
 	client  Client
-	handler BatchHandler
+	handler BlockDataHandler
 	stop    chan struct{}
 }
 
-// NewBatchWatcher constructs and starts the watcher following Avail blocks.
-func NewBatchWatcher(client Client, appID uint32, handler BatchHandler) (*BatchWatcher, error) {
-	watcher := BatchWatcher{
+// NewBlockDataWatcher constructs and starts the watcher following Avail blocks.
+func NewBlockDataWatcher(client Client, appID uint32, handler BlockDataHandler) (*BlockDataWatcher, error) {
+	watcher := BlockDataWatcher{
 		appID:   types.U32(appID),
 		client:  client,
 		handler: handler,
@@ -39,7 +39,7 @@ func NewBatchWatcher(client Client, appID uint32, handler BatchHandler) (*BatchW
 	return &watcher, nil
 }
 
-func (bw *BatchWatcher) start() error {
+func (bw *BlockDataWatcher) start() error {
 	api := bw.client.instance()
 
 	sub, err := api.RPC.Chain.SubscribeNewHeads()
@@ -52,7 +52,7 @@ func (bw *BatchWatcher) start() error {
 	return nil
 }
 
-func (bw *BatchWatcher) processBlocks(api *gsrpc.SubstrateAPI, sub *chain.NewHeadsSubscription) {
+func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, sub *chain.NewHeadsSubscription) {
 	defer sub.Unsubscribe()
 
 	for {
@@ -75,8 +75,8 @@ func (bw *BatchWatcher) processBlocks(api *gsrpc.SubstrateAPI, sub *chain.NewHea
 					continue
 				}
 
-				batch := &Batch{}
-				err = types.DecodeFromBytes(extrinsic.Method.Args, &batch)
+				blob := &Blob{}
+				err = types.DecodeFromBytes(extrinsic.Method.Args, &blob)
 				if err != nil {
 					// Don't invoke HandleError() on this because there is no
 					// way of filtering uninteresting extrinsics / method.Args
@@ -84,14 +84,14 @@ func (bw *BatchWatcher) processBlocks(api *gsrpc.SubstrateAPI, sub *chain.NewHea
 					continue
 				}
 
-				if batch.Magic != BatchMagic {
+				if blob.Magic != BlobMagic {
 					// Don't invoke HandleError() on this because there is no
 					// way of filtering uninteresting extrinsics / method.Args
 					// and failing decoding is the only way to distinct those.
 					continue
 				}
 
-				bw.handler.HandleBatch(batch)
+				bw.handler.HandleData(blob.Data)
 			}
 		case err := <-sub.Err():
 			bw.handler.HandleError(err)
@@ -102,7 +102,7 @@ func (bw *BatchWatcher) processBlocks(api *gsrpc.SubstrateAPI, sub *chain.NewHea
 }
 
 // Stop stops active watcher.
-func (bw *BatchWatcher) Stop() {
+func (bw *BlockDataWatcher) Stop() {
 	select {
 	case <-bw.stop:
 		return

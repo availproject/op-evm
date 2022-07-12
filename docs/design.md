@@ -12,66 +12,104 @@ for application rollups that are built on top of Avail platform.
 
 ### Sequencer Nodes
 
-So called sequencer nodes' main function is to aggregate transactions and batch
-them into Avail. They are called "sequencer nodes" with quotes, because
-ultimately the ordering of transactions is done by Avail and not sequencers.
+Sequencer nodes' main function is to aggregate & execute incoming transactions,
+extract the resulting state transitions and then store these in a block that is
+pushed to Avail.
 
-In the first version of Settlement Layer, ideally there is only one centralized
-sequencer, but since the ultimate ordering of transactions is done by Avail, it
-is possible to bypass the central sequencer and run multiple ones concurrently.
-However, the sequencers don't communicate together and therefore, combined with
-later described incentives, it requires careful consideration whether to run
-"own sequencer" instead of relying on the central one.
+Corresponding sequencer node is also responsible to defend itself, in case a
+watch tower node finds out any mismatches from a block.
 
-Each batch of transactions forms a block in Avail.
+There can be multiple sequencer nodes. The forged block, written to Avail,
+doesn't contain the state root hash, but only the set of transactions and
+corresponding state transitions in state DB. Avail performs the ordering of
+blocks, in case two different nodes produce a conflicting block, the first one
+"wins" while the latter one gets caught by watch tower node and results in
+generation of fault proof (and slashing for the offending sequencer).
+
+**NOTE:** :point_up: Can malicious node "kick out" an honest sequencer by
+measuring the timing of block generation and common state changes and therefore
+inject a conflicting transactions _right before_ the honest node would generate
+a block?
 
 ### Validator Nodes
 
-Validator nodes follow Avail and read, execute and validate batched
-transactions in order. On valid batch of transactions, a Settlement Layer block
-gets generated. In case there is an invalid batch of transactions in a block in
-Avail, the corresponding sequencer that produced it, gets slashed.
+Validator nodes follow Avail and read new blocks in order. They optimistically
+assume that the blocks are valid (given some sanity checks) and directly apply
+the state transitions into their state database[s].
 
-After quarantee time, the block gets finalized and becomes available to
+In the event of fault proof, the validator nodes will execute the transactions
+from a special block[s], that will result in correction of the chain state.
+
+After the set quarantee time, the block gets finalized and becomes available to
 clients.
 
-## Transaction Ordering
+### Watch Tower Nodes
+
+Watch Tower Nodes follow the generated blocks from Avail, similar to validator
+nodes, but instead of optimistically trusting that the state transitions are
+valid, the watch tower nodes execute the transactions contained in the block
+and compare the resulting state transitions with those present in the block.
+
+If there are any differences between the generated state transitions and those
+stored in the block, the corresponding watch tower node challenges the
+corresponding sequencer and generates a fault proof.
+
+### P2P Network
+
+All nodes are connected via P2P network, to quickly receive & spread the
+information about latest blocks and potential fraud proofs.
+
+## Block Ordering
 
 ### Ordering from Avail
 
-In most of the optimistic rollups, it is sequencer's responsibility to order
-and batch the transactions. This makes it difficult to introduce a distributed
-sequencing without introducing a full consensus implementation on L2.
-
-Avail Settlement Layer uses Polygon Avail DA, combined with incentives, to
-provide ordering of L2 transactions. This design allows multiple concurrent
-sequencers, but discourages race conditions because conflicts in state
-manipulations performed by competing transactions can yield slashing.
+This specification proposes a design where there can be multiple distributed
+sequencers working alone without a strict process controlling which one takes
+turn in block generation. The incentive mechanisms discourage conflicts, which
+should be enough to keep number of conflicting blocks low and relatively rare.
 
 ### Incentives
 
-On every batch of transactions that sequencer generates, there must be a stake
-that gets locked until the batch becomes a finalized block. On the event of
-submission of invalid transaction, sequencer looses the stake.
+On every block that the sequencer generates, there must be a stake that gets
+locked until the block gets finalized. In the event of submission of invalid
+block, followed by successful fraud proofe generation, the corresponding
+sequencer looses the stake.
 
 This guides two important aspects:
 
-1. The sequencer does its best to ensure validity of the transaction against
-   known blockchain state.
-2. The sequencer does its best to avoid competing transactions, where two
-   different transactions, submitted by two distinct sequencers, modify the
-   shared account state.
+1. The sequencer does its best to ensure validity of the transactions against
+   then known blockchain state.
+2. The sequencer does its best to avoid competing blocks, where contained
+   transactions, submitted by two distinct sequencers, modify the shared
+   account state.
 
 Especially the number 2. of those aspects is such that discourages running your
 own sequencer "for the fun". Still, it doesn't prevent an application rollup to
 doing so, if they feel that they get unfair treatment by central sequencer.
 
-## Finality
+## Block
+
+### Structure
+
+TODO: Define a block structure.
+
+#### Fraud Proof Block
+
+### Finality
 
 Block finality is determined by a relative time of *n* blocks. If there is no
 fraud proof generated by then, the block is considered final.
 
-### Fraud Proof
+## Fraud Proof
 
-TBD
+When the watch tower node finds out mismatches in generated state transitions,
+it starts challenge process with corresponding sequencer. Once the challenge
+process has been completed and the fraud proof generated, it is communicated to
+all parties in P2P network, in addition to being written to Avail.
 
+All validators must then execute the transaction[s] from the special fraud
+proof block and fork the head of blockchain to the new track.
+
+#### Challenge Process
+
+TODO: Write the full challenge process here.

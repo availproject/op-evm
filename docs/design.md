@@ -12,24 +12,15 @@ for application rollups that are built on top of Avail platform.
 
 ### Sequencer Nodes
 
-Sequencer nodes' main function is to aggregate & execute incoming transactions,
+Sequencer node's main function is to aggregate & execute incoming transactions,
 extract the resulting state transitions and then store these in a block that is
 pushed to Avail.
 
 Corresponding sequencer node is also responsible to defend itself, in case a
 watch tower node finds out any mismatches from a block.
 
-There can be multiple sequencer nodes. The forged block, written to Avail,
-doesn't contain the state root hash, but only the set of transactions and
-corresponding state transitions in state DB. Avail performs the ordering of
-blocks, in case two different nodes produce a conflicting block, the first one
-"wins" while the latter one gets caught by watch tower node and results in
-generation of fault proof (and slashing for the offending sequencer).
+In the first phase, there is a single sequencer node.
 
-**NOTE:** :point_up: Can malicious node "kick out" an honest sequencer by
-measuring the timing of block generation and common state changes and therefore
-inject a conflicting transactions _right before_ the honest node would generate
-a block?
 
 ### Validator Nodes
 
@@ -57,35 +48,24 @@ corresponding sequencer and generates a fault proof.
 ### P2P Network
 
 All nodes are connected via P2P network, to quickly receive & spread the
-information about latest blocks and potential fraud proofs.
+information about latest blocks and potential fraud proofs. More detailed
+networking specification shall be documented later.
 
 ## Block Ordering
 
 ### Ordering from Avail
 
-This specification proposes a design where there can be multiple distributed
-sequencers working alone without a strict process controlling which one takes
-turn in block generation. The incentive mechanisms discourage conflicts, which
-should be enough to keep number of conflicting blocks low and relatively rare.
+The block ordering comes strictly from Avail. The order of the blocks is the
+order they appear in Avail.
 
-### Incentives
+## Incentive structure
 
 On every block that the sequencer generates, there must be a stake that gets
 locked until the block gets finalized. In the event of submission of invalid
 block, followed by successful fraud proofe generation, the corresponding
 sequencer looses the stake.
 
-This guides two important aspects:
-
-1. The sequencer does its best to ensure validity of the transactions against
-   then known blockchain state.
-2. The sequencer does its best to avoid competing blocks, where contained
-   transactions, submitted by two distinct sequencers, modify the shared
-   account state.
-
-Especially the number 2. of those aspects is such that discourages running your
-own sequencer "for the fun". Still, it doesn't prevent an application rollup to
-doing so, if they feel that they get unfair treatment by central sequencer.
+TODO: Draw a sequence diagram.
 
 ## Block
 
@@ -93,7 +73,14 @@ doing so, if they feel that they get unfair treatment by central sequencer.
 
 TODO: Define a block structure.
 
-#### Fraud Proof Block
+### Fraud Proof Block
+
+Fraud Proof Block is a special block, instructing validators to fully
+verify and re-execute transactions in it. It contains the notion of the
+performed challenge game between watch tower node and corresponding sequencer
+node.
+
+TODO: Define detailed block structure.
 
 ### Finality
 
@@ -110,6 +97,15 @@ all parties in P2P network, in addition to being written to Avail.
 All validators must then execute the transaction[s] from the special fraud
 proof block and fork the head of blockchain to the new track.
 
-#### Challenge Process
+### Challenge Process
 
 TODO: Write the full challenge process here.
+
+
+## Ethereum compatibility
+
+While the Settlement Layer chain does not attempt to replicate an Ethereum
+chain on top of Avail, it tries to be EVM compatible, including most of the
+related tooling to the extend it's feasible. This lowers the barrier of entry
+for existing Ethereum developers and allows leveraging existing tooling instead
+of requiring re-implementing the wheel.

@@ -2,14 +2,20 @@ package avail
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/maticnetwork/avail-settlement/pkg/future"
 )
 
-// AvailBridgeAppID is the Avail application ID for the bridge.
-const AvailBridgeAppID = uint32(0)
+const (
+	// BridgeAppID is the Avail application ID for the bridge.
+	BridgeAppID = uint32(0)
+
+	// CallSubmitData is the RPC API call for submitting extrinsic data to Avail.
+	CallSubmitData = "DataAvailability.submit_data"
+)
 
 // Sender provides interface for sending blocks to Avail. It returns a Future
 // to query result of block finalisation.
@@ -41,19 +47,32 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 		return f
 	}
 
-	call, err := types.NewCall(meta, "DataAvailability.submit_data", types.NewBytes(bs))
-	if err != nil {
-		f.SetError(err)
-		return f
+	blob := Blob{
+		Magic: BlobMagic,
+		Data:  bs,
+	}
+
+	var call types.Call
+	{
+		// XXX: This encoding process is an inefficient hack to workaround
+		// problem in the encoding pipeline from client code to Avail server.
+		// `Blob` implements `scale.Encodeable` interface, but it it's passed
+		// directly to `types.NewCall()`, the server will return an error. This
+		// requires further investigation to fix.
+		encodedBytes, err := types.EncodeToBytes(blob)
+		if err != nil {
+			f.SetError(err)
+			return f
+		}
+
+		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
+		if err != nil {
+			f.SetError(err)
+			return f
+		}
 	}
 
 	ext := types.NewExtrinsic(call)
-
-	hash, err := api.RPC.Chain.GetBlockHashLatest()
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
 
 	rv, err := api.RPC.State.GetRuntimeVersionLatest()
 	if err != nil {
@@ -76,13 +95,15 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 
 	nonce := uint32(accountInfo.Nonce)
 	o := types.SignatureOptions{
-		BlockHash:          hash,
+		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
+		// Hence BlockHash: Genesis Hash.
+		BlockHash:          s.client.GenesisHash(),
 		Era:                types.ExtrinsicEra{IsMortalEra: false},
 		GenesisHash:        s.client.GenesisHash(),
 		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(100),
-		AppID:              types.NewU32(AvailBridgeAppID),
+		AppID:              types.NewU32(BridgeAppID),
 		TransactionVersion: rv.TransactionVersion,
 	}
 
@@ -105,11 +126,13 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 			select {
 			case status := <-sub.Chan():
 				if status.IsFinalized {
+					log.Printf("submitted block is finalized.")
 					f.SetValue(Result{})
 					return
 				}
 			case err := <-sub.Err():
 				// TODO: Consider re-connecting subscription channel on error?
+				log.Printf("submitted block subscription returned an error: %s", err)
 				f.SetError(err)
 				return
 			}

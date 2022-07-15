@@ -27,12 +27,16 @@ type Sender interface {
 type Result struct{}
 
 type sender struct {
-	client Client
+	client         Client
+	signingKeyPair signature.KeyringPair
 }
 
 // NewSender constructs an Avail block data sender.
-func NewSender(client Client) Sender {
-	return &sender{client: client}
+func NewSender(client Client, signingKeyPair signature.KeyringPair) Sender {
+	return &sender{
+		client:         client,
+		signingKeyPair: signingKeyPair,
+	}
 }
 
 // SubmitData submits data to Avail and returns a Future with Result or an
@@ -80,7 +84,7 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 		return f
 	}
 
-	key, err := types.CreateStorageKey(meta, "System", "Account", signature.TestKeyringPairAlice.PublicKey)
+	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
 	if err != nil {
 		f.SetError(err)
 		return f
@@ -107,7 +111,7 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 		TransactionVersion: rv.TransactionVersion,
 	}
 
-	err = ext.Sign(signature.TestKeyringPairAlice, o)
+	err = ext.Sign(s.signingKeyPair, o)
 	if err != nil {
 		f.SetError(err)
 		return f

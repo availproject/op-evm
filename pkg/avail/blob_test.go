@@ -44,8 +44,8 @@ func Test_BlobEncoding(t *testing.T) {
 			decodeErrMatcher: nil,
 		},
 		{
-			name:             "test 16 MB of random data",
-			input:            test.RandomBytes(t, 1<<24),
+			name:             "test 1 MB of random data",
+			input:            test.RandomBytes(t, 1<<20),
 			encodeErrMatcher: nil,
 			decodeErrMatcher: nil,
 		},
@@ -60,7 +60,8 @@ func Test_BlobEncoding(t *testing.T) {
 	for i, tc := range testCases {
 		ok := t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			input := Blob{
-				Data: tc.input,
+				Magic: BlobMagic,
+				Data:  tc.input,
 			}
 
 			buf := bytes.NewBuffer(nil)

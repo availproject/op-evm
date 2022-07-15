@@ -2,7 +2,10 @@ module github.com/maticnetwork/avail-settlement
 
 go 1.18
 
-replace github.com/0xPolygon/polygon-edge => ./third_party/polygon-edge
+replace (
+	github.com/0xPolygon/polygon-edge => ./third_party/polygon-edge
+	github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha
+)
 
 require (
 	github.com/0xPolygon/polygon-edge v0.4.1

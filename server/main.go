@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
+	golog "github.com/ipfs/go-log/v2"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
 )
 
@@ -18,10 +19,15 @@ func main() {
 
 	flag.Parse()
 
+	// Enable LibP2P logging
+	golog.SetAllLoggers(golog.LevelDebug)
+
 	config, err := config.NewServerConfig(path)
 	if err != nil {
 		log.Fatalf("failure to get node configuration: %s", err)
 	}
+
+	log.Printf("Server config: %+v", config)
 
 	serverInstance, err := server.NewServer(config)
 	if err != nil {

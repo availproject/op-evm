@@ -60,3 +60,6 @@ go.work
 # Common binaries
 server/server
 client/client
+data/avail-bootnode-1/blockchain/*
+data/avail-node-1/blockchain/*
+data/avail-node-2/blockchain/*

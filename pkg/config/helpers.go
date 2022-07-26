@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -82,4 +83,12 @@ func ParseSecretsConfig(cfg *config.Config) (*secrets.SecretsManagerConfig, erro
 	}
 
 	return secrets.ReadConfig(cfg.SecretsConfigPath)
+}
+
+func ParseNodeType(cfg *config.Config) (avail.MechanismType, error) {
+	if cfg.NodeType == "" {
+		return avail.Validator, nil
+	}
+
+	return avail.ParseType(cfg.NodeType)
 }

@@ -4,6 +4,7 @@ data_dir: "./data/avail-node-1"
 block_gas_target: "0x0"
 grpc_addr: ":20000"
 jsonrpc_addr: ":20002"
+node_type: "validator"
 telemetry:
     prometheus_addr: ""
 network:

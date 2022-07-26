@@ -4,6 +4,7 @@ data_dir: "./data/avail-bootnode-1"
 block_gas_target: "0x0"
 grpc_addr: ":10000"
 jsonrpc_addr: ":10002"
+node_type: "sequencer"
 telemetry:
     prometheus_addr: ""
 network:
@@ -20,7 +21,7 @@ tx_pool:
     max_slots: 4096
 log_level: DEBUG
 restore_file: ""
-block_time_s: 2
+block_time_s: 20
 ibft_base_time_s: 10
 headers:
     access_control_allow_origins:

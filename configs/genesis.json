@@ -30,9 +30,8 @@
         },
         "chainID": 100,
         "engine": {
-            "ibft-avail": {
-                "epochSize": 100000,
-                "type": "PoA"
+            "avail": {
+                "mechanisms": ["sequencer", "validator"]
             }
         },
         "blockGasTarget": 0

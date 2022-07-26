@@ -9,7 +9,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	golog "github.com/ipfs/go-log/v2"
+	"github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
+)
+
+const (
+	AvailConsensus server.ConsensusType = "avail"
 )
 
 func main() {
@@ -28,6 +33,9 @@ func main() {
 	}
 
 	log.Printf("Server config: %+v", config)
+
+	// Attach the concensus to the server
+	server.RegisterConsensus(AvailConsensus, avail.Factory)
 
 	serverInstance, err := server.NewServer(config)
 	if err != nil {

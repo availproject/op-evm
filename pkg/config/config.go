@@ -53,6 +53,11 @@ func NewServerConfig(path string) (*server.Config, error) {
 		return nil, err
 	}
 
+	nodeType, err := ParseNodeType(rawConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &server.Config{
 		Chain: chain,
 		JSONRPC: &server.JSONRPC{
@@ -91,5 +96,6 @@ func NewServerConfig(path string) (*server.Config, error) {
 		//IBFTBaseTimeout: rawConfig.IBFTBaseTimeout,
 		LogLevel:    hclog.LevelFromString(rawConfig.LogLevel),
 		LogFilePath: rawConfig.LogFilePath,
+		NodeType:    nodeType.String(),
 	}, nil
 }

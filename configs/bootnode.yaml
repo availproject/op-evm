@@ -21,7 +21,7 @@ tx_pool:
     max_slots: 4096
 log_level: DEBUG
 restore_file: ""
-block_time_s: 20
+block_time_s: 4
 ibft_base_time_s: 10
 headers:
     access_control_allow_origins:

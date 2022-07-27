@@ -22,6 +22,7 @@ const (
 type Sender interface {
 	SubmitData(bs []byte) future.Future[Result]
 	SubmitDataWithoutWatch(bs []byte) (*types.Hash, error)
+	SubmitDataAndWaitForStatus(bs []byte, status types.ExtrinsicStatus) future.Future[Result]
 }
 
 // Result contains the final result of block data submission.
@@ -203,13 +204,15 @@ func (s *sender) SubmitDataWithoutWatch(bs []byte) (*types.Hash, error) {
 	}
 
 	nonce := uint32(accountInfo.Nonce)
+
 	o := types.SignatureOptions{
 		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
 		// Hence BlockHash: Genesis Hash.
-		BlockHash:          s.client.GenesisHash(),
-		Era:                types.ExtrinsicEra{IsMortalEra: false},
-		GenesisHash:        s.client.GenesisHash(),
-		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
+		BlockHash:   s.client.GenesisHash(),
+		Era:         types.ExtrinsicEra{IsMortalEra: false},
+		GenesisHash: s.client.GenesisHash(),
+		Nonce:       types.NewUCompactFromUInt(uint64(nonce + 1)),
+		//Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(100),
 		AppID:              types.NewU32(BridgeAppID),
@@ -229,4 +232,118 @@ func (s *sender) SubmitDataWithoutWatch(bs []byte) (*types.Hash, error) {
 	}
 
 	return &hash, nil
+}
+
+// SubmitDataWithoutWatch submits data to Avail and does not wait for the future blocks
+func (s *sender) SubmitDataAndWaitForStatus(bs []byte, dstatus types.ExtrinsicStatus) future.Future[Result] {
+	api := s.client.instance()
+	f := future.New[Result]()
+
+	meta, err := api.RPC.State.GetMetadataLatest()
+	if err != nil {
+		f.SetError(err)
+		return f
+	}
+
+	blob := Blob{
+		Magic: BlobMagic,
+		Data:  bs,
+	}
+
+	var call types.Call
+	{
+		// XXX: This encoding process is an inefficient hack to workaround
+		// problem in the encoding pipeline from client code to Avail server.
+		// `Blob` implements `scale.Encodeable` interface, but it it's passed
+		// directly to `types.NewCall()`, the server will return an error. This
+		// requires further investigation to fix.
+		encodedBytes, err := types.EncodeToBytes(blob)
+		if err != nil {
+			f.SetError(err)
+			return f
+		}
+
+		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
+		if err != nil {
+			f.SetError(err)
+			return f
+		}
+	}
+
+	ext := types.NewExtrinsic(call)
+
+	rv, err := api.RPC.State.GetRuntimeVersionLatest()
+	if err != nil {
+		f.SetError(err)
+		return f
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
+	if err != nil {
+		f.SetError(err)
+		return f
+	}
+
+	var accountInfo types.AccountInfo
+	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
+	if err != nil || !ok {
+		f.SetError(fmt.Errorf("couldn't fetch latest account storage info"))
+		return f
+	}
+
+	nonce := uint32(accountInfo.Nonce)
+	o := types.SignatureOptions{
+		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
+		// Hence BlockHash: Genesis Hash.
+		BlockHash:          s.client.GenesisHash(),
+		Era:                types.ExtrinsicEra{IsMortalEra: false},
+		GenesisHash:        s.client.GenesisHash(),
+		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
+		SpecVersion:        rv.SpecVersion,
+		Tip:                types.NewUCompactFromUInt(100),
+		AppID:              types.NewU32(BridgeAppID),
+		TransactionVersion: rv.TransactionVersion,
+	}
+
+	err = ext.Sign(s.signingKeyPair, o)
+	if err != nil {
+		f.SetError(err)
+		return f
+	}
+
+	sub, err := api.RPC.Author.SubmitAndWatchExtrinsic(ext)
+	if err != nil {
+		f.SetError(err)
+		return f
+	}
+
+	go func() {
+		defer sub.Unsubscribe()
+
+		for {
+			select {
+			case status := <-sub.Chan():
+				if dstatus.IsInBlock {
+					if status.IsInBlock {
+						log.Printf("submitted block is in block.")
+						f.SetValue(Result{})
+						return
+					}
+				} else if dstatus.IsReady {
+					if status.IsReady {
+						log.Printf("submitted block is ready.")
+						f.SetValue(Result{})
+						return
+					}
+				}
+			case err := <-sub.Err():
+				// TODO: Consider re-connecting subscription channel on error?
+				log.Printf("submitted block subscription returned an error: %s", err)
+				f.SetError(err)
+				return
+			}
+		}
+	}()
+
+	return f
 }

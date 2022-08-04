@@ -35,15 +35,15 @@ func NewBlockDataWatcher(client Client, appID uint32, handler BlockDataHandler) 
 		stop:    make(chan struct{}),
 	}
 
-	err := watcher.start()
-	if err != nil {
-		return nil, err
-	}
+	//err := watcher.start()
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	return &watcher, nil
 }
 
-func (bw *BlockDataWatcher) start() error {
+func (bw *BlockDataWatcher) Start() error {
 	api := bw.client.instance()
 
 	meta, err := api.RPC.State.GetMetadataLatest()

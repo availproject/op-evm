@@ -38,6 +38,9 @@ build-server:
 build-client:
 	cd client && go build -o client
 
+build-e2e:
+	cd tools/e2e && go build -o e2e
+
 build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
@@ -46,7 +49,21 @@ build-contract:
 build-edge:
 	cd third_party/polygon-edge && make build
 
+tools-wallet:
+	cd tools/wallet && go build
+
 build: build-server build-client
+
+start-sequencer: build
+	rm -rf data/avail-bootnode-1/blockchain/
+	./server/server -config-file="./configs/bootnode.yaml"
+
+start-validator: build
+	rm -rf data/avail-node-1/blockchain/
+	./server/server -config-file="./configs/node-1.yaml"
+
+start-e2e: build-e2e
+	./tools/e2e/e2e
 
 deps:
 ifeq (, $(shell which polygon-edge))

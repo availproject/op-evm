@@ -9,14 +9,46 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+)
+
+const (
+	// For now hand coded address of the sequencer
+	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer() {
+// TODO: This is just a demo implementation, to get miner address working.
+// Implementing bare minimum out of which, when working correctly we can extract into more
+// proper functions in the future.
+func (d *Avail) getSequencerAccountData() (*keystore.KeyStore, accounts.Account, *keystore.Key, error) {
+	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
+	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(SequencerAddress)})
+	if err != nil {
+		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load sequencer miner account: %s", err)
+	}
+
+	passpharse := "secret"
+	keyjson, err := ks.Export(acc, passpharse, passpharse)
+	if err != nil {
+		return nil, accounts.Account{}, nil, err
+	}
+
+	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
+	if err != nil {
+		return nil, accounts.Account{}, nil, err
+	}
+
+	return ks, acc, privatekey, err
+}
+
+func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {
 	d.logger.Info("sequencer started")
 
 	for {
@@ -29,7 +61,7 @@ func (d *Avail) runSequencer() {
 
 		// There are new transactions in the pool, try to seal them
 		header := d.blockchain.Header()
-		if err := d.writeNewBlock(header); err != nil {
+		if err := d.writeNewBlock(minerKeystore, miner, minerPK, header); err != nil {
 			d.logger.Error("failed to mine block", "err", err)
 		}
 	}
@@ -90,11 +122,11 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (d *Avail) writeNewBlock(parent *types.Header) error {
+func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.Address{},
+		Miner:      types.StringToAddress(minerAccount.Address.Hex()),
 		Nonce:      types.Nonce{},
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
@@ -119,13 +151,10 @@ func (d *Avail) writeNewBlock(parent *types.Header) error {
 
 	header.Timestamp = uint64(headerTime.Unix())
 
-	miner, err := d.GetBlockCreator(header)
-	if err != nil {
-		d.logger.Info("FAILING HERE? 2")
-		return err
-	}
+	// we need to include in the extra field the current set of validators
+	assignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
 
-	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
+	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
 		d.logger.Info("FAILING HERE? 3")
 		return err
@@ -148,20 +177,27 @@ func (d *Avail) writeNewBlock(parent *types.Header) error {
 		Receipts: transition.Receipts(),
 	})
 
-	if err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
-		d.logger.Info("FAILING HERE? 4")
+	// write the seal of the block after all the fields are completed
+	header, err = writeSeal(minerPK.PrivateKey, block.Header)
+	if err != nil {
+		d.logger.Info("FAILING HERE? 5")
 		return err
 	}
 
-	// Write block to the avail
+	block.Header = header
+
+	// compute the hash, this is only a provisional hash since the final one
+	// is sealed after all the committed seals
+	block.Header.ComputeHash()
+
 	if err := d.sendBlockToAvail(block); err != nil {
-		d.logger.Info("FAILING HERE? 5")
+		d.logger.Info("FAILING HERE? 6")
 		return err
 	}
 
 	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlock(block); err != nil {
-		d.logger.Info("FAILING HERE? 6")
+		d.logger.Info("FAILING HERE? 7")
 		return err
 	}
 

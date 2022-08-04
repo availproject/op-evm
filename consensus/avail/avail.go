@@ -109,13 +109,19 @@ func (d *Avail) Initialize() error {
 }
 
 // Start starts the consensus mechanism
+// TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
 
 	// Start the syncer
 	d.syncer.Start()
 
 	if d.nodeType == Sequencer {
-		go d.runSequencer()
+		minerKeystore, minerAccount, minerPk, err := d.getSequencerAccountData()
+		if err != nil {
+			return err
+		}
+
+		go d.runSequencer(minerKeystore, minerAccount, minerPk)
 	}
 
 	if d.nodeType == Validator {
@@ -123,10 +129,6 @@ func (d *Avail) Start() error {
 	}
 
 	return nil
-}
-
-func (d *Avail) runValidator() {
-	d.logger.Info("validator started")
 }
 
 // TODO:
@@ -167,7 +169,47 @@ func (d *Avail) setState(s AvailState) {
 // REQUIRED BASE INTERFACE METHODS //
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
-	// All blocks are valid
+
+	signer, err := addressRecoverFromHeader(header)
+	if err != nil {
+		return err
+	}
+
+	d.logger.Info("Verify header", "signer", signer.String())
+
+	if signer != types.StringToAddress(SequencerAddress) {
+		d.logger.Info("Passing, how is it possible? 222")
+		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
+	}
+
+	d.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
+
+	/*
+		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
+		if !ok {
+			return fmt.Errorf(
+				"unable to get parent header for block number %d",
+				header.Number,
+			)
+		}
+
+		snap, err := i.getSnapshot(parent.Number)
+		if err != nil {
+			return err
+		}
+
+		// verify all the header fields + seal
+		if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
+			return err
+		}
+
+		// verify the committed seals
+		if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
+			return err
+		}
+
+		return nil
+	*/
 	return nil
 }
 
@@ -176,6 +218,7 @@ func (d *Avail) ProcessHeaders(headers []*types.Header) error {
 }
 
 func (d *Avail) GetBlockCreator(header *types.Header) (types.Address, error) {
+	//return addressRecoverFromHeader(header)
 	return header.Miner, nil
 }
 
@@ -203,60 +246,3 @@ func (d *Avail) Close() error {
 
 	return nil
 }
-
-/**
-package main
-​
-import (
-	"flag"
-	"log"
-	"sync"
-​
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-)
-​
-type dataHandler struct {
-	WG sync.WaitGroup
-}
-​
-func (bh *dataHandler) HandleData(bs []byte) error {
-	log.Printf("block handler: received batch w/ %d bytes\n", len(bs))
-	bh.WG.Done()
-	return nil
-}
-func (bh *dataHandler) HandleError(err error) {
-	log.Printf("block handler: error %#v\n", err)
-	bh.WG.Done()
-}
-​
-var rpcUrlFlag = flag.String("rpc-url", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
-​
-func main() {
-	flag.Parse()
-​
-	client, err := avail.NewClient(*rpcUrlFlag)
-	if err != nil {
-		log.Fatal(err)
-	}
-​
-	sender := avail.NewSender(client, signature.TestKeyringPairAlice)
-	handler := &dataHandler{}
-	handler.WG.Add(1)
-	watcher, err := avail.NewBlockDataWatcher(client, avail.BridgeAppID, handler)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer watcher.Stop()
-​
-	data := []byte("foobar quux")
-	f := sender.SubmitData(data)
-	_, err = f.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-​
-	log.Println("got Result. All good.")
-	handler.WG.Wait()
-}
-**/

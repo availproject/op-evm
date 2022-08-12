@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	// ValidatorExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
-	ValidatorExtraVanity = 32
+	// SequencerExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
+	SequencerExtraVanity = 32
 )
 
 var zeroBytes = make([]byte, 32)
@@ -18,10 +18,10 @@ var zeroBytes = make([]byte, 32)
 func assignExtraValidators(h *types.Header, validators []types.Address) {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
-	if len(extra) < ValidatorExtraVanity {
-		extra = append(extra, zeroBytes[:ValidatorExtraVanity-len(extra)]...)
+	if len(extra) < SequencerExtraVanity {
+		extra = append(extra, zeroBytes[:SequencerExtraVanity-len(extra)]...)
 	} else {
-		extra = extra[:ValidatorExtraVanity]
+		extra = extra[:SequencerExtraVanity]
 	}
 
 	ibftExtra := &ValidatorExtra{
@@ -38,10 +38,10 @@ func assignExtraValidators(h *types.Header, validators []types.Address) {
 func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
-	if len(extra) < ValidatorExtraVanity {
-		extra = append(extra, zeroBytes[:ValidatorExtraVanity-len(extra)]...)
+	if len(extra) < SequencerExtraVanity {
+		extra = append(extra, zeroBytes[:SequencerExtraVanity-len(extra)]...)
 	} else {
-		extra = extra[:ValidatorExtraVanity]
+		extra = extra[:SequencerExtraVanity]
 	}
 
 	data := istanbulExtra.MarshalRLPTo(nil)
@@ -53,11 +53,11 @@ func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 
 // getValidatorExtra returns the istanbul extra data field from the passed in header
 func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
-	if len(h.ExtraData) < ValidatorExtraVanity {
+	if len(h.ExtraData) < SequencerExtraVanity {
 		return nil, fmt.Errorf("wrong extra size: %d", len(h.ExtraData))
 	}
 
-	data := h.ExtraData[ValidatorExtraVanity:]
+	data := h.ExtraData[SequencerExtraVanity:]
 	extra := &ValidatorExtra{}
 
 	if err := extra.UnmarshalRLP(data); err != nil {

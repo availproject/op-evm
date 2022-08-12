@@ -31,6 +31,11 @@ bootstrap-genesis:
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
+build-fraud-contract:
+	solc --abi tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
+	solc --bin tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
+	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
+
 
 build-server:
 	cd server && go build -o server
@@ -40,6 +45,9 @@ build-client:
 
 build-e2e:
 	cd tools/e2e && go build -o e2e
+
+build-fraud: build-fraud-contract
+	cd tools/fraud && go build -o fraud
 
 build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
@@ -65,12 +73,19 @@ start-validator: build
 start-e2e: build-e2e
 	./tools/e2e/e2e
 
+
+start-fraud: build-fraud
+	./tools/fraud/fraud
+
+
 deps:
-ifeq (, $(shell which polygon-edge))
+ifeq (, $(shell which $(POLYGON_EDGE_BIN)))
 	git submodule update --init third_party/polygon-edge
 	cd third_party/polygon-edge && \
 	make build && \
 	mv main $(POLYGON_EDGE_BIN)
 endif
+	yarn install
+	sh ./scripts/install_solc.sh
 
 .PHONY: deps bootstrap

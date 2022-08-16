@@ -19,8 +19,16 @@ pushed to Avail.
 Corresponding sequencer node is also responsible to defend itself, in case a
 watch tower node finds out any mismatches from a block.
 
-In the first phase, there is a single sequencer node.
+In the first phase, there is a single active sequencer node at a time.
 
+### Sequencer Node Selection
+
+Sequencer node is selected by competition where first staking sequencer at a time yields the sequencer position.
+
+The sequencer candidates send a special block to Avail, containing a transaction
+where they deposit a stake. When there are no active sequencers, the first block that validators process through Avail, yields the sequencer a position and rest of the blocks (in case there are many) are ignored.
+
+Similarly, if there is the aforementioned special block submitted to Avail, when there is no need for a new sequencer, this block is ignored and ideally the submitter could be penalized for submitting it to discourage unnecessary spamming(?).
 
 ### Validator Nodes
 
@@ -106,13 +114,11 @@ The validators now rewind their local blockchains back to point before the block
 
 ![Validators re-execute transactions from the block under dispute](challenge-game-validators-reexecute.svg)
 
-Once validators have come up with results, whether the disputed block is valid or not, they must vote amongst themselves, whether they agree on the result or not. They must also coordinate, which one writes the result into Avail.
-
-In case the disputed block is deemed invalid, the sequncer will be slashed and watch tower rewarded. The invalid block gets dismissed from the blockchain, and replaced with a new one.
+In case the disputed block is deemed invalid, the sequncer will be slashed and watch tower rewarded. The invalid block gets dismissed from the blockchain, and replaced with a new one. To perform these required transactions, a new sequencer must be found, using the [sequencer node selection mechanism.](#sequencer-node-selection) Ideally one of the validators becomes a new sequencer, but alternatively, one could be looked for by broadcasting a signal via P2P network.
 
 ![Validators slash sequencer and reward watch tower](challenge-game-sequencer-slashed.svg)
 
-In case the disputed block comes out as valid, the watch tower loses its stake and sequencer gets rewarded.
+In case the disputed block comes out as valid, the watch tower loses its stake and sequencer gets rewarded. In this case the sequencer was deemed to be honest and therefore doesn't need replacement. The slashing transactions for watch tower are submitted through the existing sequencer.
 
 ![Watcher tower gets slashed and sequencer rewarded](challenge-game-watchtower-slashed.svg)
 

@@ -55,11 +55,11 @@ contract Staking {
         return _validators;
     }
 
-    function isValidator(address addr) public view returns (bool) {
+    function IsValidator(address addr) public view returns (bool) {
         return _addressToIsValidator[addr];
     }
 
-    function accountStake(address addr) public view returns (uint256) {
+    function AccountStake(address addr) public view returns (uint256) {
         return _addressToStakedAmount[addr];
     }
 

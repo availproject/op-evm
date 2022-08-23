@@ -54,6 +54,13 @@ build-contract:
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
 
+
+build-staking-contract:
+	solc --abi contracts/staking/Staking.sol -o contracts/staking/ --overwrite
+	solc --bin contracts/staking/Staking.sol -o contracts/staking/ --overwrite
+	abigen --bin=./contracts/staking/Staking.bin --abi=./contracts/staking/Staking.abi --pkg=staking --out=./contracts/staking/Staking.go
+
+
 build-edge:
 	cd third_party/polygon-edge && make build
 

@@ -3,19 +3,23 @@ package avail
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
 
-type ValidatorSet []types.Address
-
-type dataHandler struct {
-	blockchain *blockchain.Blockchain
+type FraudProof struct {
+	types.Block
 }
 
-func (dh *dataHandler) HandleData(bs []byte) error {
+type watchTower struct {
+	blockchain   *blockchain.Blockchain
+	fraudproofFn func(block types.Block) FraudProof
+}
+
+func (wt *watchTower) HandleData(bs []byte) error {
 	log.Printf("block handler: received batch w/ %d bytes\n", len(bs))
 
 	block := types.Block{}
@@ -23,11 +27,14 @@ func (dh *dataHandler) HandleData(bs []byte) error {
 		return err
 	}
 
-	if err := dh.blockchain.VerifyFinalizedBlock(&block); err != nil {
-		return fmt.Errorf("unable to verify block, %w", err)
+	if err := wt.blockchain.VerifyFinalizedBlock(&block); err != nil {
+		log.Printf("block %d (%q) cannot be verified: %s", block.Number(), block.Hash(), err)
+		_ = wt.fraudproofFn(block)
+		// TODO: Deal with fraudproof
+		return nil
 	}
 
-	if err := dh.blockchain.WriteBlock(&block); err != nil {
+	if err := wt.blockchain.WriteBlock(&block); err != nil {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 
@@ -36,45 +43,56 @@ func (dh *dataHandler) HandleData(bs []byte) error {
 
 	return nil
 }
-func (dh *dataHandler) HandleError(err error) {
+
+func (wt *watchTower) HandleError(err error) {
 	log.Printf("block handler: error %#v\n", err)
 }
 
-func (d *Avail) runValidator() error {
-	d.logger.Info("validator started")
+func (d *Avail) runWatchTower() {
+	d.logger.Info("watch tower started")
 
 	// consensus always starts in SyncState mode in case it needs
 	// to sync with Avail and/or other nodes.
 	d.setState(SyncState)
 
-	handler := &dataHandler{blockchain: d.blockchain}
+	handler := &watchTower{
+		blockchain:   d.blockchain,
+		fraudproofFn: func(blk types.Block) FraudProof { panic(blk) },
+	}
 
 	watcher, err := avail.NewBlockDataWatcher(d.availClient, avail.BridgeAppID, handler)
 	if err != nil {
-		return err
-	}
-
-	if err := watcher.Start(); err != nil {
-		return err
+		return
 	}
 
 	defer watcher.Stop()
 
-	// TODO: Figure out where do we need state cycle and how to implement it.
-	// Current version only starts the cycles for the future, doing nothing with it.
+	// TODO: Following state machine drive loop was copied from validator. It
+	// is unclear right now, if it's _really_ needed.
+
+	var once sync.Once
 	for {
 		select {
 		case <-d.closeCh:
-			return nil
+			return
 		default: // Default is here because we would block until we receive something in the closeCh
 		}
 
+		if d.isState(WatchTowerState) {
+			once.Do(func() {
+				err := watcher.Start()
+				if err != nil {
+					panic(err)
+				}
+			})
+		}
+
 		// Start the state machine loop
-		d.runValidatorCycle()
+		d.runWatchTowerCycle()
 	}
 }
 
-func (d *Avail) runValidatorCycle() {
+func (d *Avail) runWatchTowerCycle() {
 	// Based on the current state, execute the corresponding section
 	switch d.getState() {
 	case AcceptState:
@@ -85,17 +103,9 @@ func (d *Avail) runValidatorCycle() {
 
 	case SyncState:
 		d.runSyncState()
-	}
-}
 
-func (d *Avail) runValidateState() {
-	if !d.isState(ValidateState) {
+	case WatchTowerState:
 		return
 	}
-}
 
-func (d *Avail) runAcceptState() {
-	if !d.isState(AcceptState) {
-		return
-	}
 }

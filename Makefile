@@ -70,6 +70,10 @@ start-validator: build
 	rm -rf data/avail-node-1/blockchain/
 	./server/server -config-file="./configs/node-1.yaml"
 
+start-watchtower: build
+	rm -rf data/avail-watchtower-1/blockchain/
+	./server/server -config-file="./configs/watchtower-1.yaml"
+
 start-e2e: build-e2e
 	./tools/e2e/e2e
 

@@ -128,12 +128,11 @@ func (d *Avail) Start() error {
 		go d.runValidator()
 	}
 
-	return nil
-}
+	if d.nodeType == WatchTower {
+		go d.runWatchTower()
+	}
 
-// TODO:
-func (d *Avail) runWatchtower() {
-	d.logger.Info("watch tower started")
+	return nil
 }
 
 /* func (d *Avail) sendBlockToAvail(block *types.Block) error {

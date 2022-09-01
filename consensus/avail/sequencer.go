@@ -2,6 +2,7 @@ package avail
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -11,41 +12,11 @@ import (
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
-)
-
-const (
-	// For now hand coded address of the sequencer
-	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
-}
-
-// TODO: This is just a demo implementation, to get miner address working.
-// Implementing bare minimum out of which, when working correctly we can extract into more
-// proper functions in the future.
-func (d *Avail) getSequencerAccountData() (*keystore.KeyStore, accounts.Account, *keystore.Key, error) {
-	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
-	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(SequencerAddress)})
-	if err != nil {
-		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load sequencer miner account: %s", err)
-	}
-
-	passpharse := "secret"
-	keyjson, err := ks.Export(acc, passpharse, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	return ks, acc, privatekey, err
 }
 
 func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {
@@ -190,9 +161,16 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	// is sealed after all the committed seals
 	block.Header.ComputeHash()
 
-	if err := d.sendBlockToAvail(block); err != nil {
+	err, malicious := d.sendBlockToAvail(block)
+	if err != nil {
 		d.logger.Info("FAILING HERE? 6")
 		return err
+	}
+
+	if malicious {
+		// Don't write malicious block into blockchain. It messes up the parent
+		// state of blocks when validator nor watch tower has it.
+		return nil
 	}
 
 	// Write the block to the blockchain
@@ -210,14 +188,24 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	return nil
 }
 
-func (d *Avail) sendBlockToAvail(block *types.Block) error {
+func (d *Avail) sendBlockToAvail(block *types.Block) (error, bool) {
+	malicious := false
 	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
+
+	// XXX: Test watch tower and validator. This breaks a block every now and then.
+	if rand.Intn(3) == 2 {
+		d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
+		block.Header.StateRoot[0] = 42
+		malicious = true
+	}
+
 	d.logger.Info("Submitting block to avail...")
 	f := sender.SubmitDataAndWaitForStatus(block.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
 	if _, err := f.Result(); err != nil {
 		d.logger.Error("Error while submitting data to avail", err)
-		return err
+		return err, malicious
 	}
+
 	d.logger.Info("Submitted block to avail", "block", block.Header.Number)
-	return nil
+	return nil, malicious
 }

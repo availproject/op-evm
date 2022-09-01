@@ -15,8 +15,19 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+)
+
+const (
+	// For now hand coded address of the sequencer
+	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
+
+	// For now hand coded address of the watch tower
+	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
 type syncerInterface interface {
@@ -116,7 +127,7 @@ func (d *Avail) Start() error {
 	d.syncer.Start()
 
 	if d.nodeType == Sequencer {
-		minerKeystore, minerAccount, minerPk, err := d.getSequencerAccountData()
+		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
 		if err != nil {
 			return err
 		}
@@ -129,7 +140,12 @@ func (d *Avail) Start() error {
 	}
 
 	if d.nodeType == WatchTower {
-		go d.runWatchTower()
+		_, wtAccount, wtPK, err := getAccountData(WatchTowerAddress)
+		if err != nil {
+			return err
+		}
+
+		go d.runWatchTower(wtAccount, wtPK)
 	}
 
 	return nil
@@ -244,4 +260,28 @@ func (d *Avail) Close() error {
 	close(d.closeCh)
 
 	return nil
+}
+
+// TODO: This is just a demo implementation, to get miner & watch tower
+// addresses working. Implementing bare minimum out of which, when working
+// correctly we can extract into more proper functions in the future.
+func getAccountData(address string) (*keystore.KeyStore, accounts.Account, *keystore.Key, error) {
+	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
+	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(address)})
+	if err != nil {
+		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load sequencer miner account: %s", err)
+	}
+
+	passpharse := "secret"
+	keyjson, err := ks.Export(acc, passpharse, passpharse)
+	if err != nil {
+		return nil, accounts.Account{}, nil, err
+	}
+
+	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
+	if err != nil {
+		return nil, accounts.Account{}, nil, err
+	}
+
+	return ks, acc, privatekey, err
 }

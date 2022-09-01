@@ -11,7 +11,7 @@ func TestWatchTower(t *testing.T) {
 	b := blockchain.NewTestBlockchain(t, nil)
 
 	fraudProofGenerated := false
-	fpFn := func(block types.Block) FraudProof { fraudProofGenerated = true; return FraudProof{} }
+	fpFn := func(block types.Block) types.Block { fraudProofGenerated = true; return types.Block{} }
 
 	wt := watchTower{
 		blockchain:   b,

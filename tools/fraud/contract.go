@@ -14,7 +14,7 @@ import (
 	fraud "github.com/maticnetwork/avail-settlement/tools/fraud/contract"
 )
 
-func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*common.Address, *types.Transaction, error) {
+func deployContract(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account) (*common.Address, *types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {
 		return nil, nil, err
@@ -41,7 +41,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 		return nil, nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(700000) // in units

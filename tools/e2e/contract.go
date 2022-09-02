@@ -42,7 +42,10 @@ func deployContract(client *ethclient.Client, chainID *big.Int, ks *keystore.Key
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units

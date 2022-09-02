@@ -17,6 +17,8 @@ import (
 	setget "github.com/maticnetwork/avail-settlement/contracts/setget"
 )
 
+var chainID = big.NewInt(100)
+
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_inspect","params":[],"id":1}'
 
@@ -227,7 +229,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units
@@ -273,7 +278,10 @@ func writeToContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccoun
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units

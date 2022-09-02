@@ -178,7 +178,10 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 		return nil, err
 	}
 
-	ks.Unlock(fromAccount, "secret")
+	err = ks.Unlock(fromAccount, "secret")
+	if err != nil {
+		return nil, err
+	}
 
 	signedTx, err := ks.SignTx(fromAccount, tx, chainID)
 	if err != nil {
@@ -207,7 +210,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {
@@ -250,7 +256,10 @@ func writeToContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccoun
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {

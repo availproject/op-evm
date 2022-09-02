@@ -26,7 +26,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {
@@ -64,7 +67,10 @@ func writeToContract(client *ethclient.Client, chainID *big.Int, ks *keystore.Ke
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {

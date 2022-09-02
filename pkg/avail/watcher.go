@@ -124,7 +124,10 @@ func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, callIdx types
 					}
 				}
 
-				bw.handler.HandleData(blob.Data)
+				err = bw.handler.HandleData(blob.Data)
+				if err != nil {
+					log.Printf("block %d extrinsic %d: data handler returned an error: %s", head.Number, i, err)
+				}
 			}
 		case err := <-sub.Err():
 			log.Printf("block watcher error: %s", err)

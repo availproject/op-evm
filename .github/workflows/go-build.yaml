@@ -24,4 +24,4 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --skip-dirs=third_party
+          args: --skip-dirs=third_party --timeout 5m

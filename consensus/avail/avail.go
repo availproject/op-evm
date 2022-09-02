@@ -40,8 +40,8 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	validatorKey     *ecdsa.PrivateKey // Private key for the validator
-	validatorKeyAddr types.Address
+	validatorKey     *ecdsa.PrivateKey // nolint:unused // Private key for the validator
+	validatorKeyAddr types.Address     // nolint:unused
 
 	syncer syncerInterface // Reference to the sync protocol
 
@@ -51,7 +51,7 @@ type Avail struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 
-	updateCh chan struct{} // Update channel
+	updateCh chan struct{} // nolint:unused // Update channel
 
 	network        *network.Server // Reference to the networking layer
 	secretsManager secrets.SecretsManager
@@ -131,7 +131,7 @@ func (d *Avail) Start() error {
 	return nil
 }
 
-// TODO:
+// nolint:unused // TODO:
 func (d *Avail) runWatchtower() {
 	d.logger.Info("watch tower started")
 }

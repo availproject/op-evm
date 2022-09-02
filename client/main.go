@@ -25,6 +25,7 @@ func getKeystoreAccounts() (*keystore.KeyStore, error) {
 	return ks, nil
 }
 
+// nolint:unused
 func createKs() {
 	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
 	password := "secret"
@@ -196,6 +197,7 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 	return tx, nil
 }
 
+// nolint:unused
 func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {

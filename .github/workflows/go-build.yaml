@@ -1,4 +1,4 @@
-name: golangci-lint
+name: go-build
 on:
   push:
     tags:
@@ -25,3 +25,17 @@ jobs:
         with:
           version: latest
           args: --skip-dirs=third_party --timeout 5m
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: test
+        run: go test ./...
+      - name: build
+        run: go build ./...

@@ -13,6 +13,7 @@ const (
 	ValidateState
 	CommitState
 	SyncState
+	WatchTowerState
 )
 
 // String returns the string representation of the passed in state

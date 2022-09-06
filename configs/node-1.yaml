@@ -12,9 +12,9 @@ network:
     libp2p_addr: :20001
     nat_addr: ""
     dns_addr: ""
-    max_peers: -1
-    max_outbound_peers: -1
-    max_inbound_peers: -1
+    max_peers: 40
+    max_outbound_peers: 32
+    max_inbound_peers: 8
 seal: true
 tx_pool:
     price_limit: 0

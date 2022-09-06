@@ -9,10 +9,10 @@ import (
 
 var (
 	// SequencerExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
-	SequencerExtraVanity = 32
+	SequencerExtraVanity = 128
 )
 
-var zeroBytes = make([]byte, 32)
+var zeroBytes = make([]byte, 128)
 
 // assignExtraValidators is a helper method that adds validators to the extra field in the header
 func assignExtraValidators(h *types.Header, validators []types.Address) {

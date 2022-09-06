@@ -17,6 +17,8 @@ import (
 	setget "github.com/maticnetwork/avail-settlement/contracts/setget"
 )
 
+var chainID = big.NewInt(100)
+
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_inspect","params":[],"id":1}'
 
@@ -25,6 +27,7 @@ func getKeystoreAccounts() (*keystore.KeyStore, error) {
 	return ks, nil
 }
 
+// nolint:unused
 func createKs() {
 	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
 	password := "secret"
@@ -178,7 +181,10 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 		return nil, err
 	}
 
-	ks.Unlock(fromAccount, "secret")
+	err = ks.Unlock(fromAccount, "secret")
+	if err != nil {
+		return nil, err
+	}
 
 	signedTx, err := ks.SignTx(fromAccount, tx, chainID)
 	if err != nil {
@@ -193,6 +199,7 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 	return tx, nil
 }
 
+// nolint:unused
 func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {
@@ -207,7 +214,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {
@@ -219,7 +229,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units
@@ -250,7 +263,10 @@ func writeToContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccoun
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {
@@ -262,7 +278,10 @@ func writeToContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccoun
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units

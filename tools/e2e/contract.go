@@ -14,7 +14,8 @@ import (
 	"github.com/maticnetwork/avail-settlement/contracts/setget"
 )
 
-func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*types.Transaction, error) {
+// nolint:unused
+func deployContract(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account) (*types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {
 		log.Fatal(err)
@@ -26,7 +27,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {
@@ -38,7 +42,10 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 		return nil, err
 	}
 
-	auth := bind.NewKeyedTransactor(privatekey.PrivateKey)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(300000) // in units
@@ -55,6 +62,7 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	return tx, nil
 }
 
+// nolint:unused
 func writeToContract(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account, instance *setget.Setget, val *big.Int) (*types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {
@@ -69,7 +77,10 @@ func writeToContract(client *ethclient.Client, chainID *big.Int, ks *keystore.Ke
 	}
 
 	passpharse := "secret"
-	ks.Unlock(fromAccount, passpharse)
+	err = ks.Unlock(fromAccount, passpharse)
+	if err != nil {
+		return nil, err
+	}
 
 	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
 	if err != nil {

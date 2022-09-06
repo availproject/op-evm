@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// nolint:unused
 func createKeystore() {
 	ks := keystore.NewKeyStore(WalletsDir, keystore.StandardScryptN, keystore.StandardScryptP)
 	password := DefaultWalletPassphrase

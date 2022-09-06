@@ -40,7 +40,7 @@ func (dh *dataHandler) HandleError(err error) {
 	log.Printf("block handler: error %#v\n", err)
 }
 
-func (d *Avail) runValidator() error {
+func (d *Avail) runValidator() {
 	d.logger.Info("validator started")
 
 	// consensus always starts in SyncState mode in case it needs
@@ -51,11 +51,11 @@ func (d *Avail) runValidator() error {
 
 	watcher, err := avail.NewBlockDataWatcher(d.availClient, avail.BridgeAppID, handler)
 	if err != nil {
-		return err
+		panic("couldn't create new avail block watcher: " + err.Error())
 	}
 
 	if err := watcher.Start(); err != nil {
-		return err
+		panic("watcher start failed: " + err.Error())
 	}
 
 	defer watcher.Stop()
@@ -65,7 +65,7 @@ func (d *Avail) runValidator() error {
 	for {
 		select {
 		case <-d.closeCh:
-			return nil
+			return
 		default: // Default is here because we would block until we receive something in the closeCh
 		}
 

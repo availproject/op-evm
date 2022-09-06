@@ -19,8 +19,12 @@ import (
 )
 
 var (
+	// ErrParentBlockNotFound is returned when the local blockchain doesn't
+	// contain block for the referenced parent hash.
 	ErrParentBlockNotFound = errors.New("parent block not found")
 
+	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
+	// malicious block hash in `ExtraData` of the fraudproof block header.
 	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
 )
 
@@ -134,10 +138,6 @@ func (d *Avail) runWatchTowerCycle() {
 	}
 }
 
-type Fraudproof struct {
-	Block types.Hash
-}
-
 func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTowerPK *keystore.Key, maliciousBlock types.Block) (types.Block, error) {
 	header := &types.Header{
 		ParentHash: maliciousBlock.ParentHash(),
@@ -198,9 +198,7 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 			panic(err)
 		}
 
-		for i, b := range rlpExtraData {
-			header.ExtraData[i] = b
-		}
+		copy(header.ExtraData, rlpExtraData)
 
 		ve := &ValidatorExtra{}
 		bs := ve.MarshalRLPTo(nil)

@@ -204,7 +204,9 @@ ownerBalanceTransferGoto:
 		}
 	}
 
-	contractAddress, _, err := deployContract(sequencerClient, ks, ownerAccount)
+	chainID, _ := sequencerClient.ChainID(context.Background())
+
+	contractAddress, _, err := deployContract(sequencerClient, chainID, ks, ownerAccount)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -261,8 +263,6 @@ contractDeployedGoto:
 	}
 
 	log.Printf("Contract -> BEFORE SET -> Get() -> Response: %v", getVal)
-
-	chainID, _ := sequencerClient.ChainID(context.Background())
 
 	setTx, err := writeToContract(
 		sequencerClient,

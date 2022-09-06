@@ -35,7 +35,10 @@ func main() {
 	log.Printf("Server config: %+v", config)
 
 	// Attach the concensus to the server
-	server.RegisterConsensus(AvailConsensus, avail.Factory)
+	err = server.RegisterConsensus(AvailConsensus, avail.Factory)
+	if err != nil {
+		log.Fatalf("failure to register consensus: %s", err)
+	}
 
 	serverInstance, err := server.NewServer(config)
 	if err != nil {

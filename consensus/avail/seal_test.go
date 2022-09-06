@@ -23,9 +23,7 @@ func Test_writeSeal(t *testing.T) {
 		panic(err)
 	}
 
-	for i, b := range rlpExtraData {
-		hdr.ExtraData[i] = b
-	}
+	copy(hdr.ExtraData, rlpExtraData)
 
 	ve := &ValidatorExtra{}
 	bs := ve.MarshalRLPTo(nil)
@@ -33,7 +31,7 @@ func Test_writeSeal(t *testing.T) {
 
 	key := keystore.NewKeyForDirectICAP(rand.Reader)
 
-	hdr, err = writeSeal(key.PrivateKey, hdr)
+	_, err = writeSeal(key.PrivateKey, hdr)
 	if err != nil {
 		t.Fatal(err)
 	}

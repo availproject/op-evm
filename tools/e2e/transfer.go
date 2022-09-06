@@ -32,7 +32,10 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 		return nil, err
 	}
 
-	ks.Unlock(fromAccount, DefaultWalletPassphrase)
+	err = ks.Unlock(fromAccount, DefaultWalletPassphrase)
+	if err != nil {
+		return nil, err
+	}
 
 	signedTx, err := ks.SignTx(fromAccount, tx, chainID)
 	if err != nil {
@@ -45,7 +48,10 @@ func transferEth(client *ethclient.Client, ks *keystore.KeyStore, fromAccount ac
 	}
 
 	// Lock account back again...
-	ks.Lock(fromAccount.Address)
+	err = ks.Lock(fromAccount.Address)
+	if err != nil {
+		return nil, err
+	}
 
 	return tx, nil
 }

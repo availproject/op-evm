@@ -46,7 +46,7 @@ func (dh *dataHandler) HandleData(bs []byte) error {
 		return fmt.Errorf("unable to verify block, %w", err)
 	}
 
-	if err := dh.blockchain.WriteBlock(&block); err != nil {
+	if err := dh.blockchain.WriteBlock(&block, "not-sure-what-source-yet-is"); err != nil {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 

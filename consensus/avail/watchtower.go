@@ -49,7 +49,7 @@ func (wt *watchTower) HandleData(bs []byte) error {
 		return nil
 	}
 
-	if err := wt.blockchain.WriteBlock(&block); err != nil {
+	if err := wt.blockchain.WriteBlock(&block, "not-sure-yet-what-source-is"); err != nil {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 
@@ -142,7 +142,7 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 	header := &types.Header{
 		ParentHash: maliciousBlock.ParentHash(),
 		Number:     maliciousBlock.Number(),
-		Miner:      types.StringToAddress(watchTowerAccount.Address.Hex()),
+		Miner:      watchTowerAccount.Address.Bytes(),
 		Nonce:      types.Nonce{},
 		GasLimit:   maliciousBlock.Header.GasLimit, // TODO(tuommaki): This needs adjusting.
 		Timestamp:  uint64(time.Now().Unix()),

@@ -97,7 +97,7 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.StringToAddress(minerAccount.Address.Hex()),
+		Miner:      minerAccount.Address.Bytes(),
 		Nonce:      types.Nonce{},
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
@@ -174,7 +174,7 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	}
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block); err != nil {
+	if err := d.blockchain.WriteBlock(block, "not-sure-what-source-yet-is"); err != nil {
 		d.logger.Info("FAILING HERE? 7")
 		return err
 	}

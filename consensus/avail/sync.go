@@ -2,9 +2,7 @@ package avail
 
 import (
 	"errors"
-	"time"
 
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -17,45 +15,66 @@ func (d *Avail) runSyncState() {
 		return
 	}
 
-	var bestPeer *protocol.SyncPeer
-
-	deadline := time.Now().Add(30 * time.Second)
-	for bestPeer == nil && time.Now().Before(deadline) {
-		bestPeer = d.syncer.BestPeer()
-		if bestPeer == nil {
-			// Wait for best peer to come online.
-			time.Sleep(1 * time.Second)
-		}
+	callInsertBlockHook := func(block *types.Block) bool {
+		d.logger.Debug("syncing block %d", block.Number())
+		d.txpool.ResetWithHeaders(block.Header)
+		return false
 	}
 
-	if bestPeer == nil {
-		return
+	switch d.nodeType {
+	case Sequencer:
+		d.setState(AcceptState)
+	case Validator:
+		d.setState(ValidateState)
+	case WatchTower:
+		d.setState(WatchTowerState)
 	}
 
-	curHdr := d.blockchain.Header()
-	if curHdr == nil {
-		panic("blockchain is uninitialized")
+	if err := d.syncer.Sync(
+		callInsertBlockHook,
+	); err != nil {
+		d.logger.Error("watch sync failed", "err", err)
 	}
 
-	if bestPeer.Number() <= curHdr.Number {
-		d.logger.Debug("no need to sync")
+	/* 	var bestPeer *protocol.SyncPeer
 
-		switch d.nodeType {
-		case Sequencer:
-			d.setState(AcceptState)
-		case Validator:
-			d.setState(ValidateState)
-		case WatchTower:
-			d.setState(WatchTowerState)
-		}
+	   	deadline := time.Now().Add(30 * time.Second)
+	   	for bestPeer == nil && time.Now().Before(deadline) {
+	   		bestPeer = d.syncer.BestPeer()
+	   		if bestPeer == nil {
+	   			// Wait for best peer to come online.
+	   			time.Sleep(1 * time.Second)
+	   		}
+	   	}
 
-		return
-	}
+	   	if bestPeer == nil {
+	   		return
+	   	}
 
-	d.runFullSync(bestPeer)
+	   	curHdr := d.blockchain.Header()
+	   	if curHdr == nil {
+	   		panic("blockchain is uninitialized")
+	   	}
+
+	   	if bestPeer.Number() <= curHdr.Number {
+	   		d.logger.Debug("no need to sync")
+
+	   		switch d.nodeType {
+	   		case Sequencer:
+	   			d.setState(AcceptState)
+	   		case Validator:
+	   			d.setState(ValidateState)
+	   		case WatchTower:
+	   			d.setState(WatchTowerState)
+	   		}
+
+	   		return
+	   	}
+
+	   	d.runFullSync(bestPeer) */
 }
 
-func (d *Avail) runFullSync(peer *protocol.SyncPeer) {
+/* func (d *Avail) runFullSync(peer *protocol.SyncPeer) {
 	newBlockHandler := func(b *types.Block) {
 		d.logger.Debug("syncing block %d", b.Number())
 	}
@@ -65,3 +84,4 @@ func (d *Avail) runFullSync(peer *protocol.SyncPeer) {
 		d.logger.Error("bulk sync failed: %s", err)
 	}
 }
+*/

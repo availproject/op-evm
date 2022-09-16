@@ -10,7 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/syncer"
+
+	//"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -30,15 +32,6 @@ const (
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
-}
-
 // Dev consensus protocol seals any new transaction immediately
 type Avail struct {
 	logger      hclog.Logger
@@ -46,15 +39,14 @@ type Avail struct {
 	mechanisms  []MechanismType
 	nodeType    MechanismType
 
-	state *currentState // Reference to the current state
+	state  *currentState // Reference to the current state
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
 	validatorKey     *ecdsa.PrivateKey // nolint:unused // Private key for the validator
 	validatorKeyAddr types.Address     // nolint:unused
-
-	syncer syncerInterface // Reference to the sync protocol
 
 	interval uint64
 	txpool   *txpool.TxPool
@@ -71,7 +63,7 @@ type Avail struct {
 
 // Factory implements the base factory method
 func Factory(
-	params *consensus.ConsensusParams,
+	params *consensus.Params,
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
@@ -81,12 +73,18 @@ func Factory(
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		txpool:         params.Txpool,
+		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,
 		blockTime:      time.Duration(params.BlockTime) * time.Second,
 		state:          newState(),
 		nodeType:       MechanismType(params.NodeType),
+		syncer: syncer.NewSyncer(
+			params.Logger,
+			params.Network,
+			params.Blockchain,
+			time.Duration(params.BlockTime)*3*time.Second,
+		),
 	}
 
 	var err error
@@ -109,7 +107,7 @@ func Factory(
 		d.interval = interval
 	}
 
-	d.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	//d.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 
 	return d, nil
 }
@@ -124,7 +122,9 @@ func (d *Avail) Initialize() error {
 func (d *Avail) Start() error {
 
 	// Start the syncer
-	d.syncer.Start()
+	if err := d.syncer.Start(); err != nil {
+		return err
+	}
 
 	if d.nodeType == Sequencer {
 		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
@@ -228,13 +228,18 @@ func (d *Avail) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (d *Avail) PreCommitState(_header *types.Header, _txn *state.Transition) error {
+	return nil
+}
+
 func (d *Avail) ProcessHeaders(headers []*types.Header) error {
 	return nil
 }
 
 func (d *Avail) GetBlockCreator(header *types.Header) (types.Address, error) {
 	//return addressRecoverFromHeader(header)
-	return header.Miner, nil
+	return types.BytesToAddress(header.Miner), nil
 }
 
 // PreStateCommit a hook to be called before finalizing state transition on inserting block
@@ -243,7 +248,7 @@ func (d *Avail) PreStateCommit(_header *types.Header, _txn *state.Transition) er
 }
 
 func (d *Avail) GetSyncProgression() *progress.Progression {
-	return d.syncer.GetSyncProgression()
+	return nil //d.syncer.GetSyncProgression()
 }
 
 func (d *Avail) Prepare(header *types.Header) error {

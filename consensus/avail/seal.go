@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -76,7 +75,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
 	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
-	vv.Set(arena.NewBytes(h.Miner.Bytes()))
+	vv.Set(arena.NewBytes(h.Miner))
 	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
@@ -96,7 +95,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 func commitMsg(b []byte) []byte {
 	// message that the nodes need to sign to commit to a block
 	// hash with COMMIT_MSG_CODE which is the same value used in quorum
-	return crypto.Keccak256(b, []byte{byte(proto.MessageReq_Commit)})
+	return crypto.Keccak256(b, []byte{}) // []byte{byte(proto.MessageReq_Commit)}
 }
 
 func addressRecoverFromHeader(h *types.Header) (types.Address, error) {

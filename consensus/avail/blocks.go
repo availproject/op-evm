@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
 	stakingHelper "github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -29,7 +30,6 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// calculate gas limit based on parent header
 	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 1")
 		return nil, err
 	}
 
@@ -104,6 +104,12 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 		}, **/
 	}
 
+	stakeErr := Stake(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
+	if stakeErr != nil {
+		d.logger.Error("failed to query sequencers", "err", stakeErr)
+		return nil, stakeErr
+	}
+
 	ptxs, err := d.processTxns(gasLimit, transition, txns)
 	if err != nil {
 		return nil, err
@@ -152,15 +158,16 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// the old transactions are removed
 	d.txpool.ResetWithHeaders(block.Header)
 
-	addrs, err := QuerySequencers(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
+	addrs, err := QuerySequencers(transition, 5213615, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
 		d.logger.Error("failed to query sequencers", "err", err)
 		return nil, err
 	}
+	fmt.Printf("Contract sequencer addresses: %v\n", addrs)
 
 	fmt.Printf("Written block information: %+v\n", block.Header)
 	fmt.Printf("Written block transactions: %d\n", len(block.Transactions))
-	fmt.Printf("Contract sequencer addresses: %v\n", addrs)
+
 	return block, nil
 }
 
@@ -218,6 +225,65 @@ func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) (
 	return DecodeValidators(method, res.ReturnValue)
 }
 
+func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
+	if !ok {
+		return nil, errors.New("sequencers method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &stakingHelper.AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	fmt.Printf("RETURNED VALIDATORS: %+v - err: %v", res, err)
+	//return []types.Address{}, nil
+	return DecodeValidators(method, res.ReturnValue)
+}
+
+func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
+	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]
+	if !ok {
+		return errors.New("sequencers method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &stakingHelper.AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if res.Failed() {
+		return res.Err
+	}
+
+	fmt.Printf("RETURNED STAKED REQUEST: %+v - err: %v \n", res, err)
+	return nil
+}
+
 func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
@@ -229,18 +295,16 @@ func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, 
 		return nil, errors.New("failed type assertion from decodedResults to map")
 	}
 
-	panic(fmt.Sprintf("Decoded resultset: %+v", results))
+	web3Addresses, ok := results["0"].([]ethgo.Address)
 
-	/* 	web3Addresses, ok := results["0"].([]ethgo.Address)
-
-	   	if !ok {
-	   		return nil, errors.New("failed type assertion from results[0] to []ethgo.Address")
-	   	} */
+	if !ok {
+		return nil, errors.New("failed type assertion from results[0] to []ethgo.Address")
+	}
 
 	addresses := make([]types.Address, 1)
-	/* 	for idx, waddr := range web3Addresses {
+	for idx, waddr := range web3Addresses {
 		addresses[idx] = types.Address(waddr)
-	} */
+	}
 
 	return addresses, nil
 }

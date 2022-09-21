@@ -15,7 +15,7 @@ import (
 
 var (
 	// staking contract address
-	AddrStakingContract = types.StringToAddress("1002")
+	AddrStakingContract = types.StringToAddress("0x0110000000000000000000000000000000000001")
 
 	MinSequencerCount = uint64(1)
 	MaxSequencerCount = common.MaxSafeJSInt

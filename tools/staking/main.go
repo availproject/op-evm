@@ -28,7 +28,7 @@ const (
 
 var (
 	ETH            = big.NewInt(1000000000000000000)
-	StakingAddress = common.HexToAddress("0x0000000000000000000000000000000000001002")
+	StakingAddress = common.HexToAddress("0x0110000000000000000000000000000000000001")
 	MinerAddress   = common.HexToAddress("0xF817d12e6933BbA48C14D4c992719B46aD9f5f61")
 )
 
@@ -54,29 +54,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("sequencer client error: %s \n", err)
 	}
-
-	validatorClient, err := getValidatorClient()
-	if err != nil {
-		log.Fatalf("validator client error: %s \n", err)
-	}
-
-	// Fetch the current headers
-	currentSequencerHeader, err := getHeaderByNumber(sequencerClient, nil)
-	if err != nil {
-		log.Fatalf("sequencer client error - current header -: %s \n", err)
-	}
-
-	currentValidatorHeader, err := getHeaderByNumber(validatorClient, nil)
-	if err != nil {
-		log.Fatalf("validator client error - current header -: %s \n", err)
-	}
-
-	log.Printf(
-		"Current Headers -> Sequencer: %d | Validator: %d | Synced: %v \n",
-		currentSequencerHeader.Number.Int64(),
-		currentValidatorHeader.Number.Int64(),
-		headerNumbersMatch(currentSequencerHeader, currentValidatorHeader),
-	)
 
 	// Keystore and necessary account extraction
 
@@ -110,22 +87,6 @@ func main() {
 		toETH(testSequencerCurrentBalance),
 	)
 
-	genesisValidatorCurrentBalance, err := getAccountBalance(validatorClient, genesisAccount.Address, nil)
-	if err != nil {
-		log.Fatalf("failure to get genesis account balance - validator: %s \n", err)
-	}
-
-	testValidatorCurrentBalance, err := getAccountBalance(validatorClient, testAccount.Address, nil)
-	if err != nil {
-		log.Fatalf("failure to get test account balance - validator: %s \n", err)
-	}
-
-	log.Printf(
-		"Validator Balances -> Genesis: %d | Test: %d \n",
-		toETH(genesisValidatorCurrentBalance),
-		toETH(testValidatorCurrentBalance),
-	)
-
 	/* 	if genesisSequencerCurrentBalance.Int64() == genesisValidatorCurrentBalance.Int64() &&
 	   		testSequencerCurrentBalance.Int64() == testValidatorCurrentBalance.Int64() {
 	   		log.Print("Initial balances are matching between sequencer and validator nodes!")
@@ -138,7 +99,7 @@ func main() {
 		log.Fatalf("Contract -> Failure to build new contract due: %s \n", err)
 	}
 
-	isSequencer, err := contract.IsSequencer(nil, MinerAddress)
+	isSequencer, err := contract.IsValidator(nil, MinerAddress)
 	if err != nil {
 		log.Fatalf("Contract -> Failure to check if contract is sequencer: %s \n", err)
 	}

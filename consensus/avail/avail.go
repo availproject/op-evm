@@ -107,8 +107,6 @@ func Factory(
 		d.interval = interval
 	}
 
-	//d.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
-
 	return d, nil
 }
 
@@ -132,6 +130,12 @@ func (d *Avail) Start() error {
 			return err
 		}
 
+		/* 		SHOULDD STAY COMENTED OUT
+		   		if _, err := d.buildBlock(minerKeystore, minerAccount, minerPk, d.blockchain.Header()); err != nil {
+		   			d.logger.Error("failure to build staking block", "error", err)
+		   			return err
+		   		} */
+
 		go d.runSequencer(minerKeystore, minerAccount, minerPk)
 	}
 
@@ -150,18 +154,6 @@ func (d *Avail) Start() error {
 
 	return nil
 }
-
-/* func (d *Avail) sendBlockToAvail(block *types.Block) error {
-	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-	d.logger.Info("Submitting block to avail...")
-	hash, err := sender.SubmitDataWithoutWatch(block.MarshalRLP())
-	if err != nil {
-		d.logger.Error("Error while submitting data to avail", err)
-		return err
-	}
-	d.logger.Info("Submitted block to avail", "block", block.Header.Hash, "avail_block", hash.Hex())
-	return nil
-} */
 
 // STATE MACHINE METHODS //
 
@@ -199,32 +191,6 @@ func (d *Avail) VerifyHeader(header *types.Header) error {
 
 	d.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
 
-	/*
-		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
-		if !ok {
-			return fmt.Errorf(
-				"unable to get parent header for block number %d",
-				header.Number,
-			)
-		}
-
-		snap, err := i.getSnapshot(parent.Number)
-		if err != nil {
-			return err
-		}
-
-		// verify all the header fields + seal
-		if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
-			return err
-		}
-
-		// verify the committed seals
-		if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
-			return err
-		}
-
-		return nil
-	*/
 	return nil
 }
 

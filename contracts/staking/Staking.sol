@@ -3,20 +3,21 @@ pragma solidity ^0.8.7;
 
 import "node_modules/@openzeppelin/contracts/utils/Address.sol";
 
+
 contract Staking {
     using Address for address;
 
     // Parameters
-    uint128 public constant VALIDATOR_THRESHOLD = 1 ether;
+    uint128 public constant STAKING_THRESHOLD = 1 ether;
 
     // Properties
-    address[] public _validators;
-    mapping(address => bool) public _addressToIsValidator;
+    address[] public _sequencers;
+    mapping(address => bool) public _addressToIsSequencer;
     mapping(address => uint256) public _addressToStakedAmount;
-    mapping(address => uint256) public _addressToValidatorIndex;
+    mapping(address => uint256) public _addressToSequencerIndex;
     uint256 public _stakedAmount;
-    uint256 public _minimumNumValidators;
-    uint256 public _maximumNumValidators;
+    uint256 public _minimumNumSequencers;
+    uint256 public _maximumNumSequencers;
 
     // Events
     event Staked(address indexed account, uint256 amount);
@@ -37,13 +38,13 @@ contract Staking {
         _;
     }
 
-    constructor(uint256 minNumValidators, uint256 maxNumValidators) {
+    constructor(uint256 minNumSequencers, uint256 maxNumSequencers) {
         require(
-            minNumValidators <= maxNumValidators,
-            "Min validators num can not be greater than max num of validators"
+            minNumSequencers <= maxNumSequencers,
+            "Min sequencers num can not be greater than max num of sequencers"
         );
-        _minimumNumValidators = minNumValidators;
-        _maximumNumValidators = maxNumValidators;
+        _minimumNumSequencers = minNumSequencers;
+        _maximumNumSequencers = maxNumSequencers;
     }
 
     // View functions
@@ -51,24 +52,24 @@ contract Staking {
         return _stakedAmount;
     }
 
-    function CurrentValidators() public view returns (address[] memory) {
-        return _validators;
+    function CurrentSequencers() public view returns (address[] memory) {
+        return _sequencers;
     }
 
-    function IsValidator(address addr) public view returns (bool) {
-        return _addressToIsValidator[addr];
+    function IsSequencer(address addr) public view returns (bool) {
+        return _addressToIsSequencer[addr];
     }
 
     function AccountStake(address addr) public view returns (uint256) {
         return _addressToStakedAmount[addr];
     }
 
-    function MinNumValidators() public view returns (uint256) {
-        return _minimumNumValidators;
+    function MinNumSequencers() public view returns (uint256) {
+        return _minimumNumSequencers;
     }
 
-    function MaxNumValidators() public view returns (uint256) {
-        return _maximumNumValidators;
+    function MaxNumSequencers() public view returns (uint256) {
+        return _maximumNumSequencers;
     }
 
     // Public functions
@@ -89,8 +90,8 @@ contract Staking {
         _stakedAmount += msg.value;
         _addressToStakedAmount[msg.sender] += msg.value;
 
-        if (_canBecomeValidator(msg.sender)) {
-            _appendToValidatorSet(msg.sender);
+        if (_canBecomeSequencer(msg.sender)) {
+            _appendToSequencerSet(msg.sender);
         }
 
         emit Staked(msg.sender, msg.value);
@@ -102,59 +103,59 @@ contract Staking {
         _addressToStakedAmount[msg.sender] = 0;
         _stakedAmount -= amount;
 
-        if (_isValidator(msg.sender)) {
-            _deleteFromValidators(msg.sender);
+        if (_isSequencer(msg.sender)) {
+            _deleteFromSequencers(msg.sender);
         }
 
         payable(msg.sender).transfer(amount);
         emit Unstaked(msg.sender, amount);
     }
 
-    function _deleteFromValidators(address staker) private {
+    function _deleteFromSequencers(address staker) private {
         require(
-            _validators.length > _minimumNumValidators,
-            "Validators can't be less than the minimum required validator num"
+            _sequencers.length > _minimumNumSequencers,
+            "Sequencers can't be less than the minimum required sequencer num"
         );
 
         require(
-            _addressToValidatorIndex[staker] < _validators.length,
+            _addressToSequencerIndex[staker] < _sequencers.length,
             "index out of range"
         );
 
         // index of removed address
-        uint256 index = _addressToValidatorIndex[staker];
-        uint256 lastIndex = _validators.length - 1;
+        uint256 index = _addressToSequencerIndex[staker];
+        uint256 lastIndex = _sequencers.length - 1;
 
         if (index != lastIndex) {
             // exchange between the element and last to pop for delete
-            address lastAddr = _validators[lastIndex];
-            _validators[index] = lastAddr;
-            _addressToValidatorIndex[lastAddr] = index;
+            address lastAddr = _sequencers[lastIndex];
+            _sequencers[index] = lastAddr;
+            _addressToSequencerIndex[lastAddr] = index;
         }
 
-        _addressToIsValidator[staker] = false;
-        _addressToValidatorIndex[staker] = 0;
-        _validators.pop();
+        _addressToIsSequencer[staker] = false;
+        _addressToSequencerIndex[staker] = 0;
+        _sequencers.pop();
     }
 
-    function _appendToValidatorSet(address newValidator) private {
+    function _appendToSequencerSet(address newSequencer) private {
         require(
-            _validators.length < _maximumNumValidators,
-            "Validator set has reached full capacity"
+            _sequencers.length < _maximumNumSequencers,
+            "Sequencer set has reached full capacity"
         );
 
-        _addressToIsValidator[newValidator] = true;
-        _addressToValidatorIndex[newValidator] = _validators.length;
-        _validators.push(newValidator);
+        _addressToIsSequencer[newSequencer] = true;
+        _addressToSequencerIndex[newSequencer] = _sequencers.length;
+        _sequencers.push(newSequencer);
     }
 
-    function _isValidator(address account) private view returns (bool) {
-        return _addressToIsValidator[account];
+    function _isSequencer(address account) private view returns (bool) {
+        return _addressToIsSequencer[account];
     }
 
-    function _canBecomeValidator(address account) private view returns (bool) {
+    function _canBecomeSequencer(address account) private view returns (bool) {
         return
-            !_isValidator(account) &&
-            _addressToStakedAmount[account] >= VALIDATOR_THRESHOLD;
-    }
+            !_isSequencer(account) &&
+            _addressToStakedAmount[account] >= STAKING_THRESHOLD;
+    } 
 }

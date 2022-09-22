@@ -99,7 +99,7 @@ func main() {
 		log.Fatalf("Contract -> Failure to build new contract due: %s \n", err)
 	}
 
-	isSequencer, err := contract.IsValidator(nil, MinerAddress)
+	isSequencer, err := contract.IsSequencer(nil, MinerAddress)
 	if err != nil {
 		log.Fatalf("Contract -> Failure to check if contract is sequencer: %s \n", err)
 	}

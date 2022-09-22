@@ -30,6 +30,21 @@ func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Ac
 			return
 		}
 
+		// For now it's here as is, not the best path moving forward for sure but the idea
+		// is to check if sequencer is staked prior we allow any futhure block manipulations.
+		_, sequencerError := d.isSequencerStaked(miner)
+		if sequencerError != nil {
+			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
+			continue
+		}
+
+		// TODO: Figure out how to do this check properly.
+		// For now disabled until I figure out how to stake properly.
+		//if !sequencerStaked {
+		//	d.logger.Error("Forbidding block generation until sequencer is staked properly...")
+		//	continue
+		//}
+
 		// There are new transactions in the pool, try to seal them
 		header := d.blockchain.Header()
 		if err := d.writeNewBlock(minerKeystore, miner, minerPK, header); err != nil {

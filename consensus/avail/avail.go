@@ -130,11 +130,18 @@ func (d *Avail) Start() error {
 			return err
 		}
 
-		/* 		SHOULDD STAY COMENTED OUT
-		   		if _, err := d.buildBlock(minerKeystore, minerAccount, minerPk, d.blockchain.Header()); err != nil {
-		   			d.logger.Error("failure to build staking block", "error", err)
-		   			return err
-		   		} */
+		/* 		SHOULD STAY COMENTED OUT  */
+		sequencerStaked, sequencerError := d.isSequencerStaked(minerAccount)
+		if sequencerError != nil {
+			return sequencerError
+		}
+
+		if !sequencerStaked {
+			if _, err := d.buildBlock(minerKeystore, minerAccount, minerPk, d.blockchain.Header()); err != nil {
+				d.logger.Error("failure to build staking block", "error", err)
+				return err
+			}
+		}
 
 		go d.runSequencer(minerKeystore, minerAccount, minerPk)
 	}

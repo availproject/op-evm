@@ -77,7 +77,9 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 		txn.SetState(stakingHelper.AddrStakingContract, key, value)
 	}
 
-	transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount)
+	if err := transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount); err != nil {
+		return nil, err
+	}
 
 	//transition.SetTxn(txn)
 

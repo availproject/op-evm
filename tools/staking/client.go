@@ -6,6 +6,7 @@ func getSequencerClient() (*ethclient.Client, error) {
 	return ethclient.Dial(SequencerAddr)
 }
 
-func getValidatorClient() (*ethclient.Client, error) {
+/* func getValidatorClient() (*ethclient.Client, error) {
 	return ethclient.Dial(ValidatorAddr)
 }
+*/

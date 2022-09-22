@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 	"math/big"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
 )
@@ -32,14 +29,14 @@ var (
 	MinerAddress   = common.HexToAddress("0xF817d12e6933BbA48C14D4c992719B46aD9f5f61")
 )
 
-func getHeaderByNumber(client *ethclient.Client, number *big.Int) (*types.Header, error) {
+/* func getHeaderByNumber(client *ethclient.Client, number *big.Int) (*types.Header, error) {
 	return client.HeaderByNumber(context.Background(), number)
 }
 
 func headerNumbersMatch(sequencer *types.Header, validator *types.Header) bool {
 	return sequencer.Number.Int64() == validator.Number.Int64()
 }
-
+*/
 func toETH(wei *big.Int) *big.Int {
 	return big.NewInt(0).Div(wei, ETH)
 }

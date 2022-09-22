@@ -18,6 +18,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+//nolint:golint,unused
 func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
@@ -78,32 +79,11 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 		txn.SetState(stakingHelper.AddrStakingContract, key, value)
 	}
 
-	transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount)
-
-	//transition.SetTxn(txn)
-
-	txns := []*types.Transaction{
-		// Adding staking contract balance and code itself
-		/**&types.Transaction{
-			From:     types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"),
-			Nonce:    0,
-			To:       &stakingHelper.AddrStakingContract,
-			Gas:      gasLimit,
-			GasPrice: big.NewInt(40000),
-			//Input:    stakingAccount.Code,
-			Value: stakingAccount.Balance,
-		},
-
-
-		&types.Transaction{
-			From:     types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"),
-			Nonce:    0,
-			To:       nil,
-			Gas:      gasLimit,
-			GasPrice: big.NewInt(40000),
-			Input:    stakingAccount.Code,
-		}, **/
+	if err := transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount); err != nil {
+		return nil, err
 	}
+
+	txns := []*types.Transaction{}
 
 	stakeErr := Stake(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
 	if stakeErr != nil {
@@ -144,10 +124,10 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
-	/* 	if err := d.sendBlockToAvail(block); err != nil {
-		d.logger.Info("FAILING HERE? 6")
-		return nil, err
-	} */
+	//if err := d.sendBlockToAvail(block); err != nil {
+	//	d.logger.Info("FAILING HERE? 6")
+	//	return nil, err
+	//}
 
 	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlock(blk, "heck-do-i-know-yet-what-this-is"); err != nil {
@@ -172,6 +152,7 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	return blk, nil
 }
 
+//nolint:golint,unused
 func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types.Transaction) ([]*types.Transaction, error) {
 	var successful []*types.Transaction
 

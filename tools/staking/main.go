@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 	"math/big"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
 )
@@ -31,14 +28,6 @@ var (
 	StakingAddress = common.HexToAddress("0x0110000000000000000000000000000000000001")
 	MinerAddress   = common.HexToAddress("0xF817d12e6933BbA48C14D4c992719B46aD9f5f61")
 )
-
-func getHeaderByNumber(client *ethclient.Client, number *big.Int) (*types.Header, error) {
-	return client.HeaderByNumber(context.Background(), number)
-}
-
-func headerNumbersMatch(sequencer *types.Header, validator *types.Header) bool {
-	return sequencer.Number.Int64() == validator.Number.Int64()
-}
 
 func toETH(wei *big.Int) *big.Int {
 	return big.NewInt(0).Div(wei, ETH)
@@ -99,7 +88,7 @@ func main() {
 		log.Fatalf("Contract -> Failure to build new contract due: %s \n", err)
 	}
 
-	isSequencer, err := contract.IsValidator(nil, MinerAddress)
+	isSequencer, err := contract.IsSequencer(nil, MinerAddress)
 	if err != nil {
 		log.Fatalf("Contract -> Failure to check if contract is sequencer: %s \n", err)
 	}

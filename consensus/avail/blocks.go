@@ -4,9 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
 	stakingHelper "github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/umbracle/ethgo"
@@ -14,7 +18,7 @@ import (
 )
 
 //nolint:golint,unused
-/* func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
+func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -147,6 +151,7 @@ import (
 	return block, nil
 }
 
+//nolint:golint,unused
 func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types.Transaction) ([]*types.Transaction, error) {
 	var successful []*types.Transaction
 
@@ -170,7 +175,7 @@ func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types
 
 	return successful, nil
 }
-*/
+
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
 	if !ok {

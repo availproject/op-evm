@@ -4,13 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
 	stakingHelper "github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/umbracle/ethgo"
@@ -18,7 +14,7 @@ import (
 )
 
 //nolint:golint,unused
-func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
+/* func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -82,30 +78,7 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 		return nil, err
 	}
 
-	//transition.SetTxn(txn)
-
-	txns := []*types.Transaction{
-		// Adding staking contract balance and code itself
-		/**&types.Transaction{
-			From:     types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"),
-			Nonce:    0,
-			To:       &stakingHelper.AddrStakingContract,
-			Gas:      gasLimit,
-			GasPrice: big.NewInt(40000),
-			//Input:    stakingAccount.Code,
-			Value: stakingAccount.Balance,
-		},
-
-
-		&types.Transaction{
-			From:     types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"),
-			Nonce:    0,
-			To:       nil,
-			Gas:      gasLimit,
-			GasPrice: big.NewInt(40000),
-			Input:    stakingAccount.Code,
-		}, **/
-	}
+	txns := []*types.Transaction{}
 
 	stakeErr := Stake(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
 	if stakeErr != nil {
@@ -146,10 +119,10 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// is sealed after all the committed seals
 	block.Header.ComputeHash()
 
-	/* 	if err := d.sendBlockToAvail(block); err != nil {
-		d.logger.Info("FAILING HERE? 6")
-		return nil, err
-	} */
+	//if err := d.sendBlockToAvail(block); err != nil {
+	//	d.logger.Info("FAILING HERE? 6")
+	//	return nil, err
+	//}
 
 	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlock(block, "heck-do-i-know-yet-what-this-is"); err != nil {
@@ -174,7 +147,6 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	return block, nil
 }
 
-//nolint:golint,unused
 func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types.Transaction) ([]*types.Transaction, error) {
 	var successful []*types.Transaction
 
@@ -198,7 +170,7 @@ func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types
 
 	return successful, nil
 }
-
+*/
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
 	if !ok {

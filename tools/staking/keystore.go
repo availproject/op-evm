@@ -10,18 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-/* func createKeystore() {
-	ks := keystore.NewKeyStore(WalletsDir, keystore.StandardScryptN, keystore.StandardScryptP)
-	password := DefaultWalletPassphrase
-	account, err := ks.NewAccount(password)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(account.Address.Hex())
-}
-*/
-
 func getKeystore() (*keystore.KeyStore, error) {
 	ks := keystore.NewKeyStore(WalletsDir, keystore.StandardScryptN, keystore.StandardScryptP)
 	return ks, nil

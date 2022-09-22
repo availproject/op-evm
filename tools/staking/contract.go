@@ -14,7 +14,7 @@ import (
 	fraud "github.com/maticnetwork/avail-settlement/tools/fraud/contract"
 )
 
-//nolint:golint,unused
+//nolint:all
 func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount accounts.Account) (*common.Address, *types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {
@@ -55,7 +55,7 @@ func deployContract(client *ethclient.Client, ks *keystore.KeyStore, fromAccount
 	return &address, tx, nil
 }
 
-//nolint:golint,unused
+//nolint:all
 func writeToContract(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account, instance *fraud.Fraud, val *big.Int) (*types.Transaction, error) {
 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
 	if err != nil {

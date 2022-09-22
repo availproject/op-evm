@@ -9,6 +9,7 @@ import (
 
 // Checking if the staking contract is deployed, if it is skipping.
 // If not deployed, deploying the contract itself.
+//nolint:golint,unused
 func (d *Avail) deployStakingContract(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) error {
 
 	// Check if the contract is deployed to a specific address (code)

@@ -17,6 +17,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+//nolint:golint,unused
 func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
@@ -173,6 +174,7 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	return block, nil
 }
 
+//nolint:golint,unused
 func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types.Transaction) ([]*types.Transaction, error) {
 	var successful []*types.Transaction
 

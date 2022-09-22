@@ -1,16 +1,16 @@
-package avail
+package block
 
 import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/umbracle/fastrlp"
 )
 
-// TODO(tuommaki): This will be mostly useless test. Should be removed after initial development.
-func Test_writeSeal(t *testing.T) {
+func Test_WriteSeal(t *testing.T) {
 	hdr := &types.Header{}
 
 	hdr.ExtraData = make([]byte, SequencerExtraVanity)
@@ -30,9 +30,21 @@ func Test_writeSeal(t *testing.T) {
 	hdr.ExtraData = append(hdr.ExtraData, bs...)
 
 	key := keystore.NewKeyForDirectICAP(rand.Reader)
+	miner := crypto.PubKeyToAddress(&key.PrivateKey.PublicKey)
 
-	_, err = writeSeal(key.PrivateKey, hdr)
+	hdr.Miner = miner.Bytes()
+
+	hdr, err = WriteSeal(key.PrivateKey, hdr)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	signer, err := AddressRecoverFromHeader(hdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if signer != miner {
+		t.Fatalf("signer != miner, signer: %q, miner: %q", signer, miner)
 	}
 }

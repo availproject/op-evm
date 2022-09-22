@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -22,10 +23,6 @@ var (
 	// ErrParentBlockNotFound is returned when the local blockchain doesn't
 	// contain block for the referenced parent hash.
 	ErrParentBlockNotFound = errors.New("parent block not found")
-
-	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
-	// malicious block hash in `ExtraData` of the fraudproof block header.
-	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
 )
 
 type watchTower struct {
@@ -181,7 +178,7 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 
 	// Build the actual block
 	// The header hash is computed inside buildBlock
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
+	blk := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,
 		Receipts: transition.Receipts(),
@@ -189,8 +186,8 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 
 	// Write the seal of the block after all the fields are completed
 	{
-		block.Header.ExtraData = make([]byte, SequencerExtraVanity)
-		extraData := append([]byte{}, FraudproofPrefix...)
+		blk.Header.ExtraData = make([]byte, block.SequencerExtraVanity)
+		extraData := append([]byte{}, block.FraudproofPrefix...)
 		extraData = append(extraData, []byte(maliciousBlock.Hash().String())...)
 		ar := &fastrlp.Arena{}
 		rlpExtraData, err := ar.NewBytes(extraData).Bytes()
@@ -200,23 +197,23 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 
 		copy(header.ExtraData, rlpExtraData)
 
-		ve := &ValidatorExtra{}
+		ve := &block.ValidatorExtra{}
 		bs := ve.MarshalRLPTo(nil)
 		header.ExtraData = append(header.ExtraData, bs...)
 	}
 
-	header, err = writeSeal(watchTowerPK.PrivateKey, block.Header)
+	header, err = block.WriteSeal(watchTowerPK.PrivateKey, blk.Header)
 	if err != nil {
 		return types.Block{}, err
 	}
 
-	block.Header = header
+	blk.Header = header
 
 	// Compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
-	block.Header.ComputeHash()
+	blk.Header.ComputeHash()
 
-	return *block, nil
+	return *blk, nil
 }
 
 // constructFraudproofTxs returns set of transactions that challenge the

@@ -25,7 +25,7 @@ bootstrap-genesis:
 	$(POLYGON_EDGE_BIN) genesis --dir $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json \
 	--name polygon-avail-settlement \
 	--premine 0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000 \
-	--consensus ibft-avail \
+	--consensus ibft \
 	--bootnode /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa \
 	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
 
@@ -79,7 +79,7 @@ tools-wallet:
 
 build: build-server build-client
 
-start-sequencer: build
+start-sequencer: build bootstrap-staking-contract
 	rm -rf data/avail-bootnode-1/blockchain/
 	./server/server -config-file="./configs/bootnode.yaml"
 
@@ -97,7 +97,7 @@ start-e2e: build-e2e
 start-fraud: build-fraud
 	./tools/fraud/fraud
 
-start-staking: build-staking
+start-staking: build-staking 
 	./tools/staking/staking
 
 deps:

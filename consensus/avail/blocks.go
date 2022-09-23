@@ -18,6 +18,51 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+var (
+	ETH = big.NewInt(1000000000000000000)
+)
+
+func (d *Avail) isSequencerStaked(minerAccount accounts.Account) (bool, error) {
+	parent := d.blockchain.Header()
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAccount.Address.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return false, err
+	}
+
+	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
+	if err != nil {
+		return false, err
+	}
+
+	addrs, err := QuerySequencers(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
+	if err != nil {
+		d.logger.Error("failed to query sequencers", "err", err)
+		return false, err
+	}
+
+	for _, addr := range addrs {
+		if addr.String() == minerAccount.Address.Hex() {
+			d.logger.Info("Sequencer stake discovered no need to stake the sequencer.")
+			return true, nil
+		}
+	}
+
+	d.logger.Info("Staking contract address discovery information", "sequencers", addrs)
+	d.logger.Warn("Sequencer stake not discovered. Need to stake the sequencer.")
+	return false, nil
+}
+
 //nolint:golint,unused
 func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
@@ -50,36 +95,8 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// we need to include in the extra field the current set of validators
 	block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
 
-	d.logger.Info("PARENT BLOCK", "hash", parent.Hash)
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
-		d.logger.Info("FAILING HERE? 3")
-		return nil, err
-	}
-
-	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
-		[]types.Address{types.StringToAddress(minerAccount.Address.Hex())},
-		stakingHelper.PredeployParams{
-			MinSequencerCount: 1,
-			MaxSequencerCount: 10,
-		})
-	if predeployErr != nil {
-		return nil, err
-	}
-
-	cstate := d.executor.State()
-	snap := cstate.NewSnapshot()
-	txn := state.NewTxn(cstate, snap)
-
-	txn.AddBalance(stakingHelper.AddrStakingContract, stakingAccount.Balance)
-	txn.SetNonce(stakingHelper.AddrStakingContract, stakingAccount.Nonce)
-	txn.SetCode(stakingHelper.AddrStakingContract, stakingAccount.Code)
-
-	for key, value := range stakingAccount.Storage {
-		txn.SetState(stakingHelper.AddrStakingContract, key, value)
-	}
-
-	if err := transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount); err != nil {
 		return nil, err
 	}
 
@@ -95,6 +112,8 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	if err != nil {
 		return nil, err
 	}
+
+	//panic(fmt.Sprintf("transactions: %+v", ptxs))
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -114,7 +133,6 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// write the seal of the block after all the fields are completed
 	header, err = block.WriteSeal(minerPK.PrivateKey, blk.Header)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 5")
 		return nil, err
 	}
 
@@ -124,27 +142,19 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
-	//if err := d.sendBlockToAvail(block); err != nil {
-	//	d.logger.Info("FAILING HERE? 6")
-	//	return nil, err
-	//}
+	/* 	if err, _ := d.sendBlockToAvail(block); err != nil {
+		d.logger.Info("FAILING HERE? 6")
+		return nil, err
+	} */
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(blk, "heck-do-i-know-yet-what-this-is"); err != nil {
-		d.logger.Info("FAILING HERE? 7")
+	if err := d.blockchain.WriteBlock(blk, "sequencer"); err != nil {
 		return nil, err
 	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	d.txpool.ResetWithHeaders(blk.Header)
-
-	addrs, err := QuerySequencers(transition, 5213615, types.StringToAddress(minerAccount.Address.Hex()))
-	if err != nil {
-		d.logger.Error("failed to query sequencers", "err", err)
-		return nil, err
-	}
-	fmt.Printf("Contract sequencer addresses: %v\n", addrs)
 
 	fmt.Printf("Written block information: %+v\n", blk.Header)
 	fmt.Printf("Written block transactions: %d\n", len(blk.Transactions))
@@ -202,11 +212,10 @@ func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) (
 		return nil, res.Err
 	}
 
-	fmt.Printf("RETURNED VALIDATORS: %+v - err: %v", res, err)
-	//return []types.Address{}, nil
 	return DecodeValidators(method, res.ReturnValue)
 }
 
+// TODO: Figure out a way how to call a method with provided argument!
 func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
 	if !ok {
@@ -232,8 +241,6 @@ func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]ty
 		return nil, res.Err
 	}
 
-	fmt.Printf("RETURNED VALIDATORS: %+v - err: %v", res, err)
-	//return []types.Address{}, nil
 	return DecodeValidators(method, res.ReturnValue)
 }
 
@@ -247,7 +254,7 @@ func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
 		To:       &stakingHelper.AddrStakingContract,
-		Value:    big.NewInt(0),
+		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    selector,
 		GasPrice: big.NewInt(0),
 		Gas:      gasLimit,

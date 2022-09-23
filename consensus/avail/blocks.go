@@ -17,6 +17,10 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+var (
+	ETH = big.NewInt(1000000000000000000)
+)
+
 func (d *Avail) isSequencerStaked(minerAccount accounts.Account) (bool, error) {
 	parent := d.blockchain.Header()
 
@@ -53,7 +57,7 @@ func (d *Avail) isSequencerStaked(minerAccount accounts.Account) (bool, error) {
 		}
 	}
 
-	d.logger.Info("Available staked", "sequencers", addrs)
+	d.logger.Info("Staking contract address discovery information", "sequencers", addrs)
 	d.logger.Warn("Sequencer stake not discovered. Need to stake the sequencer.")
 	return false, nil
 }
@@ -90,38 +94,10 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// we need to include in the extra field the current set of validators
 	assignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
 
-	d.logger.Info("PARENT BLOCK", "hash", parent.Hash)
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
-		d.logger.Info("FAILING HERE? 3")
 		return nil, err
 	}
-
-	/* 	stakingAccount, predeployErr := stakingHelper.PredeployStakingSC(
-	   		[]types.Address{types.StringToAddress(minerAccount.Address.Hex())},
-	   		stakingHelper.PredeployParams{
-	   			MinSequencerCount: 1,
-	   			MaxSequencerCount: 10,
-	   		})
-	   	if predeployErr != nil {
-	   		return nil, err
-	   	}
-
-	   	cstate := d.executor.State()
-	   	snap := cstate.NewSnapshot()
-	   	txn := state.NewTxn(cstate, snap)
-
-	   	txn.AddBalance(stakingHelper.AddrStakingContract, stakingAccount.Balance)
-	   	txn.SetNonce(stakingHelper.AddrStakingContract, stakingAccount.Nonce)
-	   	txn.SetCode(stakingHelper.AddrStakingContract, stakingAccount.Code)
-
-	   	for key, value := range stakingAccount.Storage {
-	   		txn.SetState(stakingHelper.AddrStakingContract, key, value)
-	   	}
-
-	   	if err := transition.SetAccountDirectly(stakingHelper.AddrStakingContract, stakingAccount); err != nil {
-	   		return nil, err
-	   	} */
 
 	txns := []*types.Transaction{}
 
@@ -135,6 +111,8 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	if err != nil {
 		return nil, err
 	}
+
+	//panic(fmt.Sprintf("transactions: %+v", ptxs))
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -154,7 +132,6 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	// write the seal of the block after all the fields are completed
 	header, err = writeSeal(minerPK.PrivateKey, block.Header)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 5")
 		return nil, err
 	}
 
@@ -170,8 +147,7 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	} */
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block, "heck-do-i-know-yet-what-this-is"); err != nil {
-		d.logger.Info("FAILING HERE? 7")
+	if err := d.blockchain.WriteBlock(block, "sequencer"); err != nil {
 		return nil, err
 	}
 
@@ -277,7 +253,7 @@ func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
 		To:       &stakingHelper.AddrStakingContract,
-		Value:    big.NewInt(0),
+		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    selector,
 		GasPrice: big.NewInt(0),
 		Gas:      gasLimit,
@@ -292,7 +268,7 @@ func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
 		return res.Err
 	}
 
-	//fmt.Printf("RETURNED STAKED REQUEST: %+v - err: %v \n", res, err)
+	fmt.Printf("RETURNED STAKED REQUEST: %+v - err: %v \n", res, err)
 	return nil
 }
 

@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 const (
@@ -54,6 +53,7 @@ type Avail struct {
 
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
+	verifier   blockchain.Verifier
 
 	updateCh chan struct{} // nolint:unused // Update channel
 
@@ -74,6 +74,7 @@ func Factory(
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
+		verifier:       NewVerifier(logger.Named("verifier")),
 		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,
@@ -184,41 +185,20 @@ func (d *Avail) setState(s AvailState) {
 // REQUIRED BASE INTERFACE METHODS //
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
-
-	signer, err := block.AddressRecoverFromHeader(header)
-	if err != nil {
-		return err
-	}
-
-	d.logger.Info("Verify header", "signer", signer.String())
-
-	if signer != types.StringToAddress(SequencerAddress) {
-		d.logger.Info("Passing, how is it possible? 222")
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
-	}
-
-	d.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
-
-	return nil
-}
-
-// PreCommitState a hook to be called before finalizing state transition on inserting block
-func (d *Avail) PreCommitState(_header *types.Header, _txn *state.Transition) error {
-	return nil
+	return d.verifier.VerifyHeader(header)
 }
 
 func (d *Avail) ProcessHeaders(headers []*types.Header) error {
-	return nil
+	return d.verifier.ProcessHeaders(headers)
 }
 
 func (d *Avail) GetBlockCreator(header *types.Header) (types.Address, error) {
-	//return addressRecoverFromHeader(header)
-	return types.BytesToAddress(header.Miner), nil
+	return d.verifier.GetBlockCreator(header)
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (d *Avail) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
-	return nil
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (d *Avail) PreCommitState(header *types.Header, tx *state.Transition) error {
+	return d.verifier.PreCommitState(header, tx)
 }
 
 func (d *Avail) GetSyncProgression() *progress.Progression {

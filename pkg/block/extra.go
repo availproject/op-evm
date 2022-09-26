@@ -8,6 +8,10 @@ import (
 )
 
 var (
+	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
+	// malicious block hash in `ExtraData` of the fraudproof block header.
+	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
+
 	// SequencerExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
 	SequencerExtraVanity = 128
 )

@@ -25,9 +25,16 @@ bootstrap-genesis:
 	$(POLYGON_EDGE_BIN) genesis --dir $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json \
 	--name polygon-avail-settlement \
 	--premine 0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000 \
-	--consensus ibft-avail \
+	--consensus ibft \
 	--bootnode /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa \
 	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
+
+bootstrap-staking-contract:
+	$(POLYGON_EDGE_BIN) genesis predeploy --chain $(POLYGON_EDGE_CONFIGS_DIR)/genesis.json \
+	--predeploy-address "0x0110000000000000000000000000000000000001" \
+	--artifacts-path "$(POLYGON_EDGE_CONFIGS_DIR)/../contracts/staking/staking.json" \
+	--constructor-args "1" \
+	--constructor-args "10"
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
@@ -49,6 +56,9 @@ build-e2e:
 build-fraud: build-fraud-contract
 	cd tools/fraud && go build -o fraud
 
+build-staking:
+	cd tools/staking && go build -o staking
+
 build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
@@ -69,7 +79,7 @@ tools-wallet:
 
 build: build-server build-client
 
-start-sequencer: build
+start-sequencer: build bootstrap-staking-contract
 	rm -rf data/avail-bootnode-1/blockchain/
 	./server/server -config-file="./configs/bootnode.yaml"
 
@@ -84,10 +94,11 @@ start-watchtower: build
 start-e2e: build-e2e
 	./tools/e2e/e2e
 
-
 start-fraud: build-fraud
 	./tools/fraud/fraud
 
+start-staking: build-staking 
+	./tools/staking/staking
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

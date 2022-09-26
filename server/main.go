@@ -18,7 +18,6 @@ const (
 )
 
 func main() {
-
 	var path string
 	flag.StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
 

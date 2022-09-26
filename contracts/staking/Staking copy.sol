@@ -3,12 +3,11 @@ pragma solidity ^0.8.7;
 
 import "node_modules/@openzeppelin/contracts/utils/Address.sol";
 
-
 contract Staking {
     using Address for address;
 
     // Parameters
-    uint128 public constant STAKING_THRESHOLD = 1 ether;
+    uint128 public constant Sequencer_THRESHOLD = 1 ether;
 
     // Properties
     address[] public _sequencers;
@@ -114,7 +113,7 @@ contract Staking {
     function _deleteFromSequencers(address staker) private {
         require(
             _sequencers.length > _minimumNumSequencers,
-            "Sequencers can't be less than the minimum required sequencer num"
+            "sequencers can't be less than the minimum required sequencer num"
         );
 
         require(
@@ -141,7 +140,7 @@ contract Staking {
     function _appendToSequencerSet(address newSequencer) private {
         require(
             _sequencers.length < _maximumNumSequencers,
-            "Sequencer set has reached full capacity"
+            "sequencer set has reached full capacity"
         );
 
         _addressToIsSequencer[newSequencer] = true;
@@ -156,6 +155,6 @@ contract Staking {
     function _canBecomeSequencer(address account) private view returns (bool) {
         return
             !_isSequencer(account) &&
-            _addressToStakedAmount[account] >= STAKING_THRESHOLD;
-    } 
+            _addressToStakedAmount[account] >= Sequencer_THRESHOLD;
+    }
 }

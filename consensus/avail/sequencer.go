@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 type transitionInterface interface {
@@ -28,6 +29,21 @@ func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Ac
 		case <-d.nextNotify():
 		case <-d.closeCh:
 			return
+		}
+
+		// For now it's here as is, not the best path moving forward for sure but the idea
+		// is to check if sequencer is staked prior we allow any futhure block manipulations.
+		sequencerStaked, sequencerError := d.isSequencerStaked(miner)
+		if sequencerError != nil {
+			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
+			continue
+		}
+
+		// TODO: Figure out how to do this check properly.
+		// For now disabled until I figure out how to stake properly.
+		if !sequencerStaked {
+			d.logger.Error("Forbidding block generation until sequencer is staked properly...")
+			continue
 		}
 
 		// There are new transactions in the pool, try to seal them
@@ -97,7 +113,7 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      types.StringToAddress(minerAccount.Address.Hex()),
+		Miner:      minerAccount.Address.Bytes(),
 		Nonce:      types.Nonce{},
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
@@ -123,7 +139,7 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	assignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
+	block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
 
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
@@ -142,26 +158,26 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 
 	// Build the actual block
 	// The header hash is computed inside buildBlock
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
+	blk := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,
 		Receipts: transition.Receipts(),
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = writeSeal(minerPK.PrivateKey, block.Header)
+	header, err = block.WriteSeal(minerPK.PrivateKey, blk.Header)
 	if err != nil {
 		d.logger.Info("FAILING HERE? 5")
 		return err
 	}
 
-	block.Header = header
+	blk.Header = header
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
-	block.Header.ComputeHash()
+	blk.Header.ComputeHash()
 
-	err, malicious := d.sendBlockToAvail(block)
+	err, malicious := d.sendBlockToAvail(blk)
 	if err != nil {
 		d.logger.Info("FAILING HERE? 6")
 		return err
@@ -174,38 +190,38 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	}
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block); err != nil {
+	if err := d.blockchain.WriteBlock(blk, "not-sure-what-source-yet-is"); err != nil {
 		d.logger.Info("FAILING HERE? 7")
 		return err
 	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	d.txpool.ResetWithHeaders(block.Header)
+	d.txpool.ResetWithHeaders(blk.Header)
 
-	fmt.Printf("Written block information: %+v", block.Header)
+	fmt.Printf("Written block information: %+v", blk.Header)
 
 	return nil
 }
 
-func (d *Avail) sendBlockToAvail(block *types.Block) (error, bool) {
+func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
 	malicious := false
 	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 
 	// XXX: Test watch tower and validator. This breaks a block every now and then.
 	if rand.Intn(3) == 2 {
 		d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
-		block.Header.StateRoot[0] = 42
+		blk.Header.StateRoot[0] = 42
 		malicious = true
 	}
 
 	d.logger.Info("Submitting block to avail...")
-	f := sender.SubmitDataAndWaitForStatus(block.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
+	f := sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
 	if _, err := f.Result(); err != nil {
 		d.logger.Error("Error while submitting data to avail", err)
 		return err, malicious
 	}
 
-	d.logger.Info("Submitted block to avail", "block", block.Header.Number)
+	d.logger.Info("Submitted block to avail", "block", blk.Header.Number)
 	return nil, malicious
 }

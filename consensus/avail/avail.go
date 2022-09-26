@@ -10,7 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/syncer"
+
+	//"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -30,15 +32,6 @@ const (
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
-type syncerInterface interface {
-	Start()
-	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool, blockTimeout time.Duration)
-	GetSyncProgression() *progress.Progression
-	Broadcast(b *types.Block)
-}
-
 // Dev consensus protocol seals any new transaction immediately
 type Avail struct {
 	logger      hclog.Logger
@@ -46,7 +39,8 @@ type Avail struct {
 	mechanisms  []MechanismType
 	nodeType    MechanismType
 
-	state *currentState // Reference to the current state
+	state  *currentState // Reference to the current state
+	syncer syncer.Syncer // Reference to the sync protocol
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
@@ -54,13 +48,12 @@ type Avail struct {
 	validatorKey     *ecdsa.PrivateKey // nolint:unused // Private key for the validator
 	validatorKeyAddr types.Address     // nolint:unused
 
-	syncer syncerInterface // Reference to the sync protocol
-
 	interval uint64
 	txpool   *txpool.TxPool
 
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
+	verifier   blockchain.Verifier
 
 	updateCh chan struct{} // nolint:unused // Update channel
 
@@ -71,7 +64,7 @@ type Avail struct {
 
 // Factory implements the base factory method
 func Factory(
-	params *consensus.ConsensusParams,
+	params *consensus.Params,
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
@@ -81,12 +74,19 @@ func Factory(
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		txpool:         params.Txpool,
+		verifier:       NewVerifier(logger.Named("verifier")),
+		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,
 		blockTime:      time.Duration(params.BlockTime) * time.Second,
 		state:          newState(),
 		nodeType:       MechanismType(params.NodeType),
+		syncer: syncer.NewSyncer(
+			params.Logger,
+			params.Network,
+			params.Blockchain,
+			time.Duration(params.BlockTime)*3*time.Second,
+		),
 	}
 
 	var err error
@@ -109,8 +109,6 @@ func Factory(
 		d.interval = interval
 	}
 
-	d.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
-
 	return d, nil
 }
 
@@ -124,12 +122,27 @@ func (d *Avail) Initialize() error {
 func (d *Avail) Start() error {
 
 	// Start the syncer
-	d.syncer.Start()
+	if err := d.syncer.Start(); err != nil {
+		return err
+	}
 
 	if d.nodeType == Sequencer {
 		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
 		if err != nil {
 			return err
+		}
+
+		/* 		SHOULD STAY COMENTED OUT  */
+		sequencerStaked, sequencerError := d.isSequencerStaked(minerAccount)
+		if sequencerError != nil {
+			return sequencerError
+		}
+
+		if !sequencerStaked {
+			if _, err := d.buildBlock(minerKeystore, minerAccount, minerPk, d.blockchain.Header()); err != nil {
+				d.logger.Error("failure to build staking block", "error", err)
+				return err
+			}
 		}
 
 		go d.runSequencer(minerKeystore, minerAccount, minerPk)
@@ -150,18 +163,6 @@ func (d *Avail) Start() error {
 
 	return nil
 }
-
-/* func (d *Avail) sendBlockToAvail(block *types.Block) error {
-	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-	d.logger.Info("Submitting block to avail...")
-	hash, err := sender.SubmitDataWithoutWatch(block.MarshalRLP())
-	if err != nil {
-		d.logger.Error("Error while submitting data to avail", err)
-		return err
-	}
-	d.logger.Info("Submitted block to avail", "block", block.Header.Hash, "avail_block", hash.Hex())
-	return nil
-} */
 
 // STATE MACHINE METHODS //
 
@@ -184,66 +185,24 @@ func (d *Avail) setState(s AvailState) {
 // REQUIRED BASE INTERFACE METHODS //
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
-
-	signer, err := addressRecoverFromHeader(header)
-	if err != nil {
-		return err
-	}
-
-	d.logger.Info("Verify header", "signer", signer.String())
-
-	if signer != types.StringToAddress(SequencerAddress) {
-		d.logger.Info("Passing, how is it possible? 222")
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
-	}
-
-	d.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
-
-	/*
-		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
-		if !ok {
-			return fmt.Errorf(
-				"unable to get parent header for block number %d",
-				header.Number,
-			)
-		}
-
-		snap, err := i.getSnapshot(parent.Number)
-		if err != nil {
-			return err
-		}
-
-		// verify all the header fields + seal
-		if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
-			return err
-		}
-
-		// verify the committed seals
-		if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
-			return err
-		}
-
-		return nil
-	*/
-	return nil
+	return d.verifier.VerifyHeader(header)
 }
 
 func (d *Avail) ProcessHeaders(headers []*types.Header) error {
-	return nil
+	return d.verifier.ProcessHeaders(headers)
 }
 
 func (d *Avail) GetBlockCreator(header *types.Header) (types.Address, error) {
-	//return addressRecoverFromHeader(header)
-	return header.Miner, nil
+	return d.verifier.GetBlockCreator(header)
 }
 
-// PreStateCommit a hook to be called before finalizing state transition on inserting block
-func (d *Avail) PreStateCommit(_header *types.Header, _txn *state.Transition) error {
-	return nil
+// PreCommitState a hook to be called before finalizing state transition on inserting block
+func (d *Avail) PreCommitState(header *types.Header, tx *state.Transition) error {
+	return d.verifier.PreCommitState(header, tx)
 }
 
 func (d *Avail) GetSyncProgression() *progress.Progression {
-	return d.syncer.GetSyncProgression()
+	return nil //d.syncer.GetSyncProgression()
 }
 
 func (d *Avail) Prepare(header *types.Header) error {

@@ -69,5 +69,8 @@ data/avail-node-2/blockchain/*
 data/avail-watchtower-1/blockchain/*
 data/avail-watchtower-1/trie/*
 data/avail-bootnode-1/trie/*
+data/avail-bootnode-1/trie
+data/avail-watchtower-1/trie
+
 node_modules
 contracts/stake/node_modules

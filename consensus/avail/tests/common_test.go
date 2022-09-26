@@ -104,7 +104,6 @@ func (bbf *BasicBlockFactory) BuildBlock(parent *types.Block, txs []*types.Trans
 	return blk
 }
 
-// nolint:unused
 func newAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	t.Helper()
 
@@ -119,7 +118,6 @@ func newAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	return address, privateKey
 }
 
-// nolint:unused
 func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 	chain := newChain(t)
 	executor := newInMemExecutor(t, chain)
@@ -144,7 +142,6 @@ func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 	return executor, bchain
 }
 
-// nolint:unused
 func newInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 	t.Helper()
 
@@ -159,7 +156,6 @@ func newInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 	return e
 }
 
-// nolint:unused
 func newChain(t *testing.T) *chain.Chain {
 	balance := new(big.Int)
 	balance.SetString("0x3635c9adc5dea00000", 16)
@@ -193,7 +189,6 @@ func newChain(t *testing.T) *chain.Chain {
 	}
 }
 
-// nolint:unused
 func getHeadBlock(t *testing.T, blockchain *blockchain.Blockchain) *types.Block {
 	var head *types.Block
 

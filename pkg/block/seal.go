@@ -9,10 +9,6 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
-// malicious block hash in `ExtraData` of the fraudproof block header.
-var FraudproofPrefix = []byte("FRAUDPROOF_OF:")
-
 // WriteSeal signs the block and writes serialized `ValidatorExtra` into
 // block's `ExtraData`.
 func WriteSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {

@@ -1,8 +1,7 @@
-package avail
+package block
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -10,9 +9,15 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
+// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
+// malicious block hash in `ExtraData` of the fraudproof block header.
+var FraudproofPrefix = []byte("FRAUDPROOF_OF:")
+
+// WriteSeal signs the block and writes serialized `ValidatorExtra` into
+// block's `ExtraData`.
+func WriteSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
-	seal, err := signSealImpl(prv, h, false)
+	seal, err := signSealImpl(prv, h)
 
 	if err != nil {
 		return nil, err
@@ -31,18 +36,13 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	return h, nil
 }
 
-func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
+func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return nil, err
 	}
 
-	// if we are singing the committed seals we need to do something more
 	msg := hash
-	if committed {
-		msg = commitMsg(hash)
-	}
-
 	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
 
 	if err != nil {
@@ -68,9 +68,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators is what we got from `h` in the first place.
-	assignExtraValidators(h, extra.Validators)
-
-	fmt.Printf("Got the header extras: %+v \n", extra)
+	AssignExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
@@ -92,13 +90,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	return buf, nil
 }
 
-func commitMsg(b []byte) []byte {
-	// message that the nodes need to sign to commit to a block
-	// hash with COMMIT_MSG_CODE which is the same value used in quorum
-	return crypto.Keccak256(b, []byte{}) // []byte{byte(proto.MessageReq_Commit)}
-}
-
-func addressRecoverFromHeader(h *types.Header) (types.Address, error) {
+func AddressRecoverFromHeader(h *types.Header) (types.Address, error) {
 	// get the extra part that contains the seal
 	extra, err := getValidatorExtra(h)
 	if err != nil {

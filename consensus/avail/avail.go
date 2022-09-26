@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 const (
@@ -184,7 +185,7 @@ func (d *Avail) setState(s AvailState) {
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 
-	signer, err := addressRecoverFromHeader(header)
+	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 	stakingHelper "github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -92,7 +93,7 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	assignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
+	block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
 
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
@@ -123,23 +124,23 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 
 	// Build the actual block
 	// The header hash is computed inside buildBlock
-	block := consensus.BuildBlock(consensus.BuildBlockParams{
+	blk := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     ptxs,
 		Receipts: transition.Receipts(),
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = writeSeal(minerPK.PrivateKey, block.Header)
+	header, err = block.WriteSeal(minerPK.PrivateKey, blk.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	block.Header = header
+	blk.Header = header
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
-	block.Header.ComputeHash()
+	blk.Header.ComputeHash()
 
 	/* 	if err, _ := d.sendBlockToAvail(block); err != nil {
 		d.logger.Info("FAILING HERE? 6")
@@ -147,18 +148,18 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	} */
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(block, "sequencer"); err != nil {
+	if err := d.blockchain.WriteBlock(blk, "sequencer"); err != nil {
 		return nil, err
 	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	d.txpool.ResetWithHeaders(block.Header)
+	d.txpool.ResetWithHeaders(blk.Header)
 
-	fmt.Printf("Written block information: %+v\n", block.Header)
-	fmt.Printf("Written block transactions: %d\n", len(block.Transactions))
+	fmt.Printf("Written block information: %+v\n", blk.Header)
+	fmt.Printf("Written block transactions: %d\n", len(blk.Transactions))
 
-	return block, nil
+	return blk, nil
 }
 
 //nolint:golint,unused

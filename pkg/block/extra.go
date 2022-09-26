@@ -1,4 +1,4 @@
-package avail
+package block
 
 import (
 	"fmt"
@@ -14,8 +14,8 @@ var (
 
 var zeroBytes = make([]byte, 128)
 
-// assignExtraValidators is a helper method that adds validators to the extra field in the header
-func assignExtraValidators(h *types.Header, validators []types.Address) {
+// AssignExtraValidators is a helper method that adds validators to the extra field in the header
+func AssignExtraValidators(h *types.Header, validators []types.Address) {
 	// Pad zeros to the right up to istanbul vanity
 	extra := h.ExtraData
 	if len(extra) < SequencerExtraVanity {

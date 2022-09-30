@@ -14,6 +14,9 @@ import (
 const (
 	// SourceAvail is the constant for Avail as a block source.
 	SourceAvail = "Avail"
+
+	// SourceWatchTower is the constant for watch tower as a block source.
+	SourceWatchTower = "WatchTower"
 )
 
 var (

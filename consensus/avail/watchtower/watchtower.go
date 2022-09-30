@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -63,13 +62,8 @@ func (wt *watchTower) Check(blk *types.Block) error {
 	}
 
 	if err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
-		log.Printf("block %d (%q) cannot be verified: %s", blk.Number(), blk.Hash(), err)
-		_, err = wt.ConstructFraudproof(blk)
-		if err != nil {
-			return err
-		}
-		// TODO: Deal with fraud proof
-		wt.logger.Debug("fraud proof constructed")
+		wt.logger.Info("block %d (%q) cannot be verified: %s", blk.Number(), blk.Hash(), err)
+		return err
 	}
 
 	return nil
@@ -80,14 +74,10 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 
-	log.Printf("Received block header: %+v \n", blk.Header)
-	log.Printf("Received block transactions: %+v \n", blk.Transactions)
+	wt.logger.Debug("Received block header: %+v \n", blk.Header)
+	wt.logger.Debug("Received block transactions: %+v \n", blk.Transactions)
 
 	return nil
-}
-
-func (wt *watchTower) HandleError(err error) {
-	log.Printf("block handler: error %#v\n", err)
 }
 
 func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.Block, error) {

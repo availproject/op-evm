@@ -12,8 +12,9 @@ import (
 )
 
 func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *keystore.Key) {
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
+	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, types.Address(watchTowerAccount.Address), watchTowerPK.PrivateKey)
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
@@ -21,7 +22,7 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 		panic(err)
 	}
 
-	d.logger.Info("watchtower started")
+	logger.Info("watchtower started")
 
 	// TODO: Figure out where do we need state cycle and how to implement it.
 	// Current version only starts the cycles for the future, doing nothing with it.
@@ -37,31 +38,37 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		blk, err := block.FromAvail(availBlk, avail.BridgeAppID, callIdx)
 		if err != nil {
-			d.logger.Error("cannot extract Edge block from Avail block %d: %s", availBlk.Block.Header.Number, err)
+			logger.Error("cannot extract Edge block from Avail block %d: %s", availBlk.Block.Header.Number, err)
 			continue
 		}
 
 		err = watchTower.Check(blk)
 		if err != nil {
+			logger.Debug("block verification failed. constructing fraudproof", blk.Header.Number, blk.Header.Hash, err)
+
 			fp, err := watchTower.ConstructFraudproof(blk)
 			if err != nil {
-				d.logger.Error("failed to construct fraudproof for block %d/%q: %s", blk.Header.Number, blk.Header.Hash, err)
+				logger.Error("failed to construct fraudproof for block %d/%q: %s", blk.Header.Number, blk.Header.Hash, err)
 				continue
 			}
 
+			logger.Debug("submitting fraudproof", fp.Header.Hash)
 			f := availSender.SubmitDataAndWaitForStatus(fp.MarshalRLP(), avail_types.ExtrinsicStatus{IsInBlock: true})
 			go func() {
 				if _, err := f.Result(); err != nil {
-					d.logger.Error("submitting fraud proof to avail failed", err)
+					logger.Error("submitting fraud proof to avail failed", err)
 				}
+				logger.Debug("submitted fraudproof", fp.Header.Hash)
 			}()
+
+			// TODO: Write fraudproof to local chain
 
 			continue
 		}
 
 		err = watchTower.Apply(blk)
 		if err != nil {
-			d.logger.Error("cannot apply block %d/%q to blockchain: %s", blk.Header.Number, blk.Header.Hash, err)
+			logger.Error("cannot apply block %d/%q to blockchain: %s", blk.Header.Number, blk.Header.Hash, err)
 		}
 	}
 }

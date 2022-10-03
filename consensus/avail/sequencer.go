@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -12,12 +13,77 @@ import (
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
+type ActiveSequencers interface {
+	Get() ([]types.Address, error)
+	Contains(addr types.Address) (bool, error)
+}
+
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
+}
+
+type activeSequencerQuerier struct {
+	blockchain *blockchain.Blockchain
+	executor   *state.Executor
+	logger     hclog.Logger
+}
+
+func (asq *activeSequencerQuerier) Get() ([]types.Address, error) {
+	parent := asq.blockchain.Header()
+	minerAddress := types.BytesToAddress(parent.Miner)
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAddress.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := asq.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := asq.executor.BeginTxn(parent.StateRoot, header, minerAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs, err := QuerySequencers(transition, gasLimit, minerAddress)
+	if err != nil {
+		asq.logger.Error("failed to query sequencers", "err", err)
+		return nil, err
+	}
+
+	return addrs, nil
+}
+
+func (asq *activeSequencerQuerier) Contains(addr types.Address) (bool, error) {
+	addrs, err := asq.Get()
+	if err != nil {
+		return false, err
+	}
+
+	for _, a := range addrs {
+		if a == addr {
+			asq.logger.Info("Sequencer stake discovered no need to stake the sequencer.")
+			return true, nil
+		}
+	}
+
+	asq.logger.Info("Staking contract address discovery information", "sequencers", addrs)
+	asq.logger.Warn("Sequencer stake not discovered. Need to stake the sequencer.")
+
+	return false, nil
+
 }
 
 func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {

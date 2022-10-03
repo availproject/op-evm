@@ -68,13 +68,19 @@ func Factory(
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
+	asq := &activeSequencerQuerier{
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		logger:     logger.Named("active_sequencer_querier"),
+	}
+
 	d := &Avail{
 		logger:         logger,
 		notifyCh:       make(chan struct{}),
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		verifier:       NewVerifier(logger.Named("verifier")),
+		verifier:       NewVerifier(asq, logger.Named("verifier")),
 		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,

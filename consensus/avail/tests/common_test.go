@@ -22,6 +22,11 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
+type dumbActiveSequencerQuerier struct{}
+
+func (dasq *dumbActiveSequencerQuerier) Get() ([]types.Address, error)          { return nil, nil }
+func (dasq *dumbActiveSequencerQuerier) Contains(_ types.Address) (bool, error) { return true, nil }
+
 type BlockFactory interface {
 	BuildBlock(parent *types.Block, txs []*types.Transaction) *types.Block
 }
@@ -130,7 +135,7 @@ func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 		t.Fatal(err)
 	}
 
-	bchain.SetConsensus(avail.NewVerifier(hclog.Default()))
+	bchain.SetConsensus(avail.NewVerifier(&dumbActiveSequencerQuerier{}, hclog.Default()))
 
 	executor.GetHash = bchain.GetHashHelper
 

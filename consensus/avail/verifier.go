@@ -11,12 +11,14 @@ import (
 )
 
 type verifier struct {
-	logger hclog.Logger
+	activeSequencers ActiveSequencers
+	logger           hclog.Logger
 }
 
-func NewVerifier(logger hclog.Logger) blockchain.Verifier {
+func NewVerifier(as ActiveSequencers, logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
-		logger: logger,
+		activeSequencers: as,
+		logger:           logger,
 	}
 }
 
@@ -28,7 +30,12 @@ func (v *verifier) VerifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	if signer != types.StringToAddress(SequencerAddress) {
+	minerIsActiveSequencer, err := v.activeSequencers.Contains(signer)
+	if err != nil {
+		return err
+	}
+
+	if !minerIsActiveSequencer {
 		v.logger.Info("Passing, how is it possible? 222")
 		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
 	}

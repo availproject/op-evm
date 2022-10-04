@@ -1,4 +1,4 @@
-package tests
+package test
 
 import (
 	"crypto/ecdsa"
@@ -16,10 +16,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
 )
 
-func newAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
+func NewAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	t.Helper()
 
 	privateKey, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
@@ -33,7 +32,7 @@ func newAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	return address, privateKey
 }
 
-func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
+func NewBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 	chain := newChain(t)
 	executor := newInMemExecutor(t, chain)
 
@@ -45,7 +44,7 @@ func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 		t.Fatal(err)
 	}
 
-	bchain.SetConsensus(avail.NewVerifier(hclog.Default()))
+	bchain.SetConsensus(nil)
 
 	executor.GetHash = bchain.GetHashHelper
 
@@ -102,24 +101,4 @@ func newChain(t *testing.T) *chain.Chain {
 			},
 		},
 	}
-}
-
-func getHeadBlock(t *testing.T, blockchain *blockchain.Blockchain) *types.Block {
-	var head *types.Block
-
-	var headBlockHash types.Hash
-	hdr := blockchain.Header()
-	if hdr != nil {
-		headBlockHash = hdr.Hash
-	} else {
-		headBlockHash = blockchain.Genesis()
-	}
-
-	var ok bool
-	head, ok = blockchain.GetBlockByHash(headBlockHash, true)
-	if !ok {
-		t.Fatal("couldn't fetch head block from blockchain")
-	}
-
-	return head
 }

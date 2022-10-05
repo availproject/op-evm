@@ -1,4 +1,4 @@
-package avail
+package verifier
 
 import (
 	"fmt"
@@ -10,11 +10,16 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
+var (
+	// XXX: For now hand coded address of the sequencer. Will be removed soon.
+	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
+)
+
 type verifier struct {
 	logger hclog.Logger
 }
 
-func NewVerifier(logger hclog.Logger) blockchain.Verifier {
+func New(logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
 		logger: logger,
 	}

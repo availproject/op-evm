@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/verifier"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
@@ -130,7 +129,7 @@ func newBlockchain(t *testing.T) (*state.Executor, *blockchain.Blockchain) {
 		t.Fatal(err)
 	}
 
-	bchain.SetConsensus(verifier.New(hclog.Default()))
+	bchain.SetConsensus(block.NewVerifier(hclog.Default()))
 
 	executor.GetHash = bchain.GetHashHelper
 

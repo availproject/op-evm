@@ -13,10 +13,8 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
-var ETH = big.NewInt(1000000000000000000)
-
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t)
+	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
 	h := bchain.Genesis()
 
 	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
@@ -109,7 +107,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 	tx := &types.Transaction{
 		From:     addr,
 		To:       &addr,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
+		Value:    big.NewInt(0).Mul(big.NewInt(10), test.ETH), // 10 ETH
 		GasPrice: big.NewInt(0),
 	}
 
@@ -143,7 +141,7 @@ func addressFromPrivateKey(t *testing.T, privateKey *ecdsa.PrivateKey) types.Add
 func newBlockBuilder(t *testing.T) Builder {
 	t.Helper()
 
-	executor, bchain := test.NewBlockchain(t)
+	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
 	h := bchain.Genesis()
 
 	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())

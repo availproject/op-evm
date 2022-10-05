@@ -21,8 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/verifier"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 const (
@@ -75,7 +75,7 @@ func Factory(
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		verifier:       verifier.New(logger.Named("verifier")),
+		verifier:       block.NewVerifier(logger.Named("verifier")),
 		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,

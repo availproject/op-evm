@@ -1,4 +1,4 @@
-package verifier
+package block
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 var (
@@ -19,14 +18,14 @@ type verifier struct {
 	logger hclog.Logger
 }
 
-func New(logger hclog.Logger) blockchain.Verifier {
+func NewVerifier(logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
 		logger: logger,
 	}
 }
 
 func (v *verifier) VerifyHeader(header *types.Header) error {
-	signer, err := block.AddressRecoverFromHeader(header)
+	signer, err := AddressRecoverFromHeader(header)
 	if err != nil {
 		return err
 	}

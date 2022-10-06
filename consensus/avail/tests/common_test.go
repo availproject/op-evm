@@ -5,11 +5,9 @@ import (
 	"crypto/rand"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -20,88 +18,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
-
-type BlockFactory interface {
-	BuildBlock(parent *types.Block, txs []*types.Transaction) *types.Block
-}
-
-type BasicBlockFactory struct {
-	Executor *state.Executor
-	Coinbase types.Address
-	SignKey  *ecdsa.PrivateKey
-
-	T *testing.T
-}
-
-func NewBasicBlockFactory(t *testing.T, executor *state.Executor, coinbaseAddr types.Address, signKey *ecdsa.PrivateKey) BlockFactory {
-	return &BasicBlockFactory{
-		Executor: executor,
-		Coinbase: coinbaseAddr,
-		SignKey:  signKey,
-
-		T: t,
-	}
-}
-
-func (bbf *BasicBlockFactory) BuildBlock(parent *types.Block, txs []*types.Transaction) *types.Block {
-	header := &types.Header{
-		ParentHash: parent.Hash(),
-		Number:     parent.Number() + 1,
-		Miner:      bbf.Coinbase.Bytes(),
-		Nonce:      types.Nonce{},
-		GasLimit:   parent.Header.GasLimit, // TODO(tuommaki): This needs adjusting.
-		Timestamp:  uint64(time.Now().Unix()),
-	}
-
-	transition, err := bbf.Executor.BeginTxn(parent.Header.StateRoot, header, bbf.Coinbase)
-	if err != nil {
-		bbf.T.Fatal(err)
-	}
-
-	for _, tx := range txs {
-		err := transition.Write(tx)
-		if err != nil {
-			// TODO(tuommaki): This needs re-assesment. Theoretically there
-			// should NEVER be situation where fraud proof transaction writing
-			// could fail and hence panic here is appropriate. There is some
-			// debugging aspects though, which might need revisiting,
-			// especially if the malicious block can cause situation where this
-			// section fails - it would then defeat the purpose of watch tower.
-			bbf.T.Fatal(err)
-		}
-	}
-
-	// Commit the changes
-	_, root := transition.Commit()
-
-	// Update the header
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// Build the actual blk
-	// The header hash is computed inside buildBlock
-	blk := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header:   header,
-		Txns:     txs,
-		Receipts: transition.Receipts(),
-	})
-
-	err = block.PutValidatorExtra(blk.Header, &block.ValidatorExtra{Validators: []types.Address{bbf.Coinbase}})
-	if err != nil {
-		bbf.T.Fatalf("put validator extra failed: %s", err)
-	}
-
-	blk.Header, err = block.WriteSeal(bbf.SignKey, blk.Header)
-	if err != nil {
-		bbf.T.Fatalf("sealing block failed: %s", err)
-	}
-
-	// Compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	blk.Header.ComputeHash()
-
-	return blk
-}
 
 func newAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	t.Helper()

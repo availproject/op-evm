@@ -130,22 +130,47 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	amount := big.NewInt(0).Mul(big.NewInt(10), test.ETH)
+
 	// Transfer 10 ETH from first account to second one.
 	tx := &types.Transaction{
 		From:     address,
 		To:       &address2,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), test.ETH),
+		Value:    amount,
 		Gas:      100000,
 		GasPrice: big.NewInt(1),
 	}
 
-	_, err = bb.
+	err = bb.
 		AddTransactions(tx).
 		SignWith(privateKey).
-		Build()
+		Write("test")
 
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	blk, found := bchain.GetBlockByHash(bchain.Header().Hash, true)
+	if !found {
+		t.Fatalf("blockchain couldn't find header block")
+	}
+
+	numTxs := len(blk.Transactions)
+	if numTxs != 1 {
+		t.Fatalf("expected HEAD block to contain 1 transaction, found %d", numTxs)
+	}
+
+	tx = blk.Transactions[0]
+	if tx.From != address {
+		t.Fatalf("expected %q, got %q in tx.From", address, tx.From)
+	}
+
+	if *tx.To != address2 {
+		t.Fatalf("expected %q, got %q in tx.To", address2, tx.To)
+	}
+
+	if tx.Value.Cmp(amount) != 0 {
+		t.Fatalf("expected %q, got %q in tx.Value", tx.Value, amount)
 	}
 }
 

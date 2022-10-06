@@ -30,6 +30,7 @@ type Builder interface {
 	SignWith(signKey *ecdsa.PrivateKey) Builder
 
 	Build() (*types.Block, error)
+	Write(src string) error
 }
 
 type blockBuilder struct {
@@ -121,6 +122,20 @@ func (bb *blockBuilder) AddTransactions(tx ...*types.Transaction) Builder {
 func (bb *blockBuilder) SignWith(signKey *ecdsa.PrivateKey) Builder {
 	bb.signKey = signKey
 	return bb
+}
+
+func (bb *blockBuilder) Write(src string) error {
+	blk, err := bb.Build()
+	if err != nil {
+		return err
+	}
+
+	err = bb.blockchain.WriteBlock(blk, src)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (bb *blockBuilder) setDefaults() {

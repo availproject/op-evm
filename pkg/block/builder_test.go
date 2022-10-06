@@ -80,21 +80,7 @@ func Test_Builder_Change_CoinbaseAddress(t *testing.T) {
 	}
 }
 
-func Test_Builder_Change_Invalid_GasLimit(t *testing.T) {
-	sk := newPrivateKey(t)
-
-	// Set invalid gas limit.
-	b, err := newBlockBuilder(t).
-		SetGasLimit(1).
-		SignWith(sk).
-		Build()
-
-	if b != nil && err == nil {
-		t.Fatal("no error from block building despite of invalid gas limit")
-	}
-}
-
-func Test_Builder_Change_Valid_GasLimit(t *testing.T) {
+func Test_Builder_Change_GasLimit(t *testing.T) {
 	sk := newPrivateKey(t)
 
 	// Set ~correct gas limit.
@@ -129,19 +115,33 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	sk := newPrivateKey(t)
-	addr := addressFromPrivateKey(t, sk)
+	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
+	address, privateKey := test.NewAccount(t)
+	address2, _ := test.NewAccount(t)
 
-	tx := &types.Transaction{
-		From:     addr,
-		To:       &addr,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), test.ETH), // 10 ETH
-		GasPrice: big.NewInt(10),
+	// Deposit 100 ETH to first account.
+	test.DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), test.ETH), bchain, executor)
+
+	// Construct block.Builder w/ the blockchain instance that contains
+	// balance for our test account.
+	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bb, err := bbf.FromParentHash(bchain.Header().Hash)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	_, err := newBlockBuilder(t).
+	// Transfer 10 ETH from first account to second one.
+	tx := &types.Transaction{
+		From:     address,
+		To:       &address2,
+		Value:    big.NewInt(0).Mul(big.NewInt(10), test.ETH),
+		Gas:      100000,
+		GasPrice: big.NewInt(1),
+	}
+
+	_, err = bb.
 		AddTransactions(tx).
-		SignWith(sk).
+		SignWith(privateKey).
 		Build()
 
 	if err != nil {
@@ -158,12 +158,6 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 	}
 
 	return privateKey
-}
-
-func addressFromPrivateKey(t *testing.T, privateKey *ecdsa.PrivateKey) types.Address {
-	pk := privateKey.Public().(*ecdsa.PublicKey)
-	address := edge_crypto.PubKeyToAddress(pk)
-	return address
 }
 
 func newBlockBuilder(t *testing.T) Builder {

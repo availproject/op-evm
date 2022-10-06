@@ -80,6 +80,34 @@ func Test_Builder_Change_CoinbaseAddress(t *testing.T) {
 	}
 }
 
+func Test_Builder_Change_Invalid_GasLimit(t *testing.T) {
+	sk := newPrivateKey(t)
+
+	// Set invalid gas limit.
+	b, err := newBlockBuilder(t).
+		SetGasLimit(1).
+		SignWith(sk).
+		Build()
+
+	if b != nil && err == nil {
+		t.Fatal("no error from block building despite of invalid gas limit")
+	}
+}
+
+func Test_Builder_Change_Valid_GasLimit(t *testing.T) {
+	sk := newPrivateKey(t)
+
+	// Set ~correct gas limit.
+	_, err := newBlockBuilder(t).
+		SetGasLimit(4_713_000).
+		SignWith(sk).
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 	sk := newPrivateKey(t)
 
@@ -108,7 +136,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 		From:     addr,
 		To:       &addr,
 		Value:    big.NewInt(0).Mul(big.NewInt(10), test.ETH), // 10 ETH
-		GasPrice: big.NewInt(0),
+		GasPrice: big.NewInt(10),
 	}
 
 	_, err := newBlockBuilder(t).
@@ -116,7 +144,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 		SignWith(sk).
 		Build()
 
-	if err == nil {
+	if err != nil {
 		t.Fatal(err)
 	}
 }

@@ -22,6 +22,7 @@ var (
 type Builder interface {
 	SetBlockNumber(number uint64) Builder
 	SetCoinbaseAddress(coinbaseAddr types.Address) Builder
+	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
 
 	AddTransactions(txs ...*types.Transaction) Builder
@@ -32,10 +33,13 @@ type Builder interface {
 }
 
 type blockBuilder struct {
-	executor *state.Executor
+	blockchain *blockchain.Blockchain
+	executor   *state.Executor
+	logger     hclog.Logger
 
 	coinbase   *types.Address
 	parentRoot *types.Hash
+	gasLimit   *uint64
 
 	header *types.Header
 	parent *types.Header
@@ -59,7 +63,7 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 	return &blockBuilderFactory{
 		blockchain: blockchain,
 		executor:   executor,
-		logger:     logger.Named("block_build_factory"),
+		logger:     logger.ResetNamed("block_builder_factory"),
 	}
 }
 
@@ -74,7 +78,9 @@ func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, erro
 
 func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder, error) {
 	bb := &blockBuilder{
-		executor: bbf.executor,
+		blockchain: bbf.blockchain,
+		executor:   bbf.executor,
+		logger:     bbf.logger.ResetNamed("block_builder"),
 
 		header: &types.Header{
 			ParentHash: parent.Hash,
@@ -94,6 +100,11 @@ func (bb *blockBuilder) SetBlockNumber(n uint64) Builder {
 
 func (bb *blockBuilder) SetCoinbaseAddress(coinbaseAddr types.Address) Builder {
 	bb.coinbase = &coinbaseAddr
+	return bb
+}
+
+func (bb *blockBuilder) SetGasLimit(limit uint64) Builder {
+	bb.gasLimit = &limit
 	return bb
 }
 
@@ -122,6 +133,11 @@ func (bb *blockBuilder) setDefaults() {
 		bb.parentRoot = new(types.Hash)
 		*bb.parentRoot = bb.parent.StateRoot
 	}
+
+	if bb.gasLimit == nil {
+		bb.gasLimit = new(uint64)
+		*bb.gasLimit = 0
+	}
 }
 
 func (bb *blockBuilder) Build() (*types.Block, error) {
@@ -136,8 +152,25 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	bb.setDefaults()
 
 	// Finalize header details before transaction processing.
+	bb.header.GasLimit = *bb.gasLimit
 	bb.header.Miner = bb.coinbase.Bytes()
 	bb.header.Timestamp = uint64(time.Now().Unix())
+
+	// Set arbitrary gas limit for the first block if not set yet.
+	if bb.header.GasLimit == 0 && bb.parent.Number == 0 {
+		// This arbitrary gas limit comes from early unit tests that run with
+		// empty block.
+		bb.header.GasLimit = 4_715_000
+	}
+
+	// Check if the gas limit needs to be calculated.
+	if bb.header.GasLimit == 0 {
+		// Calculate gas limit based on parent header.
+		bb.header.GasLimit, err = bb.blockchain.CalculateGasLimit(bb.parent.Number)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Create a block transition.
 	bb.transition, err = bb.executor.BeginTxn(*bb.parentRoot, bb.header, *bb.coinbase)

@@ -111,10 +111,10 @@ func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) (
 		return nil, res.Err
 	}
 
-	return DecodeValidators(method, res.ReturnValue)
+	return DecodeSequencers(method, res.ReturnValue)
 }
 
-func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
+func DecodeSequencers(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
 		return nil, err

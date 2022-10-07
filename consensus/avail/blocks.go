@@ -212,7 +212,7 @@ func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]ty
 		return nil, res.Err
 	}
 
-	return staking.DecodeValidators(method, res.ReturnValue)
+	return staking.DecodeSequencers(method, res.ReturnValue)
 }
 
 func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {

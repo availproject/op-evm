@@ -22,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 const (
@@ -68,11 +70,7 @@ func Factory(
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
-	asq := &activeSequencerQuerier{
-		blockchain: params.Blockchain,
-		executor:   params.Executor,
-		logger:     logger.Named("active_sequencer_querier"),
-	}
+	asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
 
 	d := &Avail{
 		logger:         logger,
@@ -80,7 +78,7 @@ func Factory(
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		verifier:       NewVerifier(asq, logger.Named("verifier")),
+		verifier:       block.NewVerifier(asq, logger.Named("verifier")),
 		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,
@@ -126,13 +124,13 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
-
-	// Start the syncer
-	if err := d.syncer.Start(); err != nil {
-		return err
-	}
-
 	if d.nodeType == Sequencer {
+		// Only start the syncer for sequencer. Validator and Watch Tower are
+		// working purely out of Avail.
+		if err := d.syncer.Start(); err != nil {
+			return err
+		}
+
 		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
 		if err != nil {
 			return err

@@ -42,3 +42,17 @@ func (c *client) instance() *gsrpc.SubstrateAPI {
 func (c *client) GenesisHash() types.Hash {
 	return c.genesisHash
 }
+
+func FindCallIndex(client Client) (types.CallIndex, error) {
+	meta, err := client.instance().RPC.State.GetMetadataLatest()
+	if err != nil {
+		return types.CallIndex{}, err
+	}
+
+	callIdx, err := meta.FindCallIndex(CallSubmitData)
+	if err != nil {
+		return types.CallIndex{}, err
+	}
+
+	return callIdx, nil
+}

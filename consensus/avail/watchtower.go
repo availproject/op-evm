@@ -121,10 +121,10 @@ func (d *Avail) runWatchTowerCycle() {
 	// Based on the current state, execute the corresponding section
 	switch d.getState() {
 	case AcceptState:
-		d.runAcceptState()
+		panic("acceptstate")
 
 	case ValidateState:
-		d.runValidateState()
+		panic("validatestate")
 
 	case SyncState:
 		d.runSyncState()

@@ -57,6 +57,10 @@ func New(blockchain *blockchain.Blockchain, executor *state.Executor, account ty
 }
 
 func (wt *watchTower) Check(blk *types.Block) error {
+	if blk == nil {
+		return fmt.Errorf("%w: block == nil", ErrInvalidBlock)
+	}
+
 	if blk.Header == nil {
 		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock)
 	}

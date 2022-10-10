@@ -41,6 +41,9 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			wt := watchtower.New(blockchain, executor, coinbaseAddr, signKey)
 

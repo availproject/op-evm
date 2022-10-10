@@ -38,27 +38,27 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		blk, err := block.FromAvail(availBlk, avail.BridgeAppID, callIdx)
 		if err != nil {
-			logger.Error("cannot extract Edge block from Avail block %d: %s", availBlk.Block.Header.Number, err)
+			logger.Error("cannot extract Edge block from Avail block", "blocknumber", availBlk.Block.Header.Number, "error", err)
 			continue
 		}
 
 		err = watchTower.Check(blk)
 		if err != nil {
-			logger.Debug("block verification failed. constructing fraudproof", blk.Header.Number, blk.Header.Hash, err)
+			logger.Debug("block verification failed. constructing fraudproof", "blocknumber", blk.Header.Number, "blockhash", blk.Header.Hash, "error", err)
 
 			fp, err := watchTower.ConstructFraudproof(blk)
 			if err != nil {
-				logger.Error("failed to construct fraudproof for block %d/%q: %s", blk.Header.Number, blk.Header.Hash, err)
+				logger.Error("failed to construct fraudproof for block", "blocknumber", blk.Header.Number, "blockhash", blk.Header.Hash, "error", err)
 				continue
 			}
 
-			logger.Debug("submitting fraudproof", fp.Header.Hash)
+			logger.Debug("submitting fraudproof", "blockhash", fp.Header.Hash)
 			f := availSender.SubmitDataAndWaitForStatus(fp.MarshalRLP(), avail_types.ExtrinsicStatus{IsInBlock: true})
 			go func() {
 				if _, err := f.Result(); err != nil {
 					logger.Error("submitting fraud proof to avail failed", err)
 				}
-				logger.Debug("submitted fraudproof", fp.Header.Hash)
+				logger.Debug("submitted fraudproof", "blockhash", fp.Header.Hash)
 			}()
 
 			// TODO: Write fraudproof to local chain
@@ -68,7 +68,7 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		err = watchTower.Apply(blk)
 		if err != nil {
-			logger.Error("cannot apply block %d/%q to blockchain: %s", blk.Header.Number, blk.Header.Hash, err)
+			logger.Error("cannot apply block to blockchain", "blocknumber", blk.Header.Number, "blocknumber", blk.Header.Hash, "error", err)
 		}
 	}
 }

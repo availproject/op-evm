@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func TestValidatorBlockCheck(t *testing.T) {
@@ -30,8 +31,9 @@ func TestValidatorBlockCheck(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			executor, blockchain := newBlockchain(t)
-			coinbaseAddr, signKey := newAccount(t)
+			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := test.NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
@@ -71,8 +73,9 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			executor, blockchain := newBlockchain(t)
-			coinbaseAddr, signKey := newAccount(t)
+			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := test.NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
@@ -113,8 +116,9 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			executor, blockchain := newBlockchain(t)
-			coinbaseAddr, signKey := newAccount(t)
+			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := test.NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())

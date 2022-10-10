@@ -14,7 +14,7 @@ import (
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
 	h := bchain.Genesis()
 
 	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
@@ -115,7 +115,7 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
 	address, privateKey := test.NewAccount(t)
 	address2, _ := test.NewAccount(t)
 
@@ -188,7 +188,7 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 func newBlockBuilder(t *testing.T) Builder {
 	t.Helper()
 
-	executor, bchain := test.NewBlockchain(t, NewVerifier(hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
 	h := bchain.Genesis()
 
 	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())

@@ -22,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 const (
@@ -67,13 +69,15 @@ func Factory(
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
+	asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
+
 	d := &Avail{
 		logger:         logger,
 		notifyCh:       make(chan struct{}),
 		closeCh:        make(chan struct{}),
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
-		verifier:       NewVerifier(logger.Named("verifier")),
+		verifier:       block.NewVerifier(asq, logger.Named("verifier")),
 		txpool:         params.TxPool,
 		secretsManager: params.SecretsManager,
 		network:        params.Network,

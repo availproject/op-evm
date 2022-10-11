@@ -54,6 +54,8 @@ func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 	return e
 }
 
+// Used to get the staking contract bytecode as we never know what will be its value and when
+// something is changed via the predeploy contract edge command.
 func getStakingContractBytecode(t *testing.T) []byte {
 	jsonFile, err := os.Open("../../configs/genesis.json")
 	if err != nil {

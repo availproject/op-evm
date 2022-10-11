@@ -2,7 +2,7 @@ package test
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"os"
 	"testing"
@@ -60,7 +60,7 @@ func getStakingContractBytecode(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 
 	var data map[string]interface{}
 

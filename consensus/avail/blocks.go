@@ -11,10 +11,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/maticnetwork/avail-settlement/contracts/staking"
+	staking_contract "github.com/maticnetwork/avail-settlement/contracts/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
-	stakingHelper "github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/umbracle/ethgo"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -45,7 +44,7 @@ func (d *Avail) isSequencerStaked(minerAccount accounts.Account) (bool, error) {
 		return false, err
 	}
 
-	addrs, err := QuerySequencers(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
+	addrs, err := staking.QuerySequencers(transition, gasLimit, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {
 		d.logger.Error("failed to query sequencers", "err", err)
 		return false, err
@@ -187,37 +186,9 @@ func (d *Avail) processTxns(gasLimit uint64, txn *state.Transition, txs []*types
 	return successful, nil
 }
 
-func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
-	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
-	if !ok {
-		return nil, errors.New("sequencers method doesn't exist in Staking contract ABI")
-	}
-
-	selector := method.ID()
-	res, err := t.Apply(&types.Transaction{
-		From:     from,
-		To:       &stakingHelper.AddrStakingContract,
-		Value:    big.NewInt(0),
-		Input:    selector,
-		GasPrice: big.NewInt(0),
-		Gas:      gasLimit,
-		Nonce:    t.GetNonce(from),
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Failed() {
-		return nil, res.Err
-	}
-
-	return DecodeValidators(method, res.ReturnValue)
-}
-
 // TODO: Figure out a way how to call a method with provided argument!
 func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
-	method, ok := abi.MustNewABI(staking.StakingABI).Methods["CurrentSequencers"]
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["CurrentSequencers"]
 	if !ok {
 		return nil, errors.New("sequencers method doesn't exist in Staking contract ABI")
 	}
@@ -225,7 +196,7 @@ func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]ty
 	selector := method.ID()
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
-		To:       &stakingHelper.AddrStakingContract,
+		To:       &staking.AddrStakingContract,
 		Value:    big.NewInt(0),
 		Input:    selector,
 		GasPrice: big.NewInt(0),
@@ -241,11 +212,11 @@ func IsSequencer(t *state.Transition, gasLimit uint64, from types.Address) ([]ty
 		return nil, res.Err
 	}
 
-	return DecodeValidators(method, res.ReturnValue)
+	return staking.DecodeSequencers(method, res.ReturnValue)
 }
 
 func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
-	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["stake"]
 	if !ok {
 		return errors.New("sequencers method doesn't exist in Staking contract ABI")
 	}
@@ -253,7 +224,7 @@ func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
 	selector := method.ID()
 	res, err := t.Apply(&types.Transaction{
 		From:     from,
-		To:       &stakingHelper.AddrStakingContract,
+		To:       &staking.AddrStakingContract,
 		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    selector,
 		GasPrice: big.NewInt(0),
@@ -271,29 +242,4 @@ func Stake(t *state.Transition, gasLimit uint64, from types.Address) error {
 
 	fmt.Printf("RETURNED STAKED REQUEST: %+v - err: %v \n", res, err)
 	return nil
-}
-
-func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
-	decodedResults, err := method.Outputs.Decode(returnValue)
-	if err != nil {
-		return nil, err
-	}
-
-	results, ok := decodedResults.(map[string]interface{})
-	if !ok {
-		return nil, errors.New("failed type assertion from decodedResults to map")
-	}
-
-	web3Addresses, ok := results["0"].([]ethgo.Address)
-
-	if !ok {
-		return nil, errors.New("failed type assertion from results[0] to []ethgo.Address")
-	}
-
-	addresses := make([]types.Address, 1)
-	for idx, waddr := range web3Addresses {
-		addresses[idx] = types.Address(waddr)
-	}
-
-	return addresses, nil
 }

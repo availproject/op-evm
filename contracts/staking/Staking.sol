@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.9;
 
 import "node_modules/@openzeppelin/contracts/utils/Address.sol";
-
 
 contract Staking {
     using Address for address;
@@ -21,8 +20,8 @@ contract Staking {
 
     // Events
     event Staked(address indexed account, uint256 amount);
-
     event Unstaked(address indexed account, uint256 amount);
+    event Slashed(address indexed account, uint256 amount);
 
     // Modifiers
     modifier onlyEOA() {
@@ -85,6 +84,11 @@ contract Staking {
         _unstake();
     }
 
+    // TODO: Cannot be only staker but only watchtower for example
+    function slash() public onlyEOA onlyStaker {
+        _slash();
+    }
+
     // Private functions
     function _stake() private {
         _stakedAmount += msg.value;
@@ -109,6 +113,20 @@ contract Staking {
 
         payable(msg.sender).transfer(amount);
         emit Unstaked(msg.sender, amount);
+    }
+
+    function _slash() private {
+        uint256 amount = _addressToStakedAmount[msg.sender];
+
+        require(
+            msg.value < amount,
+            "Slash amount cannot be greater than staked amount"
+        );
+
+        uint256 newAmount = amount - msg.value;
+        _stakedAmount -= newAmount;
+
+        emit Slashed(msg.sender, amount);
     }
 
     function _deleteFromSequencers(address staker) private {

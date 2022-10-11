@@ -1,4 +1,4 @@
-package block
+package test
 
 import (
 	"crypto/ecdsa"
@@ -10,14 +10,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
+	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
 	h := bchain.Genesis()
 
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	_, err := bbf.FromParentHash(h)
 	if err != nil {
 		t.Fatal(err)
@@ -115,22 +116,22 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
-	address, privateKey := test.NewAccount(t)
-	address2, _ := test.NewAccount(t)
+	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
+	address, privateKey := NewAccount(t)
+	address2, _ := NewAccount(t)
 
 	// Deposit 100 ETH to first account.
-	test.DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), test.ETH), bchain, executor)
+	DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), ETH), bchain, executor)
 
 	// Construct block.Builder w/ the blockchain instance that contains
 	// balance for our test account.
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	bb, err := bbf.FromParentHash(bchain.Header().Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	amount := big.NewInt(0).Mul(big.NewInt(10), test.ETH)
+	amount := big.NewInt(0).Mul(big.NewInt(10), ETH)
 
 	// Transfer 10 ETH from first account to second one.
 	tx := &types.Transaction{
@@ -185,13 +186,13 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 	return privateKey
 }
 
-func newBlockBuilder(t *testing.T) Builder {
+func newBlockBuilder(t *testing.T) block.Builder {
 	t.Helper()
 
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
+	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
 	h := bchain.Genesis()
 
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	bb, err := bbf.FromParentHash(h)
 	if err != nil {
 		t.Fatal(err)

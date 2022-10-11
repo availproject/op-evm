@@ -1,4 +1,4 @@
-package tests
+package test
 
 import (
 	"errors"
@@ -10,7 +10,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func TestValidatorBlockCheck(t *testing.T) {
@@ -32,9 +31,9 @@ func TestValidatorBlockCheck(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
-			coinbaseAddr, signKey := test.NewAccount(t)
+			verifier := staking.NewVerifier(new(DumbActiveSequencers), hclog.Default())
+			executor, blockchain := NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
@@ -74,9 +73,9 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
-			coinbaseAddr, signKey := test.NewAccount(t)
+			verifier := staking.NewVerifier(new(DumbActiveSequencers), hclog.Default())
+			executor, blockchain := NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
@@ -117,9 +116,9 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
-			coinbaseAddr, signKey := test.NewAccount(t)
+			verifier := staking.NewVerifier(new(DumbActiveSequencers), hclog.Default())
+			executor, blockchain := NewBlockchain(t, verifier)
+			coinbaseAddr, signKey := NewAccount(t)
 			head := getHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())

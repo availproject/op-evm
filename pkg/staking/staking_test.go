@@ -35,43 +35,11 @@ func TestIsContractDeployed(t *testing.T) {
 	tAssert.False(staked)
 }
 
-func TestIsContractStaked(t *testing.T) {
-	tAssert := assert.New(t)
-
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()))
-	tAssert.NotNil(executor)
-	tAssert.NotNil(blockchain)
-
-	coinbaseAddr, _ := test.NewAccount(t)
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
-	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
-
-	bf := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	blck, err := bf.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
-
-	blck.SetCoinbaseAddress(coinbaseAddr)
-
-	// Now lets go build the stake tx and push it to the blockchain.
-	stakeTx, err := StakeTx(coinbaseAddr, 100000)
-	tAssert.NoError(err)
-
-	block := blck.AddTransactions(stakeTx)
-
-	// Write the block to the blockchain
-	tAssert.NoError(block.Write("test"))
-
-	// Following test only queries contract to see if coinbase address is in staked set.
-	staked, err := IsStaked(coinbaseAddr, blockchain, executor)
-	tAssert.NoError(err)
-	tAssert.True(staked)
-}
-
-// TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks
+// TestIsContractStakedAndUnStaked - Is a bit more complex unit test that requires to write multiple blocks
 // in order to satisfy the states. It will produce 5 blocks, written into the database and as a outcome,
 // staker address will be staked and removed from the sequencer list resulting in a passing test.
 // Note that there has to be 2 stakers at least as minimum staker amount in the contract is 1.
-func TestIsContractUnStaked(t *testing.T) {
+func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert := assert.New(t)
 
 	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()))

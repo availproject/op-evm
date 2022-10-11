@@ -1,4 +1,4 @@
-package block
+package verifier
 
 import (
 	"fmt"
@@ -7,39 +7,34 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/common"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 type verifier struct {
-	activeSequencers staking.ActiveSequencers
-	logger           hclog.Logger
+	logger hclog.Logger
 }
 
-func NewVerifier(as staking.ActiveSequencers, logger hclog.Logger) blockchain.Verifier {
+func NewVerifier(logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
-		activeSequencers: as,
-		logger:           logger,
+		logger: logger,
 	}
 }
 
 func (v *verifier) VerifyHeader(header *types.Header) error {
-	signer, err := AddressRecoverFromHeader(header)
+	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
 		return err
 	}
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	minerIsActiveSequencer, err := v.activeSequencers.Contains(signer)
-	if err != nil {
-		return err
+	if signer != types.StringToAddress(common.SequencerAddress) {
+		v.logger.Info("Passing, how is it possible? 222")
+		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, common.SequencerAddress)
 	}
 
-	if !minerIsActiveSequencer {
-		return fmt.Errorf("signer address '%s' does not belong to active sequencers", signer)
-	}
-
-	v.logger.Info("Seal signer address successfully verified!", "signer", signer)
+	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", common.SequencerAddress)
 
 	/*
 		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)

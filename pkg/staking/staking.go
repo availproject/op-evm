@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
@@ -16,12 +18,13 @@ import (
 var (
 	// staking contract address
 	AddrStakingContract = types.StringToAddress("0x0110000000000000000000000000000000000001")
+	ETH                 = big.NewInt(1000000000000000000)
 
 	MinSequencerCount = uint64(1)
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func ApplyStakeTx(txn *state.Transition, from types.Address, gasLimit uint64) (*types.Transaction, error) {
+func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]
 	if !ok {
 		return nil, errors.New("stake method doesn't exist in Staking contract ABI")
@@ -36,23 +39,12 @@ func ApplyStakeTx(txn *state.Transition, from types.Address, gasLimit uint64) (*
 		Input:    selector,
 		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
-		Nonce:    txn.GetNonce(from),
-	}
-
-	res, err := txn.Apply(tx)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Failed() {
-		return nil, res.Err
 	}
 
 	return tx, nil
 }
 
-func ApplyUnStakeTx(txn *state.Transition, from types.Address, gasLimit uint64) (*types.Transaction, error) {
+func UnStakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["unstake"]
 	if !ok {
 		return nil, errors.New("unstake method doesn't exist in Staking contract ABI")
@@ -67,24 +59,12 @@ func ApplyUnStakeTx(txn *state.Transition, from types.Address, gasLimit uint64) 
 		Input:    selector,
 		GasPrice: big.NewInt(50000),
 		Gas:      gasLimit,
-		Nonce:    txn.GetNonce(from),
-	}
-
-	res, err := txn.Apply(tx)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Failed() {
-		fmt.Printf("failure while unstaking: %s - err: %s \n", res.ReturnValue, res.Err)
-		return nil, res.Err
 	}
 
 	return tx, nil
 }
 
-func ApplySlashStakerTx(txn *state.Transition, from types.Address, ethValue *big.Int, gasLimit uint64) (*types.Transaction, error) {
+func SlashStakerTx(from types.Address, ethValue *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["slash"]
 	if !ok {
 		return nil, errors.New("unstake method doesn't exist in Staking contract ABI")
@@ -97,21 +77,48 @@ func ApplySlashStakerTx(txn *state.Transition, from types.Address, ethValue *big
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0), // 10 ETH
 		Input:    selector,
-		GasPrice: big.NewInt(100000),
+		GasPrice: big.NewInt(10000),
 		Gas:      gasLimit,
-		Nonce:    txn.GetNonce(from),
-	}
-
-	res, err := txn.Apply(tx)
-	if err != nil {
-		fmt.Printf("failure while attempt to slash - err: %s \n", err)
-		return nil, err
-	}
-
-	if res.Failed() {
-		fmt.Printf("failure while slashing: %+v - %s - err: %s \n", res, res.ReturnValue, res.Err)
-		return nil, res.Err
 	}
 
 	return tx, nil
+}
+
+func IsStaked(addr types.Address, bc *blockchain.Blockchain, exec *state.Executor) (bool, error) {
+	parent := bc.Header()
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      addr.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := bc.CalculateGasLimit(header.Number)
+	if err != nil {
+		return false, err
+	}
+
+	transition, err := exec.BeginTxn(parent.StateRoot, header, addr)
+	if err != nil {
+		return false, err
+	}
+
+	addrs, err := QuerySequencers(transition, gasLimit, addr)
+	if err != nil {
+		return false, err
+	}
+
+	fmt.Printf("Requested staked addr: %v - available addrs: %v \n", addr.String(), addrs)
+
+	for _, sequencerAddr := range addrs {
+		if sequencerAddr.String() == addr.String() {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

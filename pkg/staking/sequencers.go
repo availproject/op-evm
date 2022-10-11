@@ -131,7 +131,7 @@ func DecodeSequencers(method *abi.Method, returnValue []byte) ([]types.Address, 
 		return nil, errors.New("failed type assertion from results[0] to []ethgo.Address")
 	}
 
-	addresses := make([]types.Address, 1)
+	addresses := make([]types.Address, len(web3Addresses))
 	for idx, waddr := range web3Addresses {
 		addresses[idx] = types.Address(waddr)
 	}

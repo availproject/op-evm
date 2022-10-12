@@ -12,10 +12,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
@@ -116,12 +117,12 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
-	address, privateKey := NewAccount(t)
-	address2, _ := NewAccount(t)
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	address, privateKey := test.NewAccount(t)
+	address2, _ := test.NewAccount(t)
 
 	// Deposit 100 ETH to first account.
-	DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), ETH), bchain, executor)
+	test.DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), test.ETH), bchain, executor)
 
 	// Construct block.Builder w/ the blockchain instance that contains
 	// balance for our test account.
@@ -131,7 +132,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	amount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+	amount := big.NewInt(0).Mul(big.NewInt(10), test.ETH)
 
 	// Transfer 10 ETH from first account to second one.
 	tx := &types.Transaction{
@@ -189,7 +190,7 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 func newBlockBuilder(t *testing.T) block.Builder {
 	t.Helper()
 
-	executor, bchain := NewBlockchain(t, staking.NewVerifier(new(DumbActiveSequencers), hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())

@@ -2,6 +2,8 @@ package staking
 
 import (
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -13,6 +15,11 @@ import (
 	"github.com/test-go/testify/assert"
 )
 
+func getGenesisBasePath() string {
+	path, _ := os.Getwd()
+	return filepath.Join(path, "..", "..")
+}
+
 func AddrToAccount(addr types.Address) accounts.Account {
 	return accounts.Account{Address: common.BytesToAddress([]byte{})}
 }
@@ -21,7 +28,7 @@ func TestIsContractDeployed(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, nil)
+	executor, blockchain := test.NewBlockchain(t, nil, getGenesisBasePath())
 
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
@@ -42,7 +49,7 @@ func TestIsContractDeployed(t *testing.T) {
 func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()))
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -131,7 +138,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 func TestSlashStaker(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()))
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 

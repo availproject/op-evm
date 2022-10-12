@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func getHeadBlock(t *testing.T, blockchain *blockchain.Blockchain) *types.Block {
+func GetHeadBlock(t *testing.T, blockchain *blockchain.Blockchain) *types.Block {
 	var head *types.Block
 
 	var headBlockHash types.Hash

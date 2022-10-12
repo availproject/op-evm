@@ -5,6 +5,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -18,8 +19,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-func NewBlockchain(t *testing.T, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain) {
-	chain := NewChain(t)
+func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain) {
+	chain := NewChain(t, basepath)
 	executor := NewInMemExecutor(t, chain)
 
 	gr := executor.WriteGenesis(chain.Genesis.Alloc)
@@ -54,8 +55,9 @@ func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 	return e
 }
 
-func getStakingContractBytecode(t *testing.T) []byte {
-	jsonFile, err := os.Open("../../configs/genesis.json")
+func getStakingContractBytecode(t *testing.T, basepath string) []byte {
+
+	jsonFile, err := os.Open(filepath.Join(basepath, "configs/genesis.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,9 +85,9 @@ func getStakingContractBytecode(t *testing.T) []byte {
 	return nil
 }
 
-func NewChain(t *testing.T) *chain.Chain {
+func NewChain(t *testing.T, basepath string) *chain.Chain {
 	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
-	scBytecode := getStakingContractBytecode(t)
+	scBytecode := getStakingContractBytecode(t, basepath)
 
 	return &chain.Chain{
 		Genesis: &chain.Genesis{

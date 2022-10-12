@@ -192,7 +192,7 @@ func Test_Builder_Set_ExtraData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kv, err := DecodeExtraDataFields(b.Header.ExtraData)
+	kv, err := block.DecodeExtraDataFields(b.Header.ExtraData)
 	if err != nil {
 		t.Fatal(err)
 	}

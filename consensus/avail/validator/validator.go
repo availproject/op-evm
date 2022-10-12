@@ -1,7 +1,6 @@
 package validator
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -80,19 +79,17 @@ func (v *validator) Check(blk *types.Block) error {
 }
 
 func (v *validator) ProcessFraudproof(blk *types.Block) error {
-	extraData := blk.Header.ExtraData
-	if len(extraData) > 0 && bytes.Contains(extraData, block.FraudproofPrefix) {
-		v.logger.Warn("**************** FRAUD PROOF FOUND ************************")
-		addr := bytes.TrimPrefix(extraData, block.FraudproofPrefix)
-		if len(addr) < types.HashLength*2 {
-			return fmt.Errorf("invalid fraud proof block: %d/%q - target block hash invalid", blk.Number(), blk.Hash())
-		}
+	extraDataKV, err := block.DecodeExtraDataFields(blk.Header.ExtraData)
+	if err != nil {
+		return err
+	}
 
-		var hash types.Hash
-		err := hash.Scan(addr[:types.HashLength*2])
-		if err != nil {
-			return fmt.Errorf("invalid fraud proof block: %d/%q - cannot parse target block hash: %s", blk.Number(), blk.Hash(), err)
-		}
+	hashBS, exists := extraDataKV[block.KeyFraudproof]
+	if exists {
+		v.logger.Warn("**************** FRAUD PROOF FOUND ************************")
+
+		blkHash := types.BytesToHash(hashBS)
+		v.logger.Info("Fraudproof for block", "hash", blkHash)
 
 		// TODO(tuommaki): Process fraud proof.
 	}

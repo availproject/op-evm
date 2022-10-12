@@ -7,34 +7,25 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/umbracle/fastrlp"
 )
 
 func Test_WriteSeal(t *testing.T) {
 	hdr := &types.Header{}
 
-	hdr.ExtraData = make([]byte, SequencerExtraVanity)
-
-	extraData := append([]byte{}, FraudproofPrefix...)
-	extraData = append(extraData, hdr.Hash.Bytes()...)
-	ar := &fastrlp.Arena{}
-	rlpExtraData, err := ar.NewBytes(extraData).Bytes()
-	if err != nil {
-		panic(err)
-	}
-
-	copy(hdr.ExtraData, rlpExtraData)
+	kv := make(map[string][]byte)
+	kv[KeyFraudproof] = hdr.Hash.Bytes()
 
 	ve := &ValidatorExtra{}
-	bs := ve.MarshalRLPTo(nil)
-	hdr.ExtraData = append(hdr.ExtraData, bs...)
+	kv[KeyExtraValidators] = ve.MarshalRLPTo(nil)
+
+	hdr.ExtraData = EncodeExtraDataFields(kv)
 
 	key := keystore.NewKeyForDirectICAP(rand.Reader)
 	miner := crypto.PubKeyToAddress(&key.PrivateKey.PublicKey)
 
 	hdr.Miner = miner.Bytes()
 
-	hdr, err = WriteSeal(key.PrivateKey, hdr)
+	hdr, err := WriteSeal(key.PrivateKey, hdr)
 	if err != nil {
 		t.Fatal(err)
 	}

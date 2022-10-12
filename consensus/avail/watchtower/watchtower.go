@@ -4,16 +4,12 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
-	block_seal "github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -37,9 +33,10 @@ type WatchTower interface {
 }
 
 type watchTower struct {
-	blockchain *blockchain.Blockchain
-	executor   *state.Executor
-	logger     hclog.Logger
+	blockchain          *blockchain.Blockchain
+	executor            *state.Executor
+	blockBuilderFactory block.BlockBuilderFactory
+	logger              hclog.Logger
 
 	account types.Address
 	signKey *ecdsa.PrivateKey
@@ -47,9 +44,10 @@ type watchTower struct {
 
 func New(blockchain *blockchain.Blockchain, executor *state.Executor, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
 	return &watchTower{
-		blockchain: blockchain,
-		executor:   executor,
-		logger:     hclog.Default(),
+		blockchain:          blockchain,
+		executor:            executor,
+		logger:              hclog.Default(),
+		blockBuilderFactory: block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()),
 
 		account: account,
 		signKey: signKey,
@@ -85,82 +83,22 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 }
 
 func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.Block, error) {
-	header := &types.Header{
-		ParentHash: maliciousBlock.ParentHash(),
-		Number:     maliciousBlock.Number(),
-		Miner:      wt.account.Bytes(),
-		Nonce:      types.Nonce{},
-		GasLimit:   maliciousBlock.Header.GasLimit, // TODO(tuommaki): This needs adjusting.
-		Timestamp:  uint64(time.Now().Unix()),
-	}
-
-	parentHdr, found := wt.blockchain.GetParent(maliciousBlock.Header)
-	if !found {
-		return nil, ErrParentBlockNotFound
-	}
-
-	transition, err := wt.executor.BeginTxn(parentHdr.StateRoot, header, wt.account)
+	builder, err := wt.blockBuilderFactory.FromParentHash(maliciousBlock.ParentHash())
 	if err != nil {
 		return nil, err
 	}
 
-	txns := constructFraudproofTxs(maliciousBlock)
-	for _, tx := range txns {
-		err := transition.Write(tx)
-		if err != nil {
-			// TODO(tuommaki): This needs re-assesment. Theoretically there
-			// should NEVER be situation where fraud proof transaction writing
-			// could fail and hence panic here is appropriate. There is some
-			// debugging aspects though, which might need revisiting,
-			// especially if the malicious block can cause situation where this
-			// section fails - it would then defeat the purpose of watch tower.
-			panic(err)
-		}
-	}
+	blk, err := builder.
+		SetCoinbaseAddress(wt.account).
+		SetGasLimit(maliciousBlock.Header.GasLimit).
+		SetExtraDataField(block.KeyFraudproof, maliciousBlock.Hash().Bytes()).
+		AddTransactions(constructFraudproofTxs(maliciousBlock)...).
+		SignWith(wt.signKey).
+		Build()
 
-	// Commit the changes
-	_, root := transition.Commit()
-
-	// Update the header
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// Build the actual block
-	// The header hash is computed inside buildBlock
-	blk := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header:   header,
-		Txns:     txns,
-		Receipts: transition.Receipts(),
-	})
-
-	// Write the seal of the block after all the fields are completed
-	{
-		blk.Header.ExtraData = make([]byte, block_seal.SequencerExtraVanity)
-		extraData := append([]byte{}, FraudproofPrefix...)
-		extraData = append(extraData, []byte(maliciousBlock.Hash().String())...)
-		ar := &fastrlp.Arena{}
-		rlpExtraData, err := ar.NewBytes(extraData).Bytes()
-		if err != nil {
-			panic(err)
-		}
-
-		copy(header.ExtraData, rlpExtraData)
-
-		ve := &block_seal.ValidatorExtra{}
-		bs := ve.MarshalRLPTo(nil)
-		header.ExtraData = append(header.ExtraData, bs...)
-	}
-
-	header, err = block_seal.WriteSeal(wt.signKey, blk.Header)
 	if err != nil {
 		return nil, err
 	}
-
-	blk.Header = header
-
-	// Compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	blk.Header.ComputeHash()
 
 	return blk, nil
 }

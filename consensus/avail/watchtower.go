@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -186,20 +185,11 @@ func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTow
 
 	// Write the seal of the block after all the fields are completed
 	{
-		blk.Header.ExtraData = make([]byte, block.SequencerExtraVanity)
-		extraData := append([]byte{}, block.FraudproofPrefix...)
-		extraData = append(extraData, []byte(maliciousBlock.Hash().String())...)
-		ar := &fastrlp.Arena{}
-		rlpExtraData, err := ar.NewBytes(extraData).Bytes()
-		if err != nil {
-			panic(err)
-		}
-
-		copy(header.ExtraData, rlpExtraData)
-
 		ve := &block.ValidatorExtra{}
-		bs := ve.MarshalRLPTo(nil)
-		header.ExtraData = append(header.ExtraData, bs...)
+		blk.Header.ExtraData = block.EncodeExtraDataFields(map[string][]byte{
+			block.KeyExtraValidators: ve.MarshalRLPTo(nil),
+			block.KeyFraudproof:      maliciousBlock.Hash().Bytes(),
+		})
 	}
 
 	header, err = block.WriteSeal(watchTowerPK.PrivateKey, blk.Header)

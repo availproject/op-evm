@@ -1,31 +1,84 @@
 package block
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
 var (
-	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
-	// malicious block hash in `ExtraData` of the fraudproof block header.
-	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
+	// KeyExtraValidators is key that identifies the `ValidatorsExtra` object
+	// serialized in `ExtraData`.
+	KeyExtraValidators = "EXTRA_VALIDATORS"
 
-	// SequencerExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
-	SequencerExtraVanity = 128
+	// KeyFraudproof is key that identifies the fraudproof objected malicious
+	// block hash in `ExtraData` of the fraudproof block header.
+	KeyFraudproof = "FRAUDPROOF_OF"
 )
 
-var zeroBytes = make([]byte, 128)
+func EncodeExtraDataFields(data map[string][]byte) []byte {
+	var keys []string
+	for k := range data {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	a := &fastrlp.Arena{}
+
+	vv := a.NewArray()
+
+	for _, k := range keys {
+		vv.Set(a.NewString(k))
+		vv.Set(a.NewBytes(data[k]))
+	}
+
+	return vv.MarshalTo(nil)
+}
+
+func DecodeExtraDataFields(data []byte) (map[string][]byte, error) {
+	kv := make(map[string][]byte)
+
+	if len(data) == 0 {
+		return kv, nil
+	}
+
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+
+	vs, err := v.GetElems()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(vs); i += 2 {
+		k, err := vs[i].GetString()
+		if err != nil {
+			return nil, err
+		}
+
+		v, err := vs[i+1].Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		kv[k] = v
+	}
+
+	return kv, nil
+}
 
 // AssignExtraValidators is a helper method that adds validators to the extra field in the header
-func AssignExtraValidators(h *types.Header, validators []types.Address) {
-	// Pad zeros to the right up to istanbul vanity
-	extra := h.ExtraData
-	if len(extra) < SequencerExtraVanity {
-		extra = append(extra, zeroBytes[:SequencerExtraVanity-len(extra)]...)
-	} else {
-		extra = extra[:SequencerExtraVanity]
+func AssignExtraValidators(h *types.Header, validators []types.Address) error {
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return err
 	}
 
 	ibftExtra := &ValidatorExtra{
@@ -34,34 +87,43 @@ func AssignExtraValidators(h *types.Header, validators []types.Address) {
 		CommittedSeal: [][]byte{},
 	}
 
-	extra = ibftExtra.MarshalRLPTo(extra)
-	h.ExtraData = extra
+	bs := ibftExtra.MarshalRLPTo(nil)
+	kv[KeyExtraValidators] = bs
+
+	h.ExtraData = EncodeExtraDataFields(kv)
+
+	return nil
 }
 
 // PutIbftExtra sets the extra data field in the header to the passed in istanbul extra data
 func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
-	// Pad zeros to the right up to istanbul vanity
-	extra := h.ExtraData
-	if len(extra) < SequencerExtraVanity {
-		extra = append(extra, zeroBytes[:SequencerExtraVanity-len(extra)]...)
-	} else {
-		extra = extra[:SequencerExtraVanity]
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return err
 	}
 
 	data := istanbulExtra.MarshalRLPTo(nil)
-	extra = append(extra, data...)
-	h.ExtraData = extra
+
+	kv[KeyExtraValidators] = data
+
+	h.ExtraData = EncodeExtraDataFields(kv)
 
 	return nil
 }
 
 // getValidatorExtra returns the istanbul extra data field from the passed in header
 func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
-	if len(h.ExtraData) < SequencerExtraVanity {
-		return nil, fmt.Errorf("wrong extra size: %d", len(h.ExtraData))
+
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return nil, err
 	}
 
-	data := h.ExtraData[SequencerExtraVanity:]
+	data, exists := kv[KeyExtraValidators]
+	if !exists {
+		return nil, errors.New("no validators extra object found")
+	}
+
 	extra := &ValidatorExtra{}
 
 	if err := extra.UnmarshalRLP(data); err != nil {

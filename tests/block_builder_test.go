@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
+	"reflect"
 	"testing"
 
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
@@ -173,6 +174,31 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 
 	if tx.Value.Cmp(amount) != 0 {
 		t.Fatalf("expected %q, got %q in tx.Value", tx.Value, amount)
+	}
+}
+
+func Test_Builder_Set_ExtraData(t *testing.T) {
+	sk := newPrivateKey(t)
+
+	key := "foo"
+	value := []byte("bar")
+
+	b, err := newBlockBuilder(t).
+		SetExtraDataField(key, value).
+		SignWith(sk).
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kv, err := DecodeExtraDataFields(b.Header.ExtraData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(kv["foo"], value) {
+		t.Fatalf("block header ExtraData[%q]: got %v, expected %v", "foo", kv["foo"], value)
 	}
 }
 

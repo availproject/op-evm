@@ -64,7 +64,10 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	// This will effectively remove the Seal and Committed Seal fields,
 	// while keeping proposer vanity and validator set
 	// because extra.Validators is what we got from `h` in the first place.
-	AssignExtraValidators(h, extra.Validators)
+	err = AssignExtraValidators(h, extra.Validators)
+	if err != nil {
+		return nil, err
+	}
 
 	vv := arena.NewArray()
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))

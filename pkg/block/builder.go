@@ -22,6 +22,7 @@ var (
 type Builder interface {
 	SetBlockNumber(number uint64) Builder
 	SetCoinbaseAddress(coinbaseAddr types.Address) Builder
+	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
 
@@ -46,6 +47,7 @@ type blockBuilder struct {
 	parent *types.Header
 
 	transition   *state.Transition
+	extraData    map[string][]byte
 	transactions []*types.Transaction
 	signKey      *ecdsa.PrivateKey
 }
@@ -89,6 +91,8 @@ func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder,
 			GasLimit:   parent.GasLimit,
 		},
 		parent: parent,
+
+		extraData: make(map[string][]byte),
 	}
 
 	return bb, nil
@@ -101,6 +105,11 @@ func (bb *blockBuilder) SetBlockNumber(n uint64) Builder {
 
 func (bb *blockBuilder) SetCoinbaseAddress(coinbaseAddr types.Address) Builder {
 	bb.coinbase = &coinbaseAddr
+	return bb
+}
+
+func (bb *blockBuilder) SetExtraDataField(key string, value []byte) Builder {
+	bb.extraData[key] = value
 	return bb
 }
 
@@ -167,6 +176,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	bb.setDefaults()
 
 	// Finalize header details before transaction processing.
+	bb.header.ExtraData = EncodeExtraDataFields(bb.extraData)
 	bb.header.GasLimit = *bb.gasLimit
 	bb.header.Miner = bb.coinbase.Bytes()
 	bb.header.Timestamp = uint64(time.Now().Unix())

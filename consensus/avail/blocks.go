@@ -92,7 +92,10 @@ func (d *Avail) buildBlock(minerKeystore *keystore.KeyStore, minerAccount accoun
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
+	err = block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
+	if err != nil {
+		return nil, err
+	}
 
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
 	if err != nil {

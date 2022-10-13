@@ -38,27 +38,27 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		blk, err := block.FromAvail(availBlk, avail.BridgeAppID, callIdx)
 		if err != nil {
-			logger.Error("cannot extract Edge block from Avail block", "blocknumber", availBlk.Block.Header.Number, "error", err)
+			logger.Error("cannot extract Edge block from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 			continue
 		}
 
 		err = watchTower.Check(blk)
 		if err != nil {
-			logger.Debug("block verification failed. constructing fraudproof", "blocknumber", blk.Header.Number, "blockhash", blk.Header.Hash, "error", err)
+			logger.Debug("block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
 			fp, err := watchTower.ConstructFraudproof(blk)
 			if err != nil {
-				logger.Error("failed to construct fraudproof for block", "blocknumber", blk.Header.Number, "blockhash", blk.Header.Hash, "error", err)
+				logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 				continue
 			}
 
-			logger.Debug("submitting fraudproof", "blockhash", fp.Header.Hash)
+			logger.Debug("submitting fraudproof", "block_hash", fp.Header.Hash)
 			f := availSender.SubmitDataAndWaitForStatus(fp.MarshalRLP(), avail_types.ExtrinsicStatus{IsInBlock: true})
 			go func() {
 				if _, err := f.Result(); err != nil {
 					logger.Error("submitting fraud proof to avail failed", err)
 				}
-				logger.Debug("submitted fraudproof", "blockhash", fp.Header.Hash)
+				logger.Debug("submitted fraudproof", "block_hash", fp.Header.Hash)
 			}()
 
 			// TODO: Write fraudproof to local chain
@@ -68,7 +68,7 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		err = watchTower.Apply(blk)
 		if err != nil {
-			logger.Error("cannot apply block to blockchain", "blocknumber", blk.Header.Number, "blocknumber", blk.Header.Hash, "error", err)
+			logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 		}
 	}
 }

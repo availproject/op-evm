@@ -64,7 +64,7 @@ func (wt *watchTower) Check(blk *types.Block) error {
 	}
 
 	if err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
-		wt.logger.Info("block %d (%q) cannot be verified: %s", blk.Number(), blk.Hash(), err)
+		wt.logger.Info("block cannot be verified", "block_number", blk.Number(), "block_hash", blk.Hash(), "error", err)
 		return err
 	}
 
@@ -76,8 +76,8 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 
-	wt.logger.Debug("Received block header: %+v \n", blk.Header)
-	wt.logger.Debug("Received block transactions: %+v \n", blk.Transactions)
+	wt.logger.Debug("Received block header", "block_header", blk.Header)
+	wt.logger.Debug("Received block transactions", "block_transactions", blk.Transactions)
 
 	return nil
 }

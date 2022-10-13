@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,7 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/contracts/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -23,6 +26,31 @@ var (
 	MinSequencerCount = uint64(1)
 	MaxSequencerCount = common.MaxSafeJSInt
 )
+
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64) error {
+	bfCoinbase := block.NewBlockBuilderFactory(bh, exec, logger)
+	blck, err := bfCoinbase.FromParentHash(bh.Header().Hash)
+	if err != nil {
+		return err
+	}
+
+	blck.SetCoinbaseAddress(stakerAddr)
+	blck.SignWith(stakerKey)
+
+	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	if err != nil {
+		return err
+	}
+
+	blck.AddTransactions(stakeTx)
+
+	// Write the block to the blockchain
+	if err := blck.Write("sequencer"); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]

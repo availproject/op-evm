@@ -30,16 +30,14 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID uint32, callIdx avail_t
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
 		if extrinsic.Signature.AppID != avail_types.U32(appID) {
-			logger.Debug("block %d extrinsic %d: AppID doesn't match (%d vs. %d)", avail_blk.Block.Header.Number, i, extrinsic.Signature.AppID, appID)
+			logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
 			continue
 		}
 
 		if extrinsic.Method.CallIndex != callIdx {
-			logger.Debug("block %d extrinsic %d: Method.CallIndex doesn't match (got %v, expected %v)", avail_blk.Block.Header.Number, i, extrinsic.Method.CallIndex, callIdx)
+			logger.Debug("block extrinsic's Method.CallIndex doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_call_index", extrinsic.Method.CallIndex, "filter_call_index", callIdx)
 			continue
 		}
-
-		logger.Debug("block %d extrinsic %d: len(extrinsic.Method.Args): %d, extrinsic.Method.Args: '%v'", avail_blk.Block.Header.Number, i, len(extrinsic.Method.Args), extrinsic.Method.Args)
 
 		var blob avail.Blob
 		{
@@ -53,7 +51,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID uint32, callIdx avail_t
 				// Don't return just yet because there is no way of filtering
 				// uninteresting extrinsics / method.Args and failing decoding
 				// is the only way to distinct those.
-				logger.Debug("block %d extrinsic %d: decoding raw bytes from args failed: %s", avail_blk.Block.Header.Number, i, err)
+				logger.Debug("decoding block extrinsic's raw bytes from args failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
 
@@ -63,7 +61,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID uint32, callIdx avail_t
 				// Don't return just yet because there is no way of filtering
 				// uninteresting extrinsics / method.Args and failing decoding
 				// is the only way to distinct those.
-				logger.Debug("block %d extrinsic %d: decoding blob from bytes failed: %s", avail_blk.Block.Header.Number, i, err)
+				logger.Debug("decoding blob from extrinsic data failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
 		}

@@ -57,7 +57,7 @@ func (bs *BlockStream) watch() {
 	for {
 		latest, err := bs.api.RPC.Chain.GetBlockHashLatest()
 		if err != nil {
-			bs.logger.Error("couldn't fetch latest block hash: %s", err)
+			bs.logger.Error("couldn't fetch latest block hash", "error", err)
 			continue
 		}
 
@@ -74,14 +74,14 @@ func (bs *BlockStream) watch() {
 		} else {
 			blockHash, err = bs.api.RPC.Chain.GetBlockHash(bs.offset)
 			if err != nil {
-				bs.logger.Error("couldn't fetch block hash for block number %d: %s", bs.offset, err)
+				bs.logger.Error("couldn't fetch block hash for block", "block_number", bs.offset, "error", err)
 				continue
 			}
 		}
 
 		blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
 		if err != nil {
-			bs.logger.Error("couldn't fetch block: %d: %s", bs.offset, err)
+			bs.logger.Error("couldn't fetch block", "block_number", bs.offset, "block_hash", blockHash, "error", err)
 			continue
 		}
 

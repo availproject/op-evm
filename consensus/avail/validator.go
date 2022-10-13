@@ -36,19 +36,19 @@ func (d *Avail) runValidator() {
 
 		blk, err := block.FromAvail(avail_blk, avail.BridgeAppID, callIdx)
 		if err != nil {
-			d.logger.Error("cannot extract Edge block from Avail block %d: %s", avail_blk.Block.Header.Number, err)
+			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
 			continue
 		}
 
 		err = validator.Check(blk)
 		if err != nil {
-			d.logger.Error("invalid block %d/%q : %s", blk.Header.Number, blk.Header.Hash, err)
+			d.logger.Error("invalid block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 			continue
 		}
 
 		err = validator.Apply(blk)
 		if err != nil {
-			d.logger.Error("cannot apply block %d/%q to blockchain: %s", blk.Header.Number, blk.Header.Hash, err)
+			d.logger.Error("cannot apply block to blockchain", "block_nubmer", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 		}
 	}
 }

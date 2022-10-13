@@ -16,7 +16,7 @@ func (d *Avail) runSyncState() {
 	}
 
 	callInsertBlockHook := func(block *types.Block) bool {
-		d.logger.Debug("syncing block %d", block.Number())
+		d.logger.Debug("syncing block", "block_number", block.Number(), "block_hash", block.Hash())
 		d.txpool.ResetWithHeaders(block.Header)
 		return false
 	}
@@ -33,6 +33,6 @@ func (d *Avail) runSyncState() {
 	if err := d.syncer.Sync(
 		callInsertBlockHook,
 	); err != nil {
-		d.logger.Error("watch sync failed", "err", err)
+		d.logger.Error("watch sync failed", "error", err)
 	}
 }

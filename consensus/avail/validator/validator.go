@@ -61,8 +61,8 @@ func (v *validator) Apply(blk *types.Block) error {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
 	}
 
-	v.logger.Debug("Received block header: %+v \n", blk.Header)
-	v.logger.Debug("Received block transactions: %+v \n", blk.Transactions)
+	v.logger.Debug("Received block header", "header", blk.Header)
+	v.logger.Debug("Received block transactions", "transactions", blk.Transactions)
 
 	return nil
 }
@@ -190,12 +190,12 @@ func (v *validator) verifyBlockParent(childBlk *types.Block) error {
 	parent, ok := v.blockchain.GetHeaderByHash(parentHash)
 
 	if !ok {
-		v.logger.Error(fmt.Sprintf(
-			"parent of %s (%d) not found: %s",
-			childBlk.Hash().String(),
-			childBlk.Number(),
-			parentHash,
-		))
+		v.logger.Error(
+			"parent not found",
+			"child_block_hash", childBlk.Hash().String(),
+			"child_block_number", childBlk.Number(),
+			"parent_block_hash", parentHash,
+		)
 
 		return ErrParentNotFound
 	}
@@ -212,11 +212,11 @@ func (v *validator) verifyBlockParent(childBlk *types.Block) error {
 
 	// Make sure the block numbers are correct
 	if childBlk.Number()-1 != parent.Number {
-		v.logger.Error(fmt.Sprintf(
-			"number sequence not correct at %d and %d",
-			childBlk.Number(),
-			parent.Number,
-		))
+		v.logger.Error(
+			"block number sequence not correct",
+			"child_block_number", childBlk.Number(),
+			"parent_block_number", parent.Number,
+		)
 
 		return ErrInvalidBlockSequence
 	}

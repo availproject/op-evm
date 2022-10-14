@@ -41,7 +41,6 @@ type Avail struct {
 	mechanisms  []MechanismType
 	nodeType    MechanismType
 
-	state  *currentState // Reference to the current state
 	syncer syncer.Syncer // Reference to the sync protocol
 
 	notifyCh chan struct{}
@@ -83,7 +82,6 @@ func Factory(
 		secretsManager: params.SecretsManager,
 		network:        params.Network,
 		blockTime:      time.Duration(params.BlockTime) * time.Second,
-		state:          newState(),
 		nodeType:       MechanismType(params.NodeType),
 		syncer: syncer.NewSyncer(
 			params.Logger,
@@ -166,24 +164,6 @@ func (d *Avail) Start() error {
 	}
 
 	return nil
-}
-
-// STATE MACHINE METHODS //
-
-// getState returns the current IBFT state
-func (d *Avail) getState() AvailState {
-	return d.state.getState()
-}
-
-// isState checks if the node is in the passed in state
-func (d *Avail) isState(s AvailState) bool {
-	return d.state.getState() == s
-}
-
-// setState sets the IBFT state
-func (d *Avail) setState(s AvailState) {
-	d.logger.Info("state change", "new", s)
-	d.state.setState(s)
 }
 
 // REQUIRED BASE INTERFACE METHODS //

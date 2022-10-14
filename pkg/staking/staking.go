@@ -27,9 +27,9 @@ var (
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64) error {
-	bfCoinbase := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := bfCoinbase.FromParentHash(bh.Header().Hash)
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+	builder := block.NewBlockBuilderFactory(bh, exec, logger)
+	blck, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
@@ -45,11 +45,38 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 	blck.AddTransactions(stakeTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write("sequencer"); err != nil {
+	if err := blck.Write(src); err != nil {
 		return err
 	}
 
 	return nil
+
+}
+
+func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+	builder := block.NewBlockBuilderFactory(bh, exec, logger)
+	blck, err := builder.FromParentHash(bh.Header().Hash)
+	if err != nil {
+		return err
+	}
+
+	blck.SetCoinbaseAddress(stakerAddr)
+	blck.SignWith(stakerKey)
+
+	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	if err != nil {
+		return err
+	}
+
+	blck.AddTransactions(stakeTx)
+
+	// Write the block to the blockchain
+	if err := blck.Write(src); err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
@@ -65,7 +92,7 @@ func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    selector,
-		GasPrice: big.NewInt(5000),
+		GasPrice: big.NewInt(50000),
 		Gas:      gasLimit,
 	}
 

@@ -136,17 +136,16 @@ func (d *Avail) Start() error {
 		}
 
 		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+		minerAddr := types.Address(minerAccount.Address)
 
-		// For now it's here as is, not the best path moving forward for sure but the idea
-		// is to check if sequencer is staked prior we allow any futhure block manipulations.
-		sequencerStaked, sequencerError := sequencerQuerier.Contains(types.Address(minerAccount.Address))
+		sequencerStaked, sequencerError := sequencerQuerier.Contains(minerAddr)
 		if sequencerError != nil {
 			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
 			return sequencerError
 		}
 
 		if !sequencerStaked {
-			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, types.Address(minerAccount.Address), minerPk.PrivateKey, 100000)
+			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, minerAddr, minerPk.PrivateKey, 1_000_000, "sequencer")
 			if stakedErr != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err

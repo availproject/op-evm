@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
@@ -36,9 +37,9 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
-			head := getHeadBlock(t, blockchain)
+			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {

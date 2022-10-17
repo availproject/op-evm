@@ -1,213 +1,74 @@
 package avail
 
 import (
-	"errors"
-	"fmt"
-	"log"
-	"sync"
-	"time"
-
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
-var (
-	// ErrParentBlockNotFound is returned when the local blockchain doesn't
-	// contain block for the referenced parent hash.
-	ErrParentBlockNotFound = errors.New("parent block not found")
-)
-
-type watchTower struct {
-	blockchain   *blockchain.Blockchain
-	fraudproofFn func(block types.Block) types.Block
-}
-
-func (wt *watchTower) HandleData(bs []byte) error {
-	log.Printf("block handler: received batch w/ %d bytes\n", len(bs))
-
-	block := types.Block{}
-	if err := block.UnmarshalRLP(bs); err != nil {
-		return err
-	}
-
-	if err := wt.blockchain.VerifyFinalizedBlock(&block); err != nil {
-		log.Printf("block %d (%q) cannot be verified: %s", block.Number(), block.Hash(), err)
-		_ = wt.fraudproofFn(block)
-		// TODO: Deal with fraud proof
-		log.Printf("fraud proof constructed")
-		return nil
-	}
-
-	if err := wt.blockchain.WriteBlock(&block, "not-sure-yet-what-source-is"); err != nil {
-		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
-	}
-
-	log.Printf("Received block header: %+v \n", block.Header)
-	log.Printf("Received block transactions: %+v \n", block.Transactions)
-
-	return nil
-}
-
-func (wt *watchTower) HandleError(err error) {
-	log.Printf("block handler: error %#v\n", err)
-}
-
 func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *keystore.Key) {
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
+	logger := d.logger.Named("watchtower")
+	watchTower := watchtower.New(d.blockchain, d.executor, types.Address(watchTowerAccount.Address), watchTowerPK.PrivateKey)
 
-	handler := &watchTower{
-		blockchain: d.blockchain,
-		fraudproofFn: func(block types.Block) types.Block {
-			b, err := d.constructFraudproof(watchTowerAccount, watchTowerPK, block)
-			if err != nil {
-				d.logger.Error("error while constructing fraud proof", err)
-				return types.Block{}
-			}
-
-			f := availSender.SubmitDataAndWaitForStatus(b.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
-			go func() {
-				if _, err := f.Result(); err != nil {
-					d.logger.Error("Error while submitting fraud proof to avail", err)
-				}
-			}()
-			return b
-		},
-	}
-
-	watcher, err := avail.NewBlockDataWatcher(d.availClient, avail.BridgeAppID, handler)
+	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
-		return
+		panic(err)
 	}
 
-	defer watcher.Stop()
+	logger.Info("watchtower started")
 
-	// Consensus always starts in SyncState mode in case it needs
-	// to sync with Avail and/or other nodes.
-	d.setState(SyncState)
-
-	d.logger.Info("watch tower started")
-
-	var once sync.Once
+	// TODO: Figure out where do we need state cycle and how to implement it.
+	// Current version only starts the cycles for the future, doing nothing with it.
 	for {
+		var availBlk *avail_types.SignedBlock
+
 		select {
 		case <-d.closeCh:
+			availBlockStream.Close()
 			return
-		default: // Default is here because we would block until we receive something in the closeCh
+		case availBlk = <-availBlockStream.Chan():
 		}
 
-		if d.isState(WatchTowerState) {
-			once.Do(func() {
-				err := watcher.Start()
-				if err != nil {
-					panic(err)
-				}
-			})
-		}
-
-		// Start the state machine loop
-		d.runWatchTowerCycle()
-	}
-}
-
-func (d *Avail) runWatchTowerCycle() {
-	// Based on the current state, execute the corresponding section
-	switch d.getState() {
-	case AcceptState:
-		panic("acceptstate")
-
-	case ValidateState:
-		panic("validatestate")
-
-	case SyncState:
-		d.runSyncState()
-		d.setState(WatchTowerState)
-
-	case WatchTowerState:
-		return
-	}
-}
-
-func (d *Avail) constructFraudproof(watchTowerAccount accounts.Account, watchTowerPK *keystore.Key, maliciousBlock types.Block) (types.Block, error) {
-	header := &types.Header{
-		ParentHash: maliciousBlock.ParentHash(),
-		Number:     maliciousBlock.Number(),
-		Miner:      watchTowerAccount.Address.Bytes(),
-		Nonce:      types.Nonce{},
-		GasLimit:   maliciousBlock.Header.GasLimit, // TODO(tuommaki): This needs adjusting.
-		Timestamp:  uint64(time.Now().Unix()),
-	}
-
-	parentHdr, found := d.blockchain.GetParent(maliciousBlock.Header)
-	if !found {
-		return types.Block{}, ErrParentBlockNotFound
-	}
-
-	transition, err := d.executor.BeginTxn(parentHdr.StateRoot, header, types.StringToAddress(watchTowerAccount.Address.Hex()))
-	if err != nil {
-		return types.Block{}, err
-	}
-
-	txns := constructFraudproofTxs(maliciousBlock)
-	for _, tx := range txns {
-		err := transition.Write(tx)
+		blk, err := block.FromAvail(availBlk, avail.BridgeAppID, callIdx)
 		if err != nil {
-			// TODO(tuommaki): This needs re-assesment. Theoretically there
-			// should NEVER be situation where fraud proof transaction writing
-			// could fail and hence panic here is appropriate. There is some
-			// debugging aspects though, which might need revisiting,
-			// especially if the malicious block can cause situation where this
-			// section fails - it would then defeat the purpose of watch tower.
-			panic(err)
+			logger.Error("cannot extract Edge block from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
+			continue
+		}
+
+		err = watchTower.Check(blk)
+		if err != nil {
+			logger.Debug("block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+
+			fp, err := watchTower.ConstructFraudproof(blk)
+			if err != nil {
+				logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+				continue
+			}
+
+			logger.Debug("submitting fraudproof", "block_hash", fp.Header.Hash)
+			f := availSender.SubmitDataAndWaitForStatus(fp.MarshalRLP(), avail_types.ExtrinsicStatus{IsInBlock: true})
+			go func() {
+				if _, err := f.Result(); err != nil {
+					logger.Error("submitting fraud proof to avail failed", err)
+				}
+				logger.Debug("submitted fraudproof", "block_hash", fp.Header.Hash)
+			}()
+
+			// TODO: Write fraudproof to local chain
+
+			continue
+		}
+
+		err = watchTower.Apply(blk)
+		if err != nil {
+			logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 		}
 	}
-
-	// Commit the changes
-	_, root := transition.Commit()
-
-	// Update the header
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// Build the actual block
-	// The header hash is computed inside buildBlock
-	blk := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header:   header,
-		Txns:     txns,
-		Receipts: transition.Receipts(),
-	})
-
-	// Write the seal of the block after all the fields are completed
-	{
-		ve := &block.ValidatorExtra{}
-		blk.Header.ExtraData = block.EncodeExtraDataFields(map[string][]byte{
-			block.KeyExtraValidators: ve.MarshalRLPTo(nil),
-			block.KeyFraudproof:      maliciousBlock.Hash().Bytes(),
-		})
-	}
-
-	header, err = block.WriteSeal(watchTowerPK.PrivateKey, blk.Header)
-	if err != nil {
-		return types.Block{}, err
-	}
-
-	blk.Header = header
-
-	// Compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	blk.Header.ComputeHash()
-
-	return *blk, nil
-}
-
-// constructFraudproofTxs returns set of transactions that challenge the
-// malicious block and submit watchtower's stake.
-func constructFraudproofTxs(maliciousBlock types.Block) []*types.Transaction {
-	return []*types.Transaction{}
 }

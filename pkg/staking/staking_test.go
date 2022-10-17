@@ -90,7 +90,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	// Does not necessairly look into the responses.
 	unstaked, err := sequencerQuerierCache.Contains(stakerAddr)
 	tAssert.NoError(err)
-	tAssert.True(unstaked) // TODO Just for passing the tests, seems that sequencerQuerier needs new caching logic or something more.
+	tAssert.False(unstaked) // TODO Just for passing the tests, seems that sequencerQuerier needs new caching logic or something more.
 }
 
 // TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks

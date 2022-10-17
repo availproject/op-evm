@@ -1,4 +1,4 @@
-package block
+package test
 
 import (
 	"crypto/ecdsa"
@@ -11,14 +11,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	_, err := bbf.FromParentHash(h)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +118,7 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	address, privateKey := test.NewAccount(t)
 	address2, _ := test.NewAccount(t)
 
@@ -125,7 +127,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 
 	// Construct block.Builder w/ the blockchain instance that contains
 	// balance for our test account.
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	bb, err := bbf.FromParentHash(bchain.Header().Hash)
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +192,7 @@ func Test_Builder_Set_ExtraData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kv, err := DecodeExtraDataFields(b.Header.ExtraData)
+	kv, err := block.DecodeExtraDataFields(b.Header.ExtraData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,13 +213,13 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 	return privateKey
 }
 
-func newBlockBuilder(t *testing.T) Builder {
+func newBlockBuilder(t *testing.T) block.Builder {
 	t.Helper()
 
-	executor, bchain := test.NewBlockchain(t, NewVerifier(test.DumbActiveSequencers(), hclog.Default()))
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
-	bbf := NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	bb, err := bbf.FromParentHash(h)
 	if err != nil {
 		t.Fatal(err)

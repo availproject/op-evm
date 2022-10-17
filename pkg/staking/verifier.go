@@ -1,4 +1,4 @@
-package block
+package staking
 
 import (
 	"fmt"
@@ -7,15 +7,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 type verifier struct {
-	activeSequencers staking.ActiveSequencers
+	activeSequencers ActiveSequencers
 	logger           hclog.Logger
 }
 
-func NewVerifier(as staking.ActiveSequencers, logger hclog.Logger) blockchain.Verifier {
+func NewVerifier(as ActiveSequencers, logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
 		activeSequencers: as,
 		logger:           logger,
@@ -23,7 +23,7 @@ func NewVerifier(as staking.ActiveSequencers, logger hclog.Logger) blockchain.Ve
 }
 
 func (v *verifier) VerifyHeader(header *types.Header) error {
-	signer, err := AddressRecoverFromHeader(header)
+	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
 		return err
 	}

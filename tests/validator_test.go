@@ -1,16 +1,24 @@
-package tests
+package test
 
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
+
+func getGenesisBasePath() string {
+	path, _ := os.Getwd()
+	return filepath.Join(path, "..")
+}
 
 func TestValidatorBlockCheck(t *testing.T) {
 	testCases := []struct {
@@ -31,10 +39,10 @@ func TestValidatorBlockCheck(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
+			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
 			coinbaseAddr, signKey := test.NewAccount(t)
-			head := getHeadBlock(t, blockchain)
+			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {
@@ -73,10 +81,11 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
+			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
+
+			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
 			coinbaseAddr, signKey := test.NewAccount(t)
-			head := getHeadBlock(t, blockchain)
+			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {
@@ -116,10 +125,10 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := block.NewVerifier(test.DumbActiveSequencers(), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier)
+			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
+			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
 			coinbaseAddr, signKey := test.NewAccount(t)
-			head := getHeadBlock(t, blockchain)
+			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {

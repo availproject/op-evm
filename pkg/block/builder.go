@@ -205,6 +205,10 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 
 	// Write all transactions in-order.
 	for _, tx := range bb.transactions {
+		if tx.Nonce == 0 {
+			tx.Nonce = bb.transition.GetNonce(tx.From)
+		}
+
 		err := bb.transition.Write(tx)
 		if err != nil {
 			return nil, err

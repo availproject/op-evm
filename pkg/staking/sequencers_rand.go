@@ -58,7 +58,7 @@ func (rasq *randomizedActiveSequencersQuerier) Contains(addr types.Address) (boo
 	}
 
 	for _, a := range as {
-		if bytes.Compare(addr.Bytes(), a.Bytes()) == 0 {
+		if bytes.Equal(addr.Bytes(), a.Bytes()) {
 			return true, nil
 		}
 	}

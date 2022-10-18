@@ -133,14 +133,18 @@ func (d *Avail) Start() error {
 			return err
 		}
 
-		/* 		SHOULD STAY COMENTED OUT  */
-		sequencerStaked, sequencerError := d.isSequencerStaked(minerAccount)
+		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+		minerAddr := types.Address(minerAccount.Address)
+
+		sequencerStaked, sequencerError := sequencerQuerier.Contains(minerAddr)
 		if sequencerError != nil {
+			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
 			return sequencerError
 		}
 
 		if !sequencerStaked {
-			if _, err := d.buildBlock(minerKeystore, minerAccount, minerPk, d.blockchain.Header()); err != nil {
+			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, minerAddr, minerPk.PrivateKey, 1_000_000, "sequencer")
+			if stakedErr != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err
 			}

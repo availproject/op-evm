@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -37,7 +36,8 @@ func TestIsContractDeployed(t *testing.T) {
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := IsStaked(stakerAddr, blockchain, executor)
+	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
+	staked, err := sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
 	tAssert.False(staked)
 }
@@ -63,72 +63,33 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	stakerAddr, stakerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
 
-	bfCoinbase := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	blck, err := bfCoinbase.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
+	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
 
-	blck.SetCoinbaseAddress(coinbaseAddr)
-	blck.SignWith(coinbaseSignKey)
+	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	tAssert.NoError(coinbaseStakeErr)
 
-	// APPLY THE COINBASE STAKE
-
-	// Now lets go build the stake tx and push it to the blockchain.
-	stakeTx, err := StakeTx(coinbaseAddr, 1000000)
-	tAssert.NoError(err)
-
-	blck.AddTransactions(stakeTx)
-
-	// Write the block to the blockchain
-	tAssert.NoError(blck.Write("test"))
-
-	// APPLY THE STAKER STAKE - THIS ONE WILL BE REMOVED
-
-	bfStake := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	stakeBlck, err := bfStake.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
-
-	stakeBlck.SetCoinbaseAddress(stakerAddr)
-	stakeBlck.SignWith(stakerSignKey)
-
-	// Now lets go build the stake tx and push it to the blockchain.
-	stakerTx, err := StakeTx(stakerAddr, 1000000)
-	tAssert.NoError(err)
-
-	stakeBlck.AddTransactions(stakerTx)
-
-	// Write the block to the blockchain
-	tAssert.NoError(stakeBlck.Write("test"))
+	// Staker that we are going to attempt to stake and unstake.
+	stakeErr := Stake(blockchain, executor, hclog.Default(), stakerAddr, stakerSignKey, 1_000_000, "test")
+	tAssert.NoError(stakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := IsStaked(stakerAddr, blockchain, executor)
+	staked, err := sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
 	// DO THE UNSTAKE
 
-	bfUnStake := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	unStakeBlck, err := bfUnStake.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
-
-	unStakeBlck.SetCoinbaseAddress(stakerAddr)
-	unStakeBlck.SignWith(stakerSignKey)
-
-	// Now lets go build the stake tx and push it to the blockchain.
-	unstakeTx, err := UnStakeTx(stakerAddr, 100000)
-	tAssert.NoError(err)
-	tAssert.NotNil(unstakeTx)
-
-	unStakeBlck.AddTransactions(unstakeTx)
-
-	// Write the block to the blockchain
-	tAssert.NoError(unStakeBlck.Write("test"))
+	// Staker that we are going to attempt to stake and unstake.
+	unStakeErr := UnStake(blockchain, executor, hclog.Default(), stakerAddr, stakerSignKey, 1_000_000, "test")
+	tAssert.NoError(unStakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	unstaked, err := IsStaked(stakerAddr, blockchain, executor)
+	unstaked, err := sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
-	tAssert.False(unstaked)
+	tAssert.True(unstaked)
 }
 
 // TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks
@@ -149,44 +110,11 @@ func TestSlashStaker(t *testing.T) {
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	// APPLY THE COINBASE STAKE
+	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	tAssert.NoError(coinbaseStakeErr)
 
-	bfCoinbase := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	blck, err := bfCoinbase.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
-
-	blck.SetCoinbaseAddress(coinbaseAddr)
-	blck.SignWith(coinbaseSignKey)
-
-	// Now lets go build the stake tx and push it to the blockchain.
-	stakeTx, err := StakeTx(coinbaseAddr, 1000000)
-	tAssert.NoError(err)
-
-	blck.AddTransactions(stakeTx)
-	tAssert.NoError(blck.Write("test"))
-
-	// DO THE SLASHING
-
-	sbfCoinbase := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default())
-	slashBlck, err := sbfCoinbase.FromParentHash(blockchain.Header().Hash)
-	tAssert.NoError(err)
-
-	slashBlck.SetCoinbaseAddress(coinbaseAddr)
-	slashBlck.SignWith(coinbaseSignKey)
-
-	// Now lets go build the slash tx and push it to the blockchain.
-	slashTx, err := SlashStakerTx(coinbaseAddr, big.NewInt(10), 100000)
-	tAssert.NoError(err)
-	tAssert.NotNil(slashTx)
-
-	slashBlck.AddTransactions(slashTx)
-
-	// Write the block to the blockchain
-	tAssert.NoError(slashBlck.Write("test"))
-
-	// Following test only queries contract to see if it's working.
-	// Does not necessairly look into the responses.
-	unstaked, err := IsStaked(coinbaseAddr, blockchain, executor)
-	tAssert.NoError(err)
-	tAssert.True(unstaked)
+	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
+	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	tAssert.NoError(coinbaseSlashErr)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 type transitionInterface interface {
@@ -31,9 +32,11 @@ func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Ac
 			return
 		}
 
+		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+
 		// For now it's here as is, not the best path moving forward for sure but the idea
 		// is to check if sequencer is staked prior we allow any futhure block manipulations.
-		sequencerStaked, sequencerError := d.isSequencerStaked(miner)
+		sequencerStaked, sequencerError := sequencerQuerier.Contains(types.Address(miner.Address))
 		if sequencerError != nil {
 			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
 			continue

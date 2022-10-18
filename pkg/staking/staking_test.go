@@ -64,7 +64,6 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
 
 	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
-	sequencerQuerierCache := NewCachingActiveSequencersQuerier(blockchain, sequencerQuerier, hclog.Default())
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
 	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
@@ -76,9 +75,9 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := sequencerQuerierCache.Contains(stakerAddr)
+	staked, err := sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
-	tAssert.False(staked) // Querier is not working
+	tAssert.True(staked)
 
 	// DO THE UNSTAKE
 
@@ -88,9 +87,9 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	unstaked, err := sequencerQuerierCache.Contains(stakerAddr)
+	unstaked, err := sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
-	tAssert.False(unstaked) // TODO Just for passing the tests, seems that sequencerQuerier needs new caching logic or something more.
+	tAssert.True(unstaked)
 }
 
 // TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks
@@ -110,9 +109,6 @@ func TestSlashStaker(t *testing.T) {
 
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
-
-	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
-	_ = NewCachingActiveSequencersQuerier(blockchain, sequencerQuerier, hclog.Default())
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
 	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")

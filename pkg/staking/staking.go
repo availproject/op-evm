@@ -25,7 +25,7 @@ var (
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blck, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
@@ -35,7 +35,7 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 	blck.SetCoinbaseAddress(stakerAddr)
 	blck.SignWith(stakerKey)
 
-	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	stakeTx, err := StakeTx(stakerAddr, amount, nodeType, gasLimit)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 	blck.SetCoinbaseAddress(stakerAddr)
 	blck.SignWith(stakerKey)
 
-	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	stakeTx, err := UnStakeTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 }
 
-func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
+func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]
 	if !ok {
 		return nil, errors.New("stake method doesn't exist in Staking contract ABI")
@@ -111,13 +111,23 @@ func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 
 	selector := method.ID()
 
+	encodedInput, encodeErr := method.Inputs.Encode(
+		map[string]interface{}{
+			"nodeType": nodeType,
+		},
+	)
+	if encodeErr != nil {
+		return nil, encodeErr
+	}
+
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
-		Input:    selector,
+		Value:    amount, // big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
+		Input:    append(selector, encodedInput...),
 		GasPrice: big.NewInt(50000),
-		Gas:      gasLimit,
+		//V:        big.NewInt(1), // it is necessary to encode in rlp,
+		Gas: gasLimit,
 	}
 
 	return tx, nil

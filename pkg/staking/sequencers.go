@@ -87,7 +87,7 @@ func (asq *activeSequencersQuerier) Contains(addr types.Address) (bool, error) {
 }
 
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
-	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["CurrentSequencers"]
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencers"]
 	if !ok {
 		return nil, errors.New("sequencers method doesn't exist in Staking contract ABI")
 	}

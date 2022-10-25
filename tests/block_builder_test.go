@@ -83,6 +83,25 @@ func Test_Builder_Change_CoinbaseAddress(t *testing.T) {
 	}
 }
 
+func Test_Builder_Set_Difficulty(t *testing.T) {
+	sk := newPrivateKey(t)
+
+	expected := uint64(42)
+
+	b, err := newBlockBuilder(t).
+		SetDifficulty(expected).
+		SignWith(sk).
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if b.Header.Difficulty != expected {
+		t.Fatalf("block header difficulty: got %d, expected %d", b.Header.Difficulty, expected)
+	}
+}
+
 func Test_Builder_Change_GasLimit(t *testing.T) {
 	sk := newPrivateKey(t)
 

@@ -54,6 +54,7 @@ type blockBuilder struct {
 
 type BlockBuilderFactory interface {
 	FromParentHash(hash types.Hash) (Builder, error)
+	FromBlockchainHead() (Builder, error)
 }
 
 type blockBuilderFactory struct {
@@ -68,6 +69,11 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 		executor:   executor,
 		logger:     logger.ResetNamed("block_builder_factory"),
 	}
+}
+
+func (bbf *blockBuilderFactory) FromBlockchainHead() (Builder, error) {
+	hdr := bbf.blockchain.Header()
+	return bbf.FromParentHeader(hdr)
 }
 
 func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, error) {

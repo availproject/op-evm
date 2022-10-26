@@ -25,25 +25,25 @@ var (
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
-	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	tx, err := StakeTx(stakerAddr, amount, nodeType, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 
@@ -53,23 +53,23 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
-	stakeTx, err := StakeTx(stakerAddr, gasLimit)
+	tx, err := UnStakeTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 
@@ -79,23 +79,23 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 
 func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
-	stakeTx, err := SlashStakerTx(stakerAddr, gasLimit)
+	tx, err := SlashStakerTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 
@@ -103,7 +103,7 @@ func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 }
 
-func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
+func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["stake"]
 	if !ok {
 		return nil, errors.New("stake method doesn't exist in Staking contract ABI")
@@ -111,12 +111,21 @@ func StakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
 
 	selector := method.ID()
 
+	encodedInput, encodeErr := method.Inputs.Encode(
+		map[string]interface{}{
+			"nodeType": nodeType,
+		},
+	)
+	if encodeErr != nil {
+		return nil, encodeErr
+	}
+
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
-		Input:    selector,
-		GasPrice: big.NewInt(50000),
+		Input:    append(selector, encodedInput...),
+		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
 	}
 

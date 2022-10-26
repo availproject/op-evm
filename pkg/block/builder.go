@@ -233,6 +233,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 			return nil, err
 		}
 	}
+
 	// Commit the changes.
 	_, root := bb.transition.Commit()
 

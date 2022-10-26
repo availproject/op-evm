@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -17,17 +18,13 @@ import (
 
 type Threshold interface {
 	Current() (*big.Int, error)
-	Set(newAmount *big.Int) error
-	SetAddress(address types.Address)
-	SetSignKey(key *ecdsa.PrivateKey)
+	Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error
 }
 
 type threshold struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
-	address    types.Address
-	signKey    *ecdsa.PrivateKey
 }
 
 func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) Threshold {
@@ -38,30 +35,25 @@ func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *sta
 	}
 }
 
-func (st *threshold) SetAddress(address types.Address) {
-	st.address = address
-}
-
-func (st *threshold) SetSignKey(key *ecdsa.PrivateKey) {
-	st.signKey = key
-}
-
-func (st *threshold) Set(newAmount *big.Int) error {
+func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blck, err := builder.FromParentHash(st.blockchain.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(st.address)
-	blck.SignWith(st.signKey)
+	pk := signKey.Public().(*ecdsa.PublicKey)
+	address := edge_crypto.PubKeyToAddress(pk)
+
+	blck.SetCoinbaseAddress(address)
+	blck.SignWith(signKey)
 
 	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
 	if err != nil {
 		return err
 	}
 
-	setThresholdTx, setThresholdTxErr := SetThresholdTx(st.address, newAmount, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, gasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to query current staking threshold", "err", setThresholdTxErr)
 		return err

@@ -128,11 +128,6 @@ contract Staking {
     // PUBLIC STAKING FUNCTIONS
 
     function SetStakingMinThreshold(uint256 newThreshold) public onlyEOA {
-        require(
-            newThreshold > DEFAULT_STAKING_THRESHOLD,
-            "New staking threshold must be greater than default staking threshold."
-        );
-
         _minStakingThreshold = newThreshold;
     }
 
@@ -262,7 +257,7 @@ contract Staking {
 
         require(
             _addressToParticipantIndex[staker] < _participants.length,
-            "index out of range"
+            "participant index out of range in mapping"
         );
 
         // index of removed address
@@ -285,7 +280,7 @@ contract Staking {
     function _deleteFromSequencers(address staker) private {
         require(
             _addressToSequencerIndex[staker] < _sequencers.length,
-            "index out of range"
+            "sequencer index out of range in mapping"
         );
 
         // index of removed address
@@ -307,7 +302,7 @@ contract Staking {
     function _deleteFromWatchtowers(address staker) private {
         require(
             _addressToWatchtowerIndex[staker] < _watchtowers.length,
-            "index out of range"
+            "watchtower index out of range in mapping"
         );
 
         // index of removed address
@@ -329,7 +324,7 @@ contract Staking {
     function _deleteFromValidators(address staker) private {
         require(
             _addressToValidatorIndex[staker] < _validators.length,
-            "index out of range"
+            "validator index out of range in mapping"
         );
 
         // index of removed address
@@ -352,11 +347,6 @@ contract Staking {
     // Append to participant set only if participant is not already set.
     // Due to possibility to be multi-node participant, we need to make this check.
     function _appendToParticipantSet(address newParticipant) private {
-        require(
-            _participants.length < _maximumNumParticipants,
-            "Sequencer set has reached full capacity"
-        );
-
         if(!_addressToIsParticipant[newParticipant]) {
             _addressToIsParticipant[newParticipant] = true;
             _addressToParticipantIndex[newParticipant] = _participants.length;

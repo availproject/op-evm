@@ -35,12 +35,12 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 	blk.SetCoinbaseAddress(stakerAddr)
 	blk.SignWith(stakerKey)
 
-	stakeTx, err := StakeTx(stakerAddr, amount, nodeType, gasLimit)
+	tx, err := StakeTx(stakerAddr, amount, nodeType, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blk.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
 	if err := blk.Write(src); err != nil {
@@ -61,12 +61,12 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 	blk.SetCoinbaseAddress(stakerAddr)
 	blk.SignWith(stakerKey)
 
-	stakeTx, err := UnStakeTx(stakerAddr, gasLimit)
+	tx, err := UnStakeTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blk.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
 	if err := blk.Write(src); err != nil {
@@ -87,12 +87,12 @@ func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 	blk.SetCoinbaseAddress(stakerAddr)
 	blk.SignWith(stakerKey)
 
-	stakeTx, err := SlashStakerTx(stakerAddr, gasLimit)
+	tx, err := SlashStakerTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blk.AddTransactions(stakeTx)
+	blk.AddTransactions(tx)
 
 	// Write the block to the blockchain
 	if err := blk.Write(src); err != nil {
@@ -126,8 +126,7 @@ func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint
 		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    append(selector, encodedInput...),
 		GasPrice: big.NewInt(5000),
-		//V:        big.NewInt(1), // it is necessary to encode in rlp,
-		Gas: gasLimit,
+		Gas:      gasLimit,
 	}
 
 	return tx, nil

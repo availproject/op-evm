@@ -59,15 +59,13 @@ func TestGetSetStakingThreshold(t *testing.T) {
 	targetStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
 
 	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
-	stakingThresholdQuerier.SetAddress(coinbaseAddr)
-	stakingThresholdQuerier.SetSignKey(coinbaseSignKey)
 
 	currentThreshold, err := stakingThresholdQuerier.Current()
 	tAssert.NoError(err)
 	tAssert.Equal(currentThreshold, defaultStakingThresholdAmount)
 	fmt.Printf("Default staking threshold (wei): %d \n", currentThreshold)
 
-	setErr := stakingThresholdQuerier.Set(targetStakingThresholdAmount)
+	setErr := stakingThresholdQuerier.Set(targetStakingThresholdAmount, coinbaseSignKey)
 	tAssert.NoError(setErr)
 
 	targetThreshold, err := stakingThresholdQuerier.Current()
@@ -96,9 +94,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
 	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
-	stakingThresholdQuerier.SetAddress(coinbaseAddr)
-	stakingThresholdQuerier.SetSignKey(coinbaseSignKey)
-	setErr := stakingThresholdQuerier.Set(big.NewInt(10))
+	setErr := stakingThresholdQuerier.Set(big.NewInt(10), coinbaseSignKey)
 	tAssert.NoError(setErr)
 
 	stakerAddr, stakerSignKey := test.NewAccount(t)

@@ -27,6 +27,16 @@ func Test_Builder_Construction_FromParentHash(t *testing.T) {
 	}
 }
 
+func Test_Builder_Construction_FromBlockchainHead(t *testing.T) {
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	_, err := bbf.FromBlockchainHead()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func Test_Builder_Defaults(t *testing.T) {
 	sk := newPrivateKey(t)
 

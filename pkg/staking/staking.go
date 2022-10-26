@@ -53,23 +53,23 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
 	stakeTx, err := UnStakeTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(stakeTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 

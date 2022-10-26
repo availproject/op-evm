@@ -144,7 +144,7 @@ func (d *Avail) Start() error {
 		}
 
 		if !sequencerStaked {
-			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1000000000000000000))
+			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
 			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", minerAddr, minerPk.PrivateKey, stakeAmount, 1_000_000, "sequencer")
 			if stakedErr != nil {
 				d.logger.Error("failure to build staking block", "error", err)

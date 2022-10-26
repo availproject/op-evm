@@ -87,12 +87,12 @@ func main() {
 
 	log.Printf("Staking Smart Contract -> Is miner address staked: %v", isSequencer)
 
-	addrs, err := contract.CurrentSequencers(nil)
-	if err != nil {
-		log.Fatalf("Staking Smart Contract -> Failure to  fetch contract sequencers: %s \n", err)
-	}
+	/* 	addrs, err := contract.CurrentSequencers(nil)
+	   	if err != nil {
+	   		log.Fatalf("Staking Smart Contract -> Failure to  fetch contract sequencers: %s \n", err)
+	   	}
 
-	log.Printf("Staking Smart Contract -> Available staked sequencer addresses: %v", addrs)
-
+	   	log.Printf("Staking Smart Contract -> Available staked sequencer addresses: %v", addrs)
+	*/
 	os.Exit(0)
 }

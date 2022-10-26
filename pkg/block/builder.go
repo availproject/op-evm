@@ -32,6 +32,8 @@ type Builder interface {
 
 	Build() (*types.Block, error)
 	Write(src string) error
+	GetTransition() *state.Transition
+	WriteBlock(blk *types.Block, src string) error
 }
 
 type blockBuilder struct {
@@ -128,6 +130,10 @@ func (bb *blockBuilder) AddTransactions(tx ...*types.Transaction) Builder {
 	return bb
 }
 
+func (bb *blockBuilder) GetTransition() *state.Transition {
+	return bb.transition
+}
+
 func (bb *blockBuilder) SignWith(signKey *ecdsa.PrivateKey) Builder {
 	bb.signKey = signKey
 	return bb
@@ -141,6 +147,14 @@ func (bb *blockBuilder) Write(src string) error {
 
 	err = bb.blockchain.WriteBlock(blk, src)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bb *blockBuilder) WriteBlock(blk *types.Block, src string) error {
+	if err := bb.blockchain.WriteBlock(blk, src); err != nil {
 		return err
 	}
 
@@ -214,6 +228,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 			return nil, err
 		}
 	}
+
 	// Commit the changes.
 	_, root := bb.transition.Commit()
 

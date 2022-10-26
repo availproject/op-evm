@@ -27,23 +27,23 @@ var (
 
 func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
 	stakeTx, err := StakeTx(stakerAddr, amount, nodeType, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(stakeTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 
@@ -79,23 +79,23 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 
 func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blck, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromParentHash(bh.Header().Hash)
 	if err != nil {
 		return err
 	}
 
-	blck.SetCoinbaseAddress(stakerAddr)
-	blck.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(stakerAddr)
+	blk.SignWith(stakerKey)
 
 	stakeTx, err := SlashStakerTx(stakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
 
-	blck.AddTransactions(stakeTx)
+	blk.AddTransactions(stakeTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write(src); err != nil {
+	if err := blk.Write(src); err != nil {
 		return err
 	}
 
@@ -123,9 +123,9 @@ func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
-		Value:    amount, // big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
+		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
 		Input:    append(selector, encodedInput...),
-		GasPrice: big.NewInt(50000),
+		GasPrice: big.NewInt(5000),
 		//V:        big.NewInt(1), // it is necessary to encode in rlp,
 		Gas: gasLimit,
 	}

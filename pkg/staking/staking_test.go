@@ -95,8 +95,14 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	/* 	stakerAddr, stakerSignKey := test.NewAccount(t)
-	   	test.DepositBalance(t, stakerAddr, balance, blockchain, executor) */
+	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
+	stakingThresholdQuerier.SetAddress(coinbaseAddr)
+	stakingThresholdQuerier.SetSignKey(coinbaseSignKey)
+	setErr := stakingThresholdQuerier.Set(big.NewInt(10))
+	tAssert.NoError(setErr)
+
+	stakerAddr, stakerSignKey := test.NewAccount(t)
+	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
 
 	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
 
@@ -110,33 +116,29 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
-	/* / Staker that we are going to attempt to stake and unstake.
-	stakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", stakerAddr, stakerSignKey, 1_000_000, "test")
+	// Staker that we are going to attempt to stake and unstake.
+	stakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(stakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := sequencerQuerier.Contains(stakerAddr)
+	staked, err = sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
 	// DO THE UNSTAKE
 
 	// Staker that we are going to attempt to stake and unstake.
-	unStakeErr := UnStake(blockchain, executor, hclog.Default(), stakerAddr, stakerSignKey, 1_000_000, "test")
+	unStakeErr := UnStake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
 	tAssert.NoError(unStakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	unstaked, err := sequencerQuerier.Contains(stakerAddr)
+	unstaked, err := sequencerQuerier.Contains(coinbaseAddr)
 	tAssert.NoError(err)
-	tAssert.True(unstaked) */
+	tAssert.False(unstaked)
 }
 
-// TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks
-// in order to satisfy the states. It will produce 5 blocks, written into the database and as a outcome,
-// staker address will be staked and removed from the sequencer list resulting in a passing test.
-// Note that there has to be 2 stakers at least as minimum staker amount in the contract is 1.
 func TestSlashStaker(t *testing.T) {
 	tAssert := assert.New(t)
 

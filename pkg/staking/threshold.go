@@ -15,14 +15,14 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-type StakingThreshold interface {
+type Threshold interface {
 	Current() (*big.Int, error)
 	Set(newAmount *big.Int) error
 	SetAddress(address types.Address)
 	SetSignKey(key *ecdsa.PrivateKey)
 }
 
-type stakingThreshold struct {
+type threshold struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
@@ -30,23 +30,23 @@ type stakingThreshold struct {
 	signKey    *ecdsa.PrivateKey
 }
 
-func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) StakingThreshold {
-	return &stakingThreshold{
+func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) Threshold {
+	return &threshold{
 		blockchain: blockchain,
 		executor:   executor,
 		logger:     logger.ResetNamed("staking_threshold_querier"),
 	}
 }
 
-func (st *stakingThreshold) SetAddress(address types.Address) {
+func (st *threshold) SetAddress(address types.Address) {
 	st.address = address
 }
 
-func (st *stakingThreshold) SetSignKey(key *ecdsa.PrivateKey) {
+func (st *threshold) SetSignKey(key *ecdsa.PrivateKey) {
 	st.signKey = key
 }
 
-func (st *stakingThreshold) Set(newAmount *big.Int) error {
+func (st *threshold) Set(newAmount *big.Int) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blck, err := builder.FromParentHash(st.blockchain.Header().Hash)
 	if err != nil {
@@ -61,7 +61,7 @@ func (st *stakingThreshold) Set(newAmount *big.Int) error {
 		return err
 	}
 
-	setThresholdTx, setThresholdTxErr := SetStakingThresholdTx(st.address, newAmount, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetThresholdTx(st.address, newAmount, gasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to query current staking threshold", "err", setThresholdTxErr)
 		return err
@@ -77,7 +77,7 @@ func (st *stakingThreshold) Set(newAmount *big.Int) error {
 	return nil
 }
 
-func (st *stakingThreshold) Current() (*big.Int, error) {
+func (st *threshold) Current() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
 
@@ -101,7 +101,7 @@ func (st *stakingThreshold) Current() (*big.Int, error) {
 		return nil, err
 	}
 
-	threshold, err := GetStakingThresholdTx(transition, gasLimit, minerAddress)
+	threshold, err := GetThresholdTx(transition, gasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current staking threshold", "err", err)
 		return nil, err
@@ -110,7 +110,7 @@ func (st *stakingThreshold) Current() (*big.Int, error) {
 	return threshold, nil
 }
 
-func SetStakingThresholdTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
+func SetThresholdTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetStakingMinThreshold"]
 	if !ok {
 		return nil, errors.New("SetStakingMinThreshold method doesn't exist in Staking contract ABI")
@@ -137,7 +137,7 @@ func SetStakingThresholdTx(from types.Address, amount *big.Int, gasLimit uint64)
 	}, nil
 }
 
-func GetStakingThresholdTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
+func GetThresholdTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentStakingThreshold"]
 	if !ok {
 		return nil, errors.New("GetCurrentStakingThreshold method doesn't exist in Staking contract ABI")

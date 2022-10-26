@@ -22,6 +22,7 @@ var (
 type Builder interface {
 	SetBlockNumber(number uint64) Builder
 	SetCoinbaseAddress(coinbaseAddr types.Address) Builder
+	SetDifficulty(d uint64) Builder
 	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
@@ -40,6 +41,7 @@ type blockBuilder struct {
 	logger     hclog.Logger
 
 	coinbase   *types.Address
+	difficulty *uint64
 	parentRoot *types.Hash
 	gasLimit   *uint64
 
@@ -114,6 +116,11 @@ func (bb *blockBuilder) SetCoinbaseAddress(coinbaseAddr types.Address) Builder {
 	return bb
 }
 
+func (bb *blockBuilder) SetDifficulty(d uint64) Builder {
+	bb.difficulty = &d
+	return bb
+}
+
 func (bb *blockBuilder) SetExtraDataField(key string, value []byte) Builder {
 	bb.extraData[key] = value
 	return bb
@@ -159,6 +166,11 @@ func (bb *blockBuilder) setDefaults() {
 		*bb.coinbase = types.BytesToAddress(bb.parent.Miner)
 	}
 
+	if bb.difficulty == nil {
+		bb.difficulty = new(uint64)
+		*bb.difficulty = 0
+	}
+
 	if bb.parentRoot == nil {
 		bb.parentRoot = new(types.Hash)
 		*bb.parentRoot = bb.parent.StateRoot
@@ -182,6 +194,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	bb.setDefaults()
 
 	// Finalize header details before transaction processing.
+	bb.header.Difficulty = *bb.difficulty
 	bb.header.ExtraData = EncodeExtraDataFields(bb.extraData)
 	bb.header.GasLimit = *bb.gasLimit
 	bb.header.Miner = bb.coinbase.Bytes()

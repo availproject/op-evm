@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -26,7 +27,10 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 	gr := executor.WriteGenesis(chain.Genesis.Alloc)
 	chain.Genesis.StateRoot = gr
 
-	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor)
+	// use the eip155 signer
+	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
+
+	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor, signer)
 	if err != nil {
 		t.Fatal(err)
 	}

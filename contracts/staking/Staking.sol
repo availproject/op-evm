@@ -23,8 +23,15 @@ contract Staking {
     mapping(address => uint256) public _addressToParticipantIndex;
     mapping(address => string) public _addressToNodeType;
     uint256 public _stakedAmount;
+
     uint256 public _minimumNumParticipants;
     uint256 public _maximumNumParticipants;
+    uint256 public _minimumNumSequencers;
+    uint256 public _minimumNumValidators;
+    uint256 public _minimumNumWatchtowers;
+    uint256 public _maximumNumSequencers;
+    uint256 public _maximumNumValidators;
+    uint256 public _maximumNumWatchtowers;
 
     // For now, we are going to have 3 separated array storages for each node type
     address[] public _sequencers;
@@ -67,7 +74,73 @@ contract Staking {
         _maximumNumParticipants = maxNumParticipants;
     }
 
+    // PARTICIPANT LIMITER SETTERS-GETTERS
+
+    function SetMinNumParticipants(uint256 minimumNumParticipants) public returns (uint256) {
+        _minimumNumParticipants = minimumNumParticipants;
+        return _minimumNumParticipants;
+    }
+
+    function SetMaxNumParticipants(uint256 maximumNumParticipants) public returns (uint256) {
+        _maximumNumParticipants = maximumNumParticipants;
+        return _maximumNumParticipants;
+    }
+
+    function SetMinNumSequencers(uint256 minimumNumSequencers) public returns (uint256) {
+        _minimumNumSequencers = minimumNumSequencers;
+        return _minimumNumSequencers;
+    }
+
+    function SetMaxNumSequencers(uint256 maximumNumSequencers) public returns (uint256) {
+        _maximumNumSequencers = maximumNumSequencers;
+        return _maximumNumSequencers;
+    }
+
+    function SetMinNumValidators(uint256 minimumNumValidators) public returns (uint256) {
+        _minimumNumValidators = minimumNumValidators;
+        return _minimumNumValidators;
+    }
+
+    function SetMaxNumValidators(uint256 maximumNumValidators) public returns (uint256) {
+        _maximumNumValidators = maximumNumValidators;
+        return _maximumNumValidators;
+    }
+
+    function SetMinNumWatchtowers(uint256 minimumNumWatchtowers) public returns (uint256) {
+        _minimumNumWatchtowers = minimumNumWatchtowers;
+        return _minimumNumWatchtowers;
+    }
+
+    function SetMaxNumWatchtowers(uint256 maximumNumWatchtowers) public returns (uint256) {
+        _maximumNumWatchtowers = maximumNumWatchtowers;
+        return _maximumNumWatchtowers;
+    }
+
     // VIEW FUNCTIONS 
+
+    function GetMinNumSequencers() public view returns (uint256) {
+        return _minimumNumSequencers;
+    }
+
+    function GetMaxNumSequencers() public view returns (uint256) {
+        return _maximumNumSequencers;
+    }
+
+    function GetMinNumValidators() public view returns (uint256) {
+        return _minimumNumValidators;
+    }
+
+    function GetMaxNumValidators() public view returns (uint256) {
+        return _maximumNumValidators;
+    }
+
+    function GetMinNumWatchtowers() public view returns (uint256) {
+        return _minimumNumWatchtowers;
+    }
+
+    function GetMaxNumWatchtowers() public view returns (uint256) {
+        return _maximumNumWatchtowers;
+    }
 
     function GetMinNumParticipants() public view returns (uint256) {
         return _minimumNumParticipants;

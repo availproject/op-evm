@@ -37,7 +37,7 @@ func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *sta
 
 func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blck, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
 	if err != nil {
 		return err
 	}
@@ -45,8 +45,8 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	pk := signKey.Public().(*ecdsa.PublicKey)
 	address := edge_crypto.PubKeyToAddress(pk)
 
-	blck.SetCoinbaseAddress(address)
-	blck.SignWith(signKey)
+	blk.SetCoinbaseAddress(address)
+	blk.SignWith(signKey)
 
 	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
 	if err != nil {
@@ -59,10 +59,10 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 		return err
 	}
 
-	blck.AddTransactions(setThresholdTx)
+	blk.AddTransactions(setThresholdTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write("staking_threshold_modifier"); err != nil {
+	if err := blk.Write("staking_threshold_modifier"); err != nil {
 		return err
 	}
 

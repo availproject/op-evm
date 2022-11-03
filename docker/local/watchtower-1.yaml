@@ -1,18 +1,18 @@
 chain_config: ./configs/genesis.json
 secrets_config: ""
-data_dir: "./data/avail-bootnode-1"
+data_dir: "./data/avail-watchtower-1"
 block_gas_target: "0x0"
-avail_addr: "127.0.0.1:9944"
-grpc_addr: ":10000"
-jsonrpc_addr: ":10002"
+avail_addr: "avail:9944"
+grpc_addr: "watchtower-1:9632"
+jsonrpc_addr: "watchtower-1:8545"
 node_type: "sequencer"
 telemetry:
     prometheus_addr: ""
 network:
     no_discover: false
-    libp2p_addr: :10001
+    libp2p_addr: "watchtower-1:1478"
     nat_addr: ""
-    dns_addr: ""
+    dns_addr: "watchtower-1"
     max_peers: 40
     max_outbound_peers: 32
     max_inbound_peers: 8

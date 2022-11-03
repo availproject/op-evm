@@ -39,7 +39,7 @@ func NewValidatorsRater(blockchain *blockchain.Blockchain, executor *state.Execu
 
 func (st *validatorsRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (st *validatorsRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 
 func (st *validatorsRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}

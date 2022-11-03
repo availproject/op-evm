@@ -37,7 +37,7 @@ func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *sta
 
 func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}

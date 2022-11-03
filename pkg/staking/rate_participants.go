@@ -39,7 +39,7 @@ func NewParticipantRater(blockchain *blockchain.Blockchain, executor *state.Exec
 
 func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey
 
 func (st *participantRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blk, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}

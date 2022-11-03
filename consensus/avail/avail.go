@@ -96,7 +96,7 @@ func Factory(
 		return nil, fmt.Errorf("invalid avail mechanism type/s provided")
 	}
 
-	d.availClient, err = avail.NewClient("ws://127.0.0.1:9944/v1/json-rpc")
+	d.availClient, err = avail.NewClient(fmt.Sprintf("ws://%s/v1/json-rpc", params.AvailAddr.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,8 @@ func (d *Avail) Start() error {
 			return err
 		}
 
-		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
+		/*minerKeystore*/
+		_, minerAccount, minerPk, err := getAccountData(SequencerAddress)
 		if err != nil {
 			return err
 		}
@@ -152,7 +153,7 @@ func (d *Avail) Start() error {
 			}
 		}
 
-		go d.runSequencer(minerKeystore, minerAccount, minerPk)
+		go d.runSequencer(minerAccount, minerPk)
 	}
 
 	if d.nodeType == Validator {

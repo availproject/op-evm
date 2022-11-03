@@ -1,6 +1,7 @@
 package avail
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"time"
@@ -21,53 +22,73 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {
+func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) {
+	activeSequencersQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
+	defer availBlockStream.Close()
+
 	d.logger.Info("sequencer started")
 
-	for {
-		// wait until there is a new txn
+	for blk := range availBlockStream.Chan() {
+		// Check if we need to stop.
 		select {
-		case <-d.nextNotify():
 		case <-d.closeCh:
+			return
+		default:
+		}
+
+		// Periodically verify that we are staked, before proceeding with sequencer
+		// logic. In the unexpected case of being slashed and dropping below the
+		// required sequencer staking threshold, we must stop processing, because
+		// otherwise we just get slashed more.
+		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address))
+		if sequencerError != nil {
+			d.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "err", sequencerError)
 			return
 		}
 
-		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
-
-		// For now it's here as is, not the best path moving forward for sure but the idea
-		// is to check if sequencer is staked prior we allow any futhure block manipulations.
-		sequencerStaked, sequencerError := sequencerQuerier.Contains(types.Address(miner.Address))
-		if sequencerError != nil {
-			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
-			continue
-		}
-
-		// TODO: Figure out how to do this check properly.
-		// For now disabled until I figure out how to stake properly.
 		if !sequencerStaked {
-			d.logger.Error("Forbidding block generation until sequencer is staked properly...")
+			d.logger.Error("my account is not among active staked sequencers; cannot continue", "myAccount.Address", myAccount.Address)
+			return
+		}
+
+		// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
+		// time sensitive logic in sequencer, such as block generation timeouts.
+		t := blk.Block.Header.Number
+
+		d.logger.Debug("sequencer time", "t", t)
+
+		sequencers, err := activeSequencersQuerier.Get()
+		if err != nil {
+			d.logger.Error("querying staked sequencers failed; quitting", "error", err)
+			return
+		}
+
+		if len(sequencers) == 0 {
+			// This is something that should **never** happen.
+			panic("no staked sequencers")
+		}
+
+		// Is it my turn to generate next block?
+		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
+			header := d.blockchain.Header()
+			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
+				d.logger.Error("failed to mine block", "err", err)
+			}
+
 			continue
+		} else {
+			// XXX: This is just for debugging.
+			var activeSequencers []string
+			for _, s := range sequencers {
+				activeSequencers = append(activeSequencers, s.String())
+			}
+			d.logger.Debug("it's not my turn to produce a block", "myAccount.Address", myAccount.Address.String(), "activeSequencers", activeSequencers)
 		}
 
-		// There are new transactions in the pool, try to seal them
-		header := d.blockchain.Header()
-		if err := d.writeNewBlock(minerKeystore, miner, minerPK, header); err != nil {
-			d.logger.Error("failed to mine block", "err", err)
-		}
+		// TODO: What if node fails to publish a block on its turn?
+		// TODO: What if a node fails to get information about published block?
 	}
-}
-
-func (d *Avail) nextNotify() chan struct{} {
-	if d.interval == 0 {
-		d.interval = 2
-	}
-
-	go func() {
-		<-time.After(time.Duration(d.interval) * time.Second)
-		d.notifyCh <- struct{}{}
-	}()
-
-	return d.notifyCh
 }
 
 func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
@@ -112,11 +133,11 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount accounts.Account, minerPK *keystore.Key, parent *types.Header) error {
+func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key, parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
-		Miner:      minerAccount.Address.Bytes(),
+		Miner:      myAccount.Address.Bytes(),
 		Nonce:      types.Nonce{},
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
@@ -142,12 +163,12 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	err = block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(minerAccount.Address.Hex())})
+	err = block.AssignExtraValidators(header, ValidatorSet{types.StringToAddress(myAccount.Address.Hex())})
 	if err != nil {
 		return err
 	}
 
-	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(minerAccount.Address.Hex()))
+	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
 	if err != nil {
 		d.logger.Info("FAILING HERE? 3")
 		return err
@@ -171,7 +192,7 @@ func (d *Avail) writeNewBlock(minerKeystore *keystore.KeyStore, minerAccount acc
 	})
 
 	// write the seal of the block after all the fields are completed
-	header, err = block.WriteSeal(minerPK.PrivateKey, blk.Header)
+	header, err = block.WriteSeal(signKey.PrivateKey, blk.Header)
 	if err != nil {
 		d.logger.Info("FAILING HERE? 5")
 		return err

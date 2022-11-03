@@ -34,6 +34,13 @@ func ParsePrometheusAddress(cfg *config.Config) (*net.TCPAddr, error) {
 	)
 }
 
+func ParseAvailAddress(cfg *config.Config) (*net.TCPAddr, error) {
+	return helper.ResolveAddr(
+		cfg.AvailAddr,
+		helper.LocalHostBinding,
+	)
+}
+
 func ParseGrpcAddress(cfg *config.Config) (*net.TCPAddr, error) {
 	return helper.ResolveAddr(
 		cfg.GRPCAddr,

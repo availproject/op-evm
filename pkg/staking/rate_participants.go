@@ -50,12 +50,7 @@ func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMinimumParticipantsTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMinimumParticipantsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new minimum participants count", "err", setThresholdTxErr)
 		return err
@@ -84,12 +79,7 @@ func (st *participantRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMaximumParticipantsTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMaximumParticipantsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new maximum participants count", "err", setThresholdTxErr)
 		return err
@@ -118,18 +108,12 @@ func (st *participantRate) CurrentMinimum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMinimumParticipantsTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMinimumParticipantsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current minimum participants allowed", "err", err)
 		return nil, err
@@ -151,18 +135,12 @@ func (st *participantRate) CurrentMaximum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMaximumParticipantsTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMaximumParticipantsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current maximum participants allowed", "err", err)
 		return nil, err

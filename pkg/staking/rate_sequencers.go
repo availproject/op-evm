@@ -50,12 +50,7 @@ func (st *sequencerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) 
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMinimumSequencersTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMinimumSequencersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new minimum sequencers count", "err", setThresholdTxErr)
 		return err
@@ -84,12 +79,7 @@ func (st *sequencerRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) 
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMaximumSequencersTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMaximumSequencersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new maximum sequencers count", "err", setThresholdTxErr)
 		return err
@@ -118,18 +108,12 @@ func (st *sequencerRate) CurrentMinimum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMinimumSequencersTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMinimumSequencersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current minimum sequencers allowed", "err", err)
 		return nil, err
@@ -151,18 +135,12 @@ func (st *sequencerRate) CurrentMaximum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMaximumSequencersTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMaximumSequencersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current maximum sequencers allowed", "err", err)
 		return nil, err

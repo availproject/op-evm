@@ -50,12 +50,7 @@ func (st *watchtowerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMinimumWatchtowersTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMinimumWatchtowersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new minimum watchtowers count", "err", setThresholdTxErr)
 		return err
@@ -84,12 +79,7 @@ func (st *watchtowerRate) SetMaximum(newMax *big.Int, signKey *ecdsa.PrivateKey)
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMaximumWatchtowersTx(address, newMax, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMaximumWatchtowersTx(address, newMax, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new maximum watchtowers count", "err", setThresholdTxErr)
 		return err
@@ -118,18 +108,12 @@ func (st *watchtowerRate) CurrentMinimum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMinimumWatchtowersTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMinimumWatchtowersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current minimum watchtowers allowed", "err", err)
 		return nil, err
@@ -151,18 +135,12 @@ func (st *watchtowerRate) CurrentMaximum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMaximumWatchtowersTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMaximumWatchtowersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current maximum watchtowers allowed", "err", err)
 		return nil, err

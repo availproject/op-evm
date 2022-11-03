@@ -48,12 +48,7 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to query current staking threshold", "err", setThresholdTxErr)
 		return err
@@ -82,18 +77,12 @@ func (st *threshold) Current() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetThresholdTx(transition, gasLimit, minerAddress)
+	threshold, err := GetThresholdTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current staking threshold", "err", err)
 		return nil, err

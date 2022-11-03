@@ -50,12 +50,7 @@ func (st *validatorsRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMinimumValidatorsTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMinimumValidatorsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new minimum validators count", "err", setThresholdTxErr)
 		return err
@@ -84,12 +79,7 @@ func (st *validatorsRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetMaximumValidatorsTx(address, newMin, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetMaximumValidatorsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to set new maximum validators count", "err", setThresholdTxErr)
 		return err
@@ -118,18 +108,12 @@ func (st *validatorsRate) CurrentMinimum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMinimumValidatorsTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMinimumValidatorsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current minimum validators allowed", "err", err)
 		return nil, err
@@ -151,18 +135,12 @@ func (st *validatorsRate) CurrentMaximum() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetMaximumValidatorsTx(transition, gasLimit, minerAddress)
+	threshold, err := GetMaximumValidatorsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current maximum validators allowed", "err", err)
 		return nil, err

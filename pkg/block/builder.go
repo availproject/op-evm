@@ -22,6 +22,7 @@ var (
 type Builder interface {
 	SetBlockNumber(number uint64) Builder
 	SetCoinbaseAddress(coinbaseAddr types.Address) Builder
+	SetDifficulty(d uint64) Builder
 	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
@@ -40,6 +41,7 @@ type blockBuilder struct {
 	logger     hclog.Logger
 
 	coinbase   *types.Address
+	difficulty *uint64
 	parentRoot *types.Hash
 	gasLimit   *uint64
 
@@ -54,6 +56,7 @@ type blockBuilder struct {
 
 type BlockBuilderFactory interface {
 	FromParentHash(hash types.Hash) (Builder, error)
+	FromBlockchainHead() (Builder, error)
 }
 
 type blockBuilderFactory struct {
@@ -68,6 +71,11 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 		executor:   executor,
 		logger:     logger.ResetNamed("block_builder_factory"),
 	}
+}
+
+func (bbf *blockBuilderFactory) FromBlockchainHead() (Builder, error) {
+	hdr := bbf.blockchain.Header()
+	return bbf.FromParentHeader(hdr)
 }
 
 func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, error) {
@@ -105,6 +113,11 @@ func (bb *blockBuilder) SetBlockNumber(n uint64) Builder {
 
 func (bb *blockBuilder) SetCoinbaseAddress(coinbaseAddr types.Address) Builder {
 	bb.coinbase = &coinbaseAddr
+	return bb
+}
+
+func (bb *blockBuilder) SetDifficulty(d uint64) Builder {
+	bb.difficulty = &d
 	return bb
 }
 
@@ -153,6 +166,11 @@ func (bb *blockBuilder) setDefaults() {
 		*bb.coinbase = types.BytesToAddress(bb.parent.Miner)
 	}
 
+	if bb.difficulty == nil {
+		bb.difficulty = new(uint64)
+		*bb.difficulty = 0
+	}
+
 	if bb.parentRoot == nil {
 		bb.parentRoot = new(types.Hash)
 		*bb.parentRoot = bb.parent.StateRoot
@@ -176,6 +194,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	bb.setDefaults()
 
 	// Finalize header details before transaction processing.
+	bb.header.Difficulty = *bb.difficulty
 	bb.header.ExtraData = EncodeExtraDataFields(bb.extraData)
 	bb.header.GasLimit = *bb.gasLimit
 	bb.header.Miner = bb.coinbase.Bytes()
@@ -214,6 +233,7 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 			return nil, err
 		}
 	}
+
 	// Commit the changes.
 	_, root := bb.transition.Commit()
 

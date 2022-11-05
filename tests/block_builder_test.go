@@ -27,6 +27,16 @@ func Test_Builder_Construction_FromParentHash(t *testing.T) {
 	}
 }
 
+func Test_Builder_Construction_FromBlockchainHead(t *testing.T) {
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+
+	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
+	_, err := bbf.FromBlockchainHead()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func Test_Builder_Defaults(t *testing.T) {
 	sk := newPrivateKey(t)
 
@@ -80,6 +90,25 @@ func Test_Builder_Change_CoinbaseAddress(t *testing.T) {
 	miner := types.BytesToAddress(b.Header.Miner)
 	if miner != coinbase {
 		t.Fatalf("block miner address: got %q, expected %q", miner, coinbase)
+	}
+}
+
+func Test_Builder_Set_Difficulty(t *testing.T) {
+	sk := newPrivateKey(t)
+
+	expected := uint64(42)
+
+	b, err := newBlockBuilder(t).
+		SetDifficulty(expected).
+		SignWith(sk).
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if b.Header.Difficulty != expected {
+		t.Fatalf("block header difficulty: got %d, expected %d", b.Header.Difficulty, expected)
 	}
 }
 

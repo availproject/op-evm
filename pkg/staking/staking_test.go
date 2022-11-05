@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -42,6 +43,37 @@ func TestIsContractDeployed(t *testing.T) {
 	tAssert.False(staked)
 }
 
+func TestGetSetStakingThreshold(t *testing.T) {
+	tAssert := assert.New(t)
+
+	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	tAssert.NotNil(executor)
+	tAssert.NotNil(blockchain)
+
+	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
+	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
+
+	defaultStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(1), ETH)
+	targetStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+
+	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
+
+	currentThreshold, err := stakingThresholdQuerier.Current()
+	tAssert.NoError(err)
+	tAssert.Equal(currentThreshold, defaultStakingThresholdAmount)
+	fmt.Printf("Default staking threshold (wei): %d \n", currentThreshold)
+
+	setErr := stakingThresholdQuerier.Set(targetStakingThresholdAmount, coinbaseSignKey)
+	tAssert.NoError(setErr)
+
+	targetThreshold, err := stakingThresholdQuerier.Current()
+	tAssert.NoError(err)
+	tAssert.Equal(targetThreshold, targetStakingThresholdAmount)
+	fmt.Printf("Target staking threshold (wei): %d \n", targetThreshold)
+}
+
 // TestIsContractStakedAndUnStaked - Is a bit more complex unit test that requires to write multiple blocks
 // in order to satisfy the states. It will produce 5 blocks, written into the database and as a outcome,
 // staker address will be staked and removed from the sequencer list resulting in a passing test.
@@ -53,12 +85,17 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	// GET THE REQUIRED ADDRESSES
-
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
 	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+
+	// GET THE REQUIRED ADDRESSES
 
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
+
+	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
+	setErr := stakingThresholdQuerier.Set(big.NewInt(10), coinbaseSignKey)
+	tAssert.NoError(setErr)
 
 	stakerAddr, stakerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
@@ -66,36 +103,38 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
+	// Following test only queries contract to see if it's working.
+	// Does not necessairly look into the responses.
+	staked, err := sequencerQuerier.Contains(coinbaseAddr)
+	tAssert.NoError(err)
+	tAssert.True(staked)
+
 	// Staker that we are going to attempt to stake and unstake.
-	stakeErr := Stake(blockchain, executor, hclog.Default(), stakerAddr, stakerSignKey, 1_000_000, "test")
+	stakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(stakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := sequencerQuerier.Contains(stakerAddr)
+	staked, err = sequencerQuerier.Contains(stakerAddr)
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
 	// DO THE UNSTAKE
 
 	// Staker that we are going to attempt to stake and unstake.
-	unStakeErr := UnStake(blockchain, executor, hclog.Default(), stakerAddr, stakerSignKey, 1_000_000, "test")
+	unStakeErr := UnStake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
 	tAssert.NoError(unStakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	unstaked, err := sequencerQuerier.Contains(stakerAddr)
+	unstaked, err := sequencerQuerier.Contains(coinbaseAddr)
 	tAssert.NoError(err)
-	tAssert.True(unstaked)
+	tAssert.False(unstaked)
 }
 
-// TestIsContractUnStaked - Is a bit more complex unit test that requires to write multiple blocks
-// in order to satisfy the states. It will produce 5 blocks, written into the database and as a outcome,
-// staker address will be staked and removed from the sequencer list resulting in a passing test.
-// Note that there has to be 2 stakers at least as minimum staker amount in the contract is 1.
 func TestSlashStaker(t *testing.T) {
 	tAssert := assert.New(t)
 
@@ -105,13 +144,14 @@ func TestSlashStaker(t *testing.T) {
 
 	// GET THE REQUIRED ADDRESSES
 
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
 	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
 
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)

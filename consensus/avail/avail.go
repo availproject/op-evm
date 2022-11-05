@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/syncer"
 
 	//"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -24,6 +26,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 const (
@@ -69,8 +72,19 @@ func Factory(
 ) (consensus.Consensus, error) {
 	logger := params.Logger.Named("avail")
 
-	asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
+	bs, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		panic("can't find validator key! - " + err.Error())
+	}
 
+	validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+	if err != nil {
+		panic("validator key decoding failed: " + err.Error())
+	}
+
+	validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+
+	asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
 	d := &Avail{
 		logger:         logger,
 		notifyCh:       make(chan struct{}),
@@ -89,9 +103,10 @@ func Factory(
 			params.Blockchain,
 			time.Duration(params.BlockTime)*3*time.Second,
 		),
+		validatorKey:     validatorKey,
+		validatorKeyAddr: validatorAddr,
 	}
 
-	var err error
 	if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
 		return nil, fmt.Errorf("invalid avail mechanism type/s provided")
 	}
@@ -129,14 +144,13 @@ func (d *Avail) Start() error {
 			return err
 		}
 
-		/*minerKeystore*/
-		_, minerAccount, minerPk, err := getAccountData(SequencerAddress)
-		if err != nil {
-			return err
-		}
+		// Ensure that sequencer always has balance
+		depositBalance(d.validatorKeyAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
+		d.logger.Error("automatic sequencer balance deposit active; remove this ASAP ...^")
 
 		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
-		minerAddr := types.Address(minerAccount.Address)
+		minerAddr := d.validatorKeyAddr
+		minerPk := d.validatorKey
 
 		sequencerStaked, sequencerError := sequencerQuerier.Contains(minerAddr)
 		if sequencerError != nil {
@@ -146,14 +160,14 @@ func (d *Avail) Start() error {
 
 		if !sequencerStaked {
 			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", minerAddr, minerPk.PrivateKey, stakeAmount, 1_000_000, "sequencer")
-			if stakedErr != nil {
+			err := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", minerAddr, minerPk, stakeAmount, 1_000_000, "sequencer")
+			if err != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err
 			}
 		}
 
-		go d.runSequencer(minerAccount, minerPk)
+		go d.runSequencer(accounts.Account{Address: common.Address(minerAddr)}, &keystore.Key{PrivateKey: minerPk})
 	}
 
 	if d.nodeType == Validator {
@@ -209,6 +223,56 @@ func (d *Avail) Close() error {
 	close(d.closeCh)
 
 	return nil
+}
+
+func depositBalance(receiver types.Address, amount *big.Int, bchain *blockchain.Blockchain, executor *state.Executor) {
+	parent := bchain.Header()
+	if parent == nil {
+		panic("couldn't load header for HEAD block")
+	}
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      receiver.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit,
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	transition, err := executor.BeginTxn(parent.StateRoot, header, receiver)
+	if err != nil {
+		panic("failed to begin transition: " + err.Error())
+	}
+
+	err = transition.SetAccountDirectly(receiver, &chain.GenesisAccount{Balance: amount})
+	if err != nil {
+		panic("failed to set account balance directly: " + err.Error())
+	}
+
+	// Commit the changes
+	_, root := transition.Commit()
+
+	// Update the header
+	header.StateRoot = root
+	header.GasUsed = transition.TotalGas()
+
+	// Build the actual block
+	// The header hash is computed inside `BuildBlock()`
+	blk := consensus.BuildBlock(consensus.BuildBlockParams{
+		Header:   header,
+		Txns:     []*types.Transaction{},
+		Receipts: transition.Receipts(),
+	})
+
+	// Compute the hash, this is only a provisional hash since the final one
+	// is sealed after all the committed seals
+	blk.Header.ComputeHash()
+
+	err = bchain.WriteBlock(blk, "test")
+	if err != nil {
+		panic("failed to write balance transfer block: " + err.Error())
+	}
 }
 
 // TODO: This is just a demo implementation, to get miner & watch tower

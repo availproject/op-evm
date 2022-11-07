@@ -14,6 +14,7 @@ require (
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/go-hclog v1.3.1
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/test-go/testify v1.1.4
 	github.com/umbracle/ethgo v0.1.4-0.20220722090909-c8ac32939570

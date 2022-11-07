@@ -37,7 +37,7 @@ func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *sta
 
 func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
-	blck, err := builder.FromParentHash(st.blockchain.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
@@ -45,24 +45,19 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	pk := signKey.Public().(*ecdsa.PublicKey)
 	address := edge_crypto.PubKeyToAddress(pk)
 
-	blck.SetCoinbaseAddress(address)
-	blck.SignWith(signKey)
+	blk.SetCoinbaseAddress(address)
+	blk.SignWith(signKey)
 
-	gasLimit, err := st.blockchain.CalculateGasLimit(st.blockchain.Header().Number)
-	if err != nil {
-		return err
-	}
-
-	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, gasLimit)
+	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
 		st.logger.Error("failed to query current staking threshold", "err", setThresholdTxErr)
 		return err
 	}
 
-	blck.AddTransactions(setThresholdTx)
+	blk.AddTransactions(setThresholdTx)
 
 	// Write the block to the blockchain
-	if err := blck.Write("staking_threshold_modifier"); err != nil {
+	if err := blk.Write("staking_threshold_modifier"); err != nil {
 		return err
 	}
 
@@ -82,18 +77,12 @@ func (st *threshold) Current() (*big.Int, error) {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	// calculate gas limit based on parent header
-	gasLimit, err := st.blockchain.CalculateGasLimit(header.Number)
-	if err != nil {
-		return nil, err
-	}
-
 	transition, err := st.executor.BeginTxn(parent.StateRoot, header, minerAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	threshold, err := GetThresholdTx(transition, gasLimit, minerAddress)
+	threshold, err := GetThresholdTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
 		st.logger.Error("failed to query current staking threshold", "err", err)
 		return nil, err

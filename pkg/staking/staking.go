@@ -27,7 +27,7 @@ var (
 
 func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blk, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blk, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 
 func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
-	blk, err := builder.FromParentHash(bh.Header().Hash)
+	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}

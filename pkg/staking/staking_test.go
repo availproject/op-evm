@@ -37,8 +37,8 @@ func TestIsContractDeployed(t *testing.T) {
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
-	staked, err := sequencerQuerier.Contains(stakerAddr)
+	sequencerQuerier := NewActiveParticipantsQuerier(blockchain, executor, hclog.Default())
+	staked, err := sequencerQuerier.Contains(stakerAddr, Sequencer)
 	tAssert.NoError(err)
 	tAssert.False(staked)
 }
@@ -47,7 +47,7 @@ func TestGetSetStakingThreshold(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -81,7 +81,7 @@ func TestGetSetStakingThreshold(t *testing.T) {
 func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -100,25 +100,25 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	stakerAddr, stakerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
 
-	sequencerQuerier := NewActiveSequencersQuerier(blockchain, executor, hclog.Default())
+	sequencerQuerier := NewActiveParticipantsQuerier(blockchain, executor, hclog.Default())
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), string(WatchTower), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err := sequencerQuerier.Contains(coinbaseAddr)
+	staked, err := sequencerQuerier.Contains(coinbaseAddr, WatchTower)
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
 	// Staker that we are going to attempt to stake and unstake.
-	stakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
+	stakeErr := Stake(blockchain, executor, hclog.Default(), string(WatchTower), stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(stakeErr)
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	staked, err = sequencerQuerier.Contains(stakerAddr)
+	staked, err = sequencerQuerier.Contains(stakerAddr, WatchTower)
 	tAssert.NoError(err)
 	tAssert.True(staked)
 
@@ -130,7 +130,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 
 	// Following test only queries contract to see if it's working.
 	// Does not necessairly look into the responses.
-	unstaked, err := sequencerQuerier.Contains(coinbaseAddr)
+	unstaked, err := sequencerQuerier.Contains(coinbaseAddr, WatchTower)
 	tAssert.NoError(err)
 	tAssert.False(unstaked)
 }
@@ -138,7 +138,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 func TestSlashStaker(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 

@@ -11,11 +11,11 @@ import (
 )
 
 type verifier struct {
-	activeSequencers ActiveSequencers
+	activeSequencers ActiveParticipants
 	logger           hclog.Logger
 }
 
-func NewVerifier(as ActiveSequencers, logger hclog.Logger) blockchain.Verifier {
+func NewVerifier(as ActiveParticipants, logger hclog.Logger) blockchain.Verifier {
 	return &verifier{
 		activeSequencers: as,
 		logger:           logger,
@@ -30,7 +30,7 @@ func (v *verifier) VerifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	minerIsActiveSequencer, err := v.activeSequencers.Contains(signer)
+	minerIsActiveSequencer, err := v.activeSequencers.Contains(signer, Sequencer)
 	if err != nil {
 		return err
 	}

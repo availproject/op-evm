@@ -10,12 +10,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/syncer"
 
-	//"github.com/0xPolygon/polygon-edge/protocol"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -36,6 +35,10 @@ const (
 	// For now hand coded address of the watch tower
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
+
+type Config struct {
+	AvailAddr string
+}
 
 // Dev consensus protocol seals any new transaction immediately
 type Avail struct {
@@ -66,67 +69,68 @@ type Avail struct {
 	blockTime      time.Duration // Minimum block generation time in seconds
 }
 
-// Factory implements the base factory method
-func Factory(
-	params *consensus.Params,
-) (consensus.Consensus, error) {
-	logger := params.Logger.Named("avail")
+// Factory returns the consensus factory method
+func Factory(config Config) func(params *consensus.Params) (consensus.Consensus, error) {
+	return func(params *consensus.Params) (consensus.Consensus, error) {
+		logger := params.Logger.Named("avail")
 
-	bs, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
-	if err != nil {
-		panic("can't find validator key! - " + err.Error())
-	}
-
-	validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
-	if err != nil {
-		panic("validator key decoding failed: " + err.Error())
-	}
-
-	validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
-
-	asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
-	d := &Avail{
-		logger:         logger,
-		notifyCh:       make(chan struct{}),
-		closeCh:        make(chan struct{}),
-		blockchain:     params.Blockchain,
-		executor:       params.Executor,
-		verifier:       staking.NewVerifier(asq, logger.Named("verifier")),
-		txpool:         params.TxPool,
-		secretsManager: params.SecretsManager,
-		network:        params.Network,
-		blockTime:      time.Duration(params.BlockTime) * time.Second,
-		nodeType:       MechanismType(params.NodeType),
-		syncer: syncer.NewSyncer(
-			params.Logger,
-			params.Network,
-			params.Blockchain,
-			time.Duration(params.BlockTime)*3*time.Second,
-		),
-		validatorKey:     validatorKey,
-		validatorKeyAddr: validatorAddr,
-	}
-
-	if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
-		return nil, fmt.Errorf("invalid avail mechanism type/s provided")
-	}
-
-	d.availClient, err = avail.NewClient(fmt.Sprintf("ws://%s/v1/json-rpc", params.AvailAddr.String()))
-	if err != nil {
-		return nil, err
-	}
-
-	rawInterval, ok := params.Config.Config["interval"]
-	if ok {
-		interval, ok := rawInterval.(uint64)
-		if !ok {
-			return nil, fmt.Errorf("interval expected int")
+		bs, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
+		if err != nil {
+			panic("can't find validator key! - " + err.Error())
 		}
 
-		d.interval = interval
-	}
+		validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+		if err != nil {
+			panic("validator key decoding failed: " + err.Error())
+		}
 
-	return d, nil
+		validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+
+		asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
+
+		d := &Avail{
+			logger:         logger,
+			notifyCh:       make(chan struct{}),
+			closeCh:        make(chan struct{}),
+			blockchain:     params.Blockchain,
+			executor:       params.Executor,
+			verifier:       staking.NewVerifier(asq, logger.Named("verifier")),
+			txpool:         params.TxPool,
+			secretsManager: params.SecretsManager,
+			network:        params.Network,
+			blockTime:      time.Duration(params.BlockTime) * time.Second,
+			nodeType:       MechanismType(params.NodeType),
+			syncer: syncer.NewSyncer(
+				params.Logger,
+				params.Network,
+				params.Blockchain,
+				time.Duration(params.BlockTime)*3*time.Second,
+			),
+			validatorKey:     validatorKey,
+			validatorKeyAddr: validatorAddr,
+		}
+
+		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
+			return nil, fmt.Errorf("invalid avail mechanism type/s provided")
+		}
+
+		d.availClient, err = avail.NewClient(config.AvailAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		rawInterval, ok := params.Config.Config["interval"]
+		if ok {
+			interval, ok := rawInterval.(uint64)
+			if !ok {
+				return nil, fmt.Errorf("interval expected int")
+			}
+
+			d.interval = interval
+		}
+
+		return d, nil
+	}
 }
 
 // Initialize initializes the consensus

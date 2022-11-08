@@ -18,7 +18,8 @@ const (
 )
 
 func main() {
-	var path string
+	var availAddr, path string
+	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
 	flag.StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
 
 	flag.Parse()
@@ -34,7 +35,7 @@ func main() {
 	log.Printf("Server config: %+v", config)
 
 	// Attach the concensus to the server
-	err = server.RegisterConsensus(AvailConsensus, avail.Factory)
+	err = server.RegisterConsensus(AvailConsensus, avail.Factory(avail.Config{AvailAddr: availAddr}))
 	if err != nil {
 		log.Fatalf("failure to register consensus: %s", err)
 	}

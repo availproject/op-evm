@@ -18,11 +18,6 @@ func NewServerConfig(path string) (*server.Config, error) {
 		return nil, err
 	}
 
-	availAddr, err := ParseAvailAddress(rawConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	jsonRpcAddr, err := ParseJsonRpcAddress(rawConfig)
 	if err != nil {
 		return nil, err
@@ -69,7 +64,6 @@ func NewServerConfig(path string) (*server.Config, error) {
 			JSONRPCAddr:              jsonRpcAddr,
 			AccessControlAllowOrigin: rawConfig.Headers.AccessControlAllowOrigins,
 		},
-		AvailAddr:  availAddr,
 		GRPCAddr:   grpcAddr,
 		LibP2PAddr: libp2pAddr,
 		Telemetry: &server.Telemetry{

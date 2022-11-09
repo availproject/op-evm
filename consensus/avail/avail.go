@@ -164,14 +164,15 @@ func (d *Avail) Start() error {
 				return err
 			}
 		}
-		_ = wtAccount
-		//go d.runWatchTower(wtAccount, wtPK)
+
+		go d.runWatchTower(wtAccount, wtPK)
 	}
 
 	return nil
 }
 
 // REQUIRED BASE INTERFACE METHODS //
+// BeginDisputeResolution -
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 	return d.verifier.VerifyHeader(header)

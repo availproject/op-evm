@@ -17,7 +17,7 @@ import (
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
@@ -28,7 +28,7 @@ func Test_Builder_Construction_FromParentHash(t *testing.T) {
 }
 
 func Test_Builder_Construction_FromBlockchainHead(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
 	_, err := bbf.FromBlockchainHead()
@@ -147,7 +147,7 @@ func Test_Builder_Change_ParentStateRoot(t *testing.T) {
 }
 
 func Test_Builder_Add_Transaction(t *testing.T) {
-	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	address, privateKey := test.NewAccount(t)
 	address2, _ := test.NewAccount(t)
 
@@ -245,7 +245,7 @@ func newPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 func newBlockBuilder(t *testing.T) block.Builder {
 	t.Helper()
 
-	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default()), getGenesisBasePath())
+	executor, bchain := test.NewBlockchain(t, staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())

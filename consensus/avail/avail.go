@@ -71,7 +71,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 	return func(params *consensus.Params) (consensus.Consensus, error) {
 		logger := params.Logger.Named("avail")
 
-		asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
+		asq := staking.NewActiveParticipantsQuerier(params.Blockchain, params.Executor, logger)
 
 		d := &Avail{
 			logger:         logger,
@@ -125,6 +125,10 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+
+	stakingNode := staking.NewNode(d.blockchain, d.executor, d.logger, staking.NodeType(d.nodeType))
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+
 	if d.nodeType == Sequencer {
 		// Only start the syncer for sequencer. Validator and Watch Tower are
 		// working purely out of Avail.
@@ -137,19 +141,8 @@ func (d *Avail) Start() error {
 			return err
 		}
 
-		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
-		minerAddr := types.Address(minerAccount.Address)
-
-		sequencerStaked, sequencerError := sequencerQuerier.Contains(minerAddr)
-		if sequencerError != nil {
-			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
-			return sequencerError
-		}
-
-		if !sequencerStaked {
-			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-			stakedErr := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", minerAddr, minerPk.PrivateKey, stakeAmount, 1_000_000, "sequencer")
-			if stakedErr != nil {
+		if stakingNode.ShouldStake(minerPk.PrivateKey) {
+			if err := stakingNode.Stake(stakeAmount, minerPk.PrivateKey); err != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err
 			}
@@ -168,6 +161,13 @@ func (d *Avail) Start() error {
 			return err
 		}
 
+		if stakingNode.ShouldStake(wtPK.PrivateKey) {
+			if err := stakingNode.Stake(stakeAmount, wtPK.PrivateKey); err != nil {
+				d.logger.Error("failure to build staking block", "error", err)
+				return err
+			}
+		}
+
 		go d.runWatchTower(wtAccount, wtPK)
 	}
 
@@ -175,6 +175,7 @@ func (d *Avail) Start() error {
 }
 
 // REQUIRED BASE INTERFACE METHODS //
+// BeginDisputeResolution -
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 	return d.verifier.VerifyHeader(header)

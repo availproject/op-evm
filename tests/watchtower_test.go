@@ -37,7 +37,7 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			verifier := staking.NewVerifier(new(test.DumbActiveSequencers), hclog.Default())
+			verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
 			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
 			head := test.GetHeadBlock(t, blockchain)
 

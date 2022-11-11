@@ -38,6 +38,10 @@ contract Staking {
     mapping(address => bool) public _addressToIsSequencer;
     mapping(address => uint256) public _addressToSequencerIndex;
 
+    address[] public _sequencers_in_probation;
+    mapping(address => bool) public _addressToIsSequencerInProbation;
+    mapping(address => uint256) public _addressToSequencerInProbationIndex;
+
     address[] public _watchtowers;
     mapping(address => bool) public _addressToIsWatchtower;
     mapping(address => uint256) public _addressToWatchtowerIndex;
@@ -75,10 +79,6 @@ contract Staking {
     }
 
     // PARTICIPANT LIMITER SETTERS-GETTERS
-
-    function GetRandomActiveParticipants(string memory nodeType) public view returns (address[] memory) {
-        return _sequencers;
-    }
 
     function SetMinNumParticipants(uint256 minimumNumParticipants) public returns (uint256) {
         _minimumNumParticipants = minimumNumParticipants;
@@ -164,6 +164,10 @@ contract Staking {
 
     function GetCurrentSequencers() public view returns (address[] memory) {
         return _sequencers;
+    }
+
+    function GetCurrentSequencersInProbation() public view returns (address[] memory) {
+        return _sequencers_in_probation;
     }
 
     function GetCurrentWatchtowers() public view returns (address[] memory) {

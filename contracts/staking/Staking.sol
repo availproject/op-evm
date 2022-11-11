@@ -76,6 +76,10 @@ contract Staking {
 
     // PARTICIPANT LIMITER SETTERS-GETTERS
 
+    function GetRandomActiveParticipants(string memory nodeType) public view returns (address[] memory) {
+        return _sequencers;
+    }
+
     function SetMinNumParticipants(uint256 minimumNumParticipants) public returns (uint256) {
         _minimumNumParticipants = minimumNumParticipants;
         return _minimumNumParticipants;

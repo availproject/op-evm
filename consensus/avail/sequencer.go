@@ -23,7 +23,7 @@ type transitionInterface interface {
 }
 
 func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) {
-	activeSequencersQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+	activeSequencersQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
 	defer availBlockStream.Close()
 
@@ -41,7 +41,7 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 		// logic. In the unexpected case of being slashed and dropping below the
 		// required sequencer staking threshold, we must stop processing, because
 		// otherwise we just get slashed more.
-		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address))
+		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address), staking.Sequencer)
 		if sequencerError != nil {
 			d.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "err", sequencerError)
 			return
@@ -58,7 +58,7 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 
 		d.logger.Debug("sequencer time", "t", t)
 
-		sequencers, err := activeSequencersQuerier.Get()
+		sequencers, err := activeSequencersQuerier.Get(staking.Sequencer)
 		if err != nil {
 			d.logger.Error("querying staked sequencers failed; quitting", "error", err)
 			return

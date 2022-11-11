@@ -86,7 +86,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 
 		validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
 
-		asq := staking.NewActiveSequencersQuerier(params.Blockchain, params.Executor, logger)
+		asq := staking.NewActiveParticipantsQuerier(params.Blockchain, params.Executor, logger)
 
 		d := &Avail{
 			logger:         logger,
@@ -141,6 +141,9 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+	stakingNode := staking.NewNode(d.blockchain, d.executor, d.logger, staking.NodeType(d.nodeType))
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+
 	if d.nodeType == Sequencer {
 		// Only start the syncer for sequencer. Validator and Watch Tower are
 		// working purely out of Avail.
@@ -152,11 +155,11 @@ func (d *Avail) Start() error {
 		depositBalance(d.validatorKeyAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
 		d.logger.Error("automatic sequencer balance deposit active; remove this ASAP ...^")
 
-		sequencerQuerier := staking.NewActiveSequencersQuerier(d.blockchain, d.executor, d.logger)
+		participantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 		minerAddr := d.validatorKeyAddr
 		minerPk := d.validatorKey
 
-		sequencerStaked, sequencerError := sequencerQuerier.Contains(minerAddr)
+		sequencerStaked, sequencerError := participantsQuerier.Contains(minerAddr, staking.Sequencer)
 		if sequencerError != nil {
 			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
 			return sequencerError
@@ -184,6 +187,13 @@ func (d *Avail) Start() error {
 			return err
 		}
 
+		if stakingNode.ShouldStake(wtPK.PrivateKey) {
+			if err := stakingNode.Stake(stakeAmount, wtPK.PrivateKey); err != nil {
+				d.logger.Error("failure to build staking block", "error", err)
+				return err
+			}
+		}
+
 		go d.runWatchTower(wtAccount, wtPK)
 	}
 
@@ -191,6 +201,7 @@ func (d *Avail) Start() error {
 }
 
 // REQUIRED BASE INTERFACE METHODS //
+// BeginDisputeResolution -
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 	return d.verifier.VerifyHeader(header)

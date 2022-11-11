@@ -68,7 +68,7 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 
 	switch nodeType {
 	case Sequencer:
-		addrs, err := QuerySequencers(transition, gasLimit, minerAddress)
+		addrs, err := QueryActiveSequencers(transition, gasLimit, minerAddress)
 		if err != nil {
 			asq.logger.Error("failed to query sequencers", "err", err)
 			return nil, err
@@ -141,10 +141,65 @@ func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address)
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+func QueryActiveSequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	toReturn := []types.Address{}
+
+	addrs, err := QuerySequencers(t, gasLimit, from)
+	if err != nil {
+		return nil, err
+	}
+
+	probationAddrs, err := QuerySequencersInProbation(t, gasLimit, from)
+	if err != nil {
+		return nil, err
+	}
+
+mainLoop:
+	for _, addr := range addrs {
+		for _, probationAddr := range probationAddrs {
+			if addr.String() == probationAddr.String() {
+				continue mainLoop
+			}
+		}
+
+		toReturn = append(toReturn, addr)
+	}
+
+	return toReturn, nil
+}
+
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencers"]
 	if !ok {
 		return nil, errors.New("GetCurrentSequencers method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	return DecodeParticipants(method, res.ReturnValue)
+}
+
+func QuerySequencersInProbation(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencersInProbation"]
+	if !ok {
+		return nil, errors.New("GetCurrentSequencersInProbation method doesn't exist in Staking contract ABI")
 	}
 
 	selector := method.ID()

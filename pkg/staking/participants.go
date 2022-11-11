@@ -68,7 +68,7 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 
 	switch nodeType {
 	case Sequencer:
-		addrs, err := QueryActiveSequencers(transition, gasLimit, minerAddress)
+		addrs, err := QueryActiveSequencers(asq.blockchain, asq.executor, transition, gasLimit, minerAddress)
 		if err != nil {
 			asq.logger.Error("failed to query sequencers", "err", err)
 			return nil, err
@@ -141,7 +141,7 @@ func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address)
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
-func QueryActiveSequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+func QueryActiveSequencers(blockchain *blockchain.Blockchain, executor *state.Executor, t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	toReturn := []types.Address{}
 
 	addrs, err := QuerySequencers(t, gasLimit, from)
@@ -149,7 +149,29 @@ func QueryActiveSequencers(t *state.Transition, gasLimit uint64, from types.Addr
 		return nil, err
 	}
 
-	probationAddrs, err := QuerySequencersInProbation(t, gasLimit, from)
+	parent := blockchain.Header()
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      from.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	probationGasLimit, err := blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := executor.BeginTxn(parent.StateRoot, header, from)
+	if err != nil {
+		return nil, err
+	}
+
+	probationAddrs, err := QuerySequencersInProbation(transition, probationGasLimit, from)
 	if err != nil {
 		return nil, err
 	}

@@ -12,13 +12,13 @@ type staticActiveSequencers struct {
 	sequencers []types.Address
 }
 
-func (sas *staticActiveSequencers) Get() ([]types.Address, error) {
+func (sas *staticActiveSequencers) Get(_ NodeType) ([]types.Address, error) {
 	lst := make([]types.Address, len(sas.sequencers))
 	copy(lst, sas.sequencers)
 	return lst, nil
 }
 
-func (sas *staticActiveSequencers) Contains(addr types.Address) (bool, error) {
+func (sas *staticActiveSequencers) Contains(addr types.Address, _ NodeType) (bool, error) {
 	for _, a := range sas.sequencers {
 		if bytes.Equal(a.Bytes(), addr.Bytes()) {
 			return true, nil

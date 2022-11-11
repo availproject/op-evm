@@ -12,19 +12,24 @@ import (
 // used to shuffle sequencer addresses.
 type RandomSeedFn func() int64
 
+type ActiveSequencers interface {
+	Get() ([]types.Address, error)
+	Contains(addr types.Address) (bool, error)
+}
+
 type randomizedActiveSequencersQuerier struct {
 	rngSeedFn RandomSeedFn
-	querier   ActiveSequencers
+	querier   ActiveParticipants
 }
 
 // NewRandomizedActiveSequencersQuerier returns an implementation of
 // `ActiveSequencers` that deterministically randomizes list of currently
 // active sequencers. Given same number from `RandomSeedFn` and list of
 // addresses from `ActiveSequencers`, the return value of `Get()` is the same.
-func NewRandomizedActiveSequencersQuerier(rngSeedFn RandomSeedFn, activeSequencers ActiveSequencers) ActiveSequencers {
+func NewRandomizedActiveSequencersQuerier(rngSeedFn RandomSeedFn, activeParticipants ActiveParticipants) ActiveSequencers {
 	return &randomizedActiveSequencersQuerier{
 		rngSeedFn: rngSeedFn,
-		querier:   activeSequencers,
+		querier:   activeParticipants,
 	}
 }
 
@@ -35,7 +40,7 @@ func (as addresses) Less(i, j int) bool { return bytes.Compare(as[i].Bytes(), as
 func (as addresses) Swap(i, j int)      { tmp := as[i]; as[i] = as[j]; as[j] = tmp }
 
 func (rasq *randomizedActiveSequencersQuerier) Get() ([]types.Address, error) {
-	as, err := rasq.querier.Get()
+	as, err := rasq.querier.Get(Sequencer)
 	if err != nil {
 		return nil, err
 	}
@@ -52,16 +57,5 @@ func (rasq *randomizedActiveSequencersQuerier) Get() ([]types.Address, error) {
 }
 
 func (rasq *randomizedActiveSequencersQuerier) Contains(addr types.Address) (bool, error) {
-	as, err := rasq.querier.Get()
-	if err != nil {
-		return false, err
-	}
-
-	for _, a := range as {
-		if bytes.Equal(addr.Bytes(), a.Bytes()) {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return rasq.querier.Contains(addr, Sequencer)
 }

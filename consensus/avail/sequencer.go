@@ -71,12 +71,28 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 			panic("no staked sequencers")
 		}
 
+		// XXX: Debug
+		var sb strings.Builder
+		sb.WriteString("[")
+		for i, s := range sequencers {
+			sb.WriteString(s.String())
+			if i+1 < len(sequencers) {
+				sb.WriteString(", ")
+			}
+		}
+		sb.WriteString("]")
+		d.logger.Error("@@@@@@@@@@@ ACTIVE SEQUENCERS", "myAddress", myAccount.Address.String(), "activeSequencers", sb.String())
+		// XXX: End of Debug
+
 		// Is it my turn to generate next block?
 		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
 			header := d.blockchain.Header()
+			d.logger.Error("it's my turn; producing a block", "t", blk.Block.Header.Number)
 			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
 				d.logger.Error("failed to mine block", "err", err)
 			}
+
+			d.logger.Error("block produced")
 
 			continue
 		} else {
@@ -206,6 +222,8 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
+	d.logger.Error("sending block to avail")
+
 	err, malicious := d.sendBlockToAvail(blk)
 	if err != nil {
 		d.logger.Info("FAILING HERE? 6")
@@ -217,6 +235,8 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 		// state of blocks when validator nor watch tower has it.
 		return nil
 	}
+
+	d.logger.Error("writing block to blockchain")
 
 	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlock(blk, "not-sure-what-source-yet-is"); err != nil {
@@ -247,7 +267,7 @@ func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
 	d.logger.Info("Submitting block to avail...")
 	f := sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
 	if _, err := f.Result(); err != nil {
-		d.logger.Error("Error while submitting data to avail", err)
+		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err, malicious
 	}
 

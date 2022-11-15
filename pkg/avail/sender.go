@@ -311,18 +311,27 @@ func (s *sender) SubmitDataAndWaitForStatus(bs []byte, dstatus types.ExtrinsicSt
 		return f
 	}
 
+	log.Printf("XXXXXXX: Sending Avail block\n")
+
 	sub, err := api.RPC.Author.SubmitAndWatchExtrinsic(ext)
 	if err != nil {
 		f.SetError(err)
 		return f
 	}
+	log.Printf("XXXXXXX: Sent Avail block\n")
 
 	go func() {
 		defer sub.Unsubscribe()
 
 		for {
+			log.Printf("waiting for Avail send block subscriptions status\n")
 			select {
 			case status := <-sub.Chan():
+				sts, err := dstatus.MarshalJSON()
+				if err != nil {
+					panic(err)
+				}
+				log.Printf("FOOBAR - status from Avail: %q", string(sts))
 				if dstatus.IsInBlock {
 					if status.IsInBlock {
 						log.Printf("submitted block is in block.")

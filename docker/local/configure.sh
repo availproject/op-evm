@@ -14,5 +14,5 @@ NODE_ID=$1
 P2P_ID=$(/p2pkeytoid /data/avail-$NODE_ID/libp2p/libp2p.key)
 
 # Append to genesis.json
-jq ".bootnodes += [\"/dns4/$NODE_ID/tcp/10001/p2p/$P2P_ID\"]" /configs/genesis.json > /configs/genesis.json.new && mv /configs/genesis.json.new /configs/genesis.json
+jq ".bootnodes += [\"/dns4/$NODE_ID/tcp/1478/p2p/$P2P_ID\"]" /configs/genesis.json > /configs/genesis.json.new && mv /configs/genesis.json.new /configs/genesis.json
 

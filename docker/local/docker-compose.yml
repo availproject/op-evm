@@ -8,12 +8,11 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-1.yaml"]
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
     depends_on:
       - avail
     ports:
       - '10000:9632'
-      - '10001:1478'
       - '10002:8545'
     networks:
       - avail-settlement
@@ -21,12 +20,11 @@ services:
     
   sequencer-2:
     image: avail-settlement
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-2.yaml"]
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-2.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
     depends_on:
       - avail
     ports:
       - '20000:9632'
-      - '20001:1478'
       - '20002:8545'
     networks:
       - avail-settlement
@@ -34,12 +32,11 @@ services:
     
   sequencer-3:
     image: avail-settlement
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-3.yaml"]
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-3.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
     depends_on:
       - avail
     ports:
       - '30000:9632'
-      - '30001:1478'
       - '30002:8545'
     networks:
       - avail-settlement
@@ -47,7 +44,7 @@ services:
     
   watchtower-1:
     image: avail-settlement
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/watchtower-1.yaml"]
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/watchtower-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
     depends_on:
       - avail
     ports:

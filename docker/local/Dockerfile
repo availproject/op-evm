@@ -25,29 +25,16 @@ COPY docker/local/sequencer-3.yaml /configs
 COPY docker/local/watchtower-1.yaml /configs
 COPY docker/local/configure.sh /configure.sh
 
-# Data dir contains generated secrets.
-#COPY data /data
-
-# Ensure that no leftovers end up to container image.
-#RUN rm -fr data/*/blockchain data/*/libp2p
-
 COPY --from=builder /avail-settlement/avail-settlement /avail-settlement
 COPY --from=builder /avail-settlement/p2pkeytoid /p2pkeytoid
 COPY --from=builder /avail-settlement/third_party/polygon-edge/polygon-edge /polygon-edge
 
+# Configuration script generates secrets for the node & adjusts
+# the genesis.json bootnode list accordingly.
 RUN /configure.sh sequencer-1
 RUN /configure.sh sequencer-2
 RUN /configure.sh sequencer-3
 RUN /configure.sh watchtower-1
-
-#RUN /polygon-edge secrets init --data-dir /data/avail-sequencer-1
-#RUN /polygon-edge secrets init --data-dir /data/avail-sequencer-2
-#RUN /polygon-edge secrets init --data-dir /data/avail-sequencer-3
-#RUN /polygon-edge secrets init --data-dir /data/avail-watchtower-1
-
-
-# TODO(tuommaki): Generate secrets for each sequencer node & sed the pub. key
-# into genesis.json for bootnode address.
 
 # Expose json-rpc, libp2p and grpc ports
 EXPOSE 8545 9632 1478

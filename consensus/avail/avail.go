@@ -52,8 +52,8 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	validatorKey     *ecdsa.PrivateKey // nolint:unused // Private key for the validator
-	validatorKeyAddr types.Address     // nolint:unused
+	signKey   *ecdsa.PrivateKey
+	minerAddr types.Address
 
 	interval uint64
 	txpool   *txpool.TxPool
@@ -106,8 +106,8 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 				params.Blockchain,
 				time.Duration(params.BlockTime)*3*time.Second,
 			),
-			validatorKey:     validatorKey,
-			validatorKeyAddr: validatorAddr,
+			signKey:   validatorKey,
+			minerAddr: validatorAddr,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -152,14 +152,11 @@ func (d *Avail) Start() error {
 		}
 
 		// Ensure that sequencer always has balance
-		depositBalance(d.validatorKeyAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
+		depositBalance(d.minerAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
 		d.logger.Error("automatic sequencer balance deposit active; remove this ASAP ...^")
 
 		participantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-		minerAddr := d.validatorKeyAddr
-		minerPk := d.validatorKey
-
-		sequencerStaked, sequencerError := participantsQuerier.Contains(minerAddr, staking.Sequencer)
+		sequencerStaked, sequencerError := participantsQuerier.Contains(d.minerAddr, staking.Sequencer)
 		if sequencerError != nil {
 			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
 			return sequencerError
@@ -167,14 +164,14 @@ func (d *Avail) Start() error {
 
 		if !sequencerStaked {
 			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-			err := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", minerAddr, minerPk, stakeAmount, 1_000_000, "sequencer")
+			err := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", d.minerAddr, d.signKey, stakeAmount, 1_000_000, "sequencer")
 			if err != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err
 			}
 		}
 
-		go d.runSequencer(accounts.Account{Address: common.Address(minerAddr)}, &keystore.Key{PrivateKey: minerPk})
+		go d.runSequencer(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	}
 
 	if d.nodeType == Validator {

@@ -39,7 +39,7 @@ contract Staking {
     mapping(address => uint256) public _addressToSequencerIndex;
 
     address[] public _sequencers_in_probation;
-    mapping(address => bool) public _addressToIsSequencerInProbation;
+    mapping(address => bool) public _addressToIsSequencerInProbationAddr;
     mapping(address => uint256) public _addressToSequencerInProbationIndex;
 
     address[] public _watchtowers;
@@ -54,6 +54,10 @@ contract Staking {
     event Staked(address indexed account, uint256 amount);
     event Unstaked(address indexed account, uint256 amount);
     event Slashed(address indexed account, uint256 newAmount, uint256 slashedAmount);
+
+    // Fraud Dispute Resolution Events
+    event DisputeResolutionBegan(address indexed account);
+    event DisputeResolutionEnded(address indexed account);
 
     // Modifiers
     modifier onlyEOA() {
@@ -166,10 +170,6 @@ contract Staking {
         return _sequencers;
     }
 
-    function GetCurrentSequencersInProbation() public view returns (address[] memory) {
-        return _sequencers_in_probation;
-    }
-
     function GetCurrentWatchtowers() public view returns (address[] memory) {
         return _watchtowers;
     }
@@ -205,6 +205,27 @@ contract Staking {
     // -- END VIEW FUNCTIONS 
 
 
+    // PUBLIC FRAUD DISPUTE RESOLUTION FUNCTIONS
+
+    function GetCurrentSequencersInProbation() public view returns (address[] memory) {
+        return _sequencers_in_probation;
+    }
+
+    function GetIsSequencerInProbation(address sequencerAddr) public view returns (bool) {
+        return _isSequencerInProbation(sequencerAddr);
+    }
+
+    function BeginDisputeResolution(address sequencerAddr) public {
+        _appendToSequencersInProbationSet(sequencerAddr);
+        emit DisputeResolutionBegan(sequencerAddr);
+    }
+
+    function EndDisputeResolution(address sequencerAddr) public {
+        _deleteFromSequencersInProbationSet(sequencerAddr);
+        emit DisputeResolutionEnded(sequencerAddr);
+    }
+
+    // -- END FRAUD DISPUTE RESOLUTION FUNCTIONS
 
     // PUBLIC STAKING FUNCTIONS
 
@@ -424,6 +445,33 @@ contract Staking {
         _validators.pop();
     }
 
+    function _appendToSequencersInProbationSet(address newMaliciousAddr) private {
+        _addressToIsSequencerInProbationAddr[newMaliciousAddr] = true;
+        _addressToSequencerInProbationIndex[newMaliciousAddr] = _sequencers_in_probation.length;
+        _sequencers_in_probation.push(newMaliciousAddr);
+    }
+
+    function _deleteFromSequencersInProbationSet(address participant) private {
+        require(
+            _addressToSequencerInProbationIndex[participant] < _sequencers_in_probation.length,
+            "malicious participant index out of range in mapping"
+        );
+
+        // index of removed address
+        uint256 index = _addressToSequencerInProbationIndex[participant];
+        uint256 lastIndex = _sequencers_in_probation.length - 1;
+
+        if (index != lastIndex) {
+            // exchange between the element and last to pop for delete
+            address lastAddr = _sequencers_in_probation[lastIndex];
+            _sequencers_in_probation[index] = lastAddr;
+            _addressToSequencerInProbationIndex[lastAddr] = index;
+        }
+
+        _addressToIsSequencerInProbationAddr[participant] = false;
+        _addressToSequencerInProbationIndex[participant] = 0;
+        _sequencers_in_probation.pop();
+    }
 
     // Append to participant set only if participant is not already set.
     // Due to possibility to be multi-node participant, we need to make this check.
@@ -451,6 +499,10 @@ contract Staking {
         _addressToIsValidator[newValidator] = true;
         _addressToValidatorIndex[newValidator] = _validators.length;
         _validators.push(newValidator);
+    }
+
+    function _isSequencerInProbation(address account) private view returns (bool) {
+        return _addressToIsSequencerInProbationAddr[account];
     }
 
     function _isParticipant(address account) private view returns (bool) {

@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	// Enable LibP2P logging
-	golog.SetAllLoggers(golog.LevelDebug)
+	golog.SetAllLoggers(golog.LevelError)
 
 	config, err := config.NewServerConfig(path)
 	if err != nil {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -23,7 +25,9 @@ type transitionInterface interface {
 }
 
 func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) {
-	activeSequencersQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+	t := new(atomic.Int64)
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
 	defer availBlockStream.Close()
 
@@ -41,7 +45,7 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 		// logic. In the unexpected case of being slashed and dropping below the
 		// required sequencer staking threshold, we must stop processing, because
 		// otherwise we just get slashed more.
-		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address), staking.Sequencer)
+		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address))
 		if sequencerError != nil {
 			d.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "err", sequencerError)
 			return
@@ -54,11 +58,9 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 
 		// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
 		// time sensitive logic in sequencer, such as block generation timeouts.
-		t := blk.Block.Header.Number
+		t.Store(int64(blk.Block.Header.Number))
 
-		d.logger.Debug("sequencer time", "t", t)
-
-		sequencers, err := activeSequencersQuerier.Get(staking.Sequencer)
+		sequencers, err := activeSequencersQuerier.Get()
 		if err != nil {
 			d.logger.Error("querying staked sequencers failed; quitting", "error", err)
 			return
@@ -83,7 +85,7 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 			for _, s := range sequencers {
 				activeSequencers = append(activeSequencers, s.String())
 			}
-			d.logger.Debug("it's not my turn to produce a block", "myAccount.Address", myAccount.Address.String(), "activeSequencers", activeSequencers)
+			d.logger.Debug("it's not my turn to produce a block", "t", blk.Block.Header.Number, "myAccount.Address", myAccount.Address.String(), "activeSequencers", activeSequencers)
 		}
 
 		// TODO: What if node fails to publish a block on its turn?

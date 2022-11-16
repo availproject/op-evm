@@ -150,11 +150,30 @@ func TestSlashStaker(t *testing.T) {
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), "sequencer", coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
-	tAssert.NoError(coinbaseStakeErr)
+	maliciousAddr, maliciousSignKey := test.NewAccount(t)
+	test.DepositBalance(t, maliciousAddr, balance, blockchain, executor)
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
+	tAssert.NoError(coinbaseStakeErr)
+
+	maliciousStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
+	tAssert.NoError(maliciousStakeErr)
+
+	dr := NewDisputeResolution(blockchain, executor, hclog.Default())
+
+	err := dr.Begin(maliciousAddr, maliciousSignKey)
+	tAssert.NoError(err)
+
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousAddr)
+	tAssert.NoError(isProbationSequencerErr)
+	tAssert.True(isProbationSequencer)
+
+	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
+	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, maliciousAddr, 1_000_000, "test")
 	tAssert.NoError(coinbaseSlashErr)
+
+	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousAddr)
+	tAssert.NoError(isProbationSequencerErr)
+	tAssert.False(isProbationSequencer)
 }

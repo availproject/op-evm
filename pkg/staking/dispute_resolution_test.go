@@ -50,7 +50,7 @@ func TestEndDisputeResolution(t *testing.T) {
 	tAssert.NotNil(blockchain)
 
 	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
-	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
+	coinbaseAddr, _ := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
@@ -61,7 +61,7 @@ func TestEndDisputeResolution(t *testing.T) {
 
 	// BEGIN THE DISPUTE RESOLUTION
 
-	err := dr.Begin(byzantineSequencerAddr, coinbaseSignKey)
+	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get()
@@ -75,7 +75,7 @@ func TestEndDisputeResolution(t *testing.T) {
 
 	// END THE DISPUTE RESOLUTION
 
-	err = dr.End(byzantineSequencerAddr, coinbaseSignKey)
+	err = dr.End(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err = dr.Get()

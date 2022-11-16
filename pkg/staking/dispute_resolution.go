@@ -3,6 +3,7 @@ package staking
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -74,6 +75,8 @@ func (dr *disputeResolution) Contains(addr types.Address) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	fmt.Printf("Contains: %v - requested: %v \n", addrs, addr)
 
 	for _, a := range addrs {
 		if a == addr {

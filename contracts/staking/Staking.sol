@@ -8,6 +8,7 @@ contract Staking {
 
     // Parameters
     uint256 public constant DEFAULT_STAKING_THRESHOLD = 1 ether;
+    uint256 public constant DEFAULT_MIN_SLASH_PERCENTAGE = 1;
     string public  constant NODE_SEQUENCER = "sequencer";
     string public  constant NODE_WATCHTOWER = "watchtower";
     string public  constant NODE_VALIDATOR = "validator";
@@ -16,6 +17,7 @@ contract Staking {
 
     // Properties
     uint256 public _minStakingThreshold;
+    uint256 public _slashPercentage;
 
     address[] public _participants;
     mapping(address => bool) public _addressToIsParticipant;
@@ -126,6 +128,10 @@ contract Staking {
 
     // VIEW FUNCTIONS 
 
+    function GetSlashPercentage() public view returns (uint256) {
+        return _getSlashPercentage();
+    }
+
     function GetMinNumSequencers() public view returns (uint256) {
         return _minimumNumSequencers;
     }
@@ -229,6 +235,10 @@ contract Staking {
 
     // PUBLIC STAKING FUNCTIONS
 
+    function SetSlashPercentage(uint256 newPercentage) public onlyEOA {
+        _slashPercentage = newPercentage;
+    }
+
     function SetStakingMinThreshold(uint256 newThreshold) public onlyEOA {
         _minStakingThreshold = newThreshold;
     }
@@ -242,8 +252,8 @@ contract Staking {
     }
 
     // TODO: Cannot be only staker but only watchtower for example
-    function slash(uint256 slashAmount) public onlyEOA onlyStaker {
-        _slash(slashAmount);
+    function slash(address slashAddr, uint256 slashAmount) public onlyEOA onlyStaker {
+        _slash(slashAddr, slashAmount);
     }
 
     // -- END PUBLIC STAKING FUNCTIONS
@@ -330,7 +340,7 @@ contract Staking {
     // - Make sure slashing amount is properly transferred to appropriate participants
     // - Append slashed with time interval into the mapping so next sequencer set won't include it.
     //
-    function _slash(uint256 slashAmount) private {
+    function _slash(address slashAddr, uint256 slashAmount) private {
         uint256 amount = _addressToStakedAmount[msg.sender];
 
         require(
@@ -349,6 +359,11 @@ contract Staking {
 
         payable(msg.sender).transfer(slashAmount);
         emit Slashed(msg.sender, newStakedAmount, slashAmount);
+
+        if(_isSequencerInProbation(slashAddr)) {
+            _deleteFromSequencersInProbationSet(slashAddr);
+            emit DisputeResolutionEnded(slashAddr);
+        }
     }
 
     function _deleteFromParticipants(address staker) private {
@@ -581,6 +596,14 @@ contract Staking {
             return _minStakingThreshold;
         } else {
             return DEFAULT_STAKING_THRESHOLD;
+        }
+    }
+
+    function _getSlashPercentage() private view returns (uint256) {
+        if (_slashPercentage <= 0) {
+            return DEFAULT_MIN_SLASH_PERCENTAGE;
+        } else {
+            return _slashPercentage;
         }
     }
 

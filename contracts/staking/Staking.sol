@@ -468,6 +468,11 @@ contract Staking {
 
     function _deleteFromSequencersInProbationSet(address participant) private {
         require(
+            _isSequencerInProbation(participant),
+            "Address has to be in probation in order to delete it from the probation sequencers list."
+        );
+
+        require(
             _addressToSequencerInProbationIndex[participant] < _sequencers_in_probation.length,
             "malicious participant index out of range in mapping"
         );

@@ -3,7 +3,6 @@ package staking
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -76,8 +75,6 @@ func (dr *disputeResolution) Contains(addr types.Address) (bool, error) {
 		return false, err
 	}
 
-	fmt.Printf("Contains: %v - requested: %v \n", addrs, addr)
-
 	for _, a := range addrs {
 		if a == addr {
 			return true, nil
@@ -100,9 +97,9 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	disputeResolutionTx, disputeResolutionTxErr := BeginDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
-	if disputeResolutionTxErr != nil {
-		dr.logger.Error("failed to begin new fraud dispute resolution", "err", disputeResolutionTxErr)
+	disputeResolutionTx, err := BeginDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
+	if err != nil {
+		dr.logger.Error("failed to begin new fraud dispute resolution", "err", err)
 		return err
 	}
 
@@ -129,9 +126,9 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
 
-	disputeResolutionTx, disputeResolutionTxErr := EndDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
-	if disputeResolutionTxErr != nil {
-		dr.logger.Error("failed to end new fraud dispute resolution", "err", disputeResolutionTxErr)
+	disputeResolutionTx, err := EndDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
+	if err != nil {
+		dr.logger.Error("failed to end new fraud dispute resolution", "err", err)
 		return err
 	}
 

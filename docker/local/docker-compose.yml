@@ -8,7 +8,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+    entrypoint: ["/avail-settlement", "-bootstrap", "-config-file", "/configs/sequencer-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
     depends_on:
       - avail
     ports:
@@ -24,8 +24,8 @@ services:
     depends_on:
       - avail
     ports:
-      - '20000:9632'
-      - '20002:8545'
+     - '20000:9632'
+     - '20002:8545'
     networks:
       - avail-settlement
     restart: on-failure

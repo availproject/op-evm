@@ -3,12 +3,15 @@ package avail
 import (
 	"bytes"
 	"fmt"
+	"log"
+	"math/big"
 	"math/rand"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
@@ -31,6 +34,14 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
 	defer availBlockStream.Close()
 
+	d.logger.Info("ensuring sequencer staked")
+	err := d.ensureSequencerStaked(activeParticipantsQuerier)
+	if err != nil {
+		d.logger.Error("error while ensuring sequencer staked", "error", err)
+		return
+	}
+
+	d.logger.Info("ensured sequencer staked")
 	d.logger.Info("sequencer started")
 
 	for blk := range availBlockStream.Chan() {
@@ -103,10 +114,134 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 			}
 			d.logger.Debug("it's not my turn to produce a block", "t", blk.Block.Header.Number, "myAccount.Address", myAccount.Address.String(), "activeSequencers", activeSequencers)
 		}
-
-		// TODO: What if node fails to publish a block on its turn?
-		// TODO: What if a node fails to get information about published block?
 	}
+}
+
+func (d *Avail) ensureSequencerStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
+	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+	if err != nil {
+		return err
+	}
+
+	if staked {
+		d.logger.Debug("sequencer already staked")
+		return nil
+	}
+
+	log.Printf("\n\n---------------------------------------\n\nStaking %q.\n\n---------------------------------------\n", d.nodeType)
+
+	if MechanismType(d.nodeType) == BootstrapSequencer {
+		return d.stakeBootstrapSequencer()
+	} else if MechanismType(d.nodeType) == Sequencer {
+		return d.stakeSequencer(activeParticipantsQuerier)
+	} else {
+		panic("invalid node type: " + d.nodeType)
+	}
+}
+
+// stakeBootstrapSequencer takes care of sequencer staking for the very first
+// bootstrap sequencer. This needs special handling, because there won't be any
+// other sequencer forging a block with staking transaction, therefore it must
+// be build by the bootstrap node itself.
+func (d *Avail) stakeBootstrapSequencer() error {
+
+	log.Printf("\n\n---------------------------------------\n\nStaking bootstrap sequencer.\n\n---------------------------------------\n")
+
+	// First, build the staking block.
+	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
+	bb, err := blockBuilderFactory.FromBlockchainHead()
+	if err != nil {
+		return err
+	}
+
+	bb.SetCoinbaseAddress(d.minerAddr)
+	bb.SignWith(d.signKey)
+
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	if err != nil {
+		panic(err)
+		//return err
+	}
+
+	bb.AddTransactions(tx)
+	blk, err := bb.Build()
+	if err != nil {
+		panic(err)
+		//return err
+	}
+
+	for {
+		log.Printf("==============> Sending bootstrap sequencer stake block to Avail")
+		err, malicious := d.sendBlockToAvail(blk)
+		if err != nil {
+			panic(err)
+		}
+
+		if !malicious {
+			log.Printf("==============> Sent bootstrap sequencer stake block to Avail")
+			break
+		}
+		log.Printf("==============> Sent bootstrap sequencer stake block to Avail, but it was malicious. Retrying...")
+	}
+
+	err = d.blockchain.WriteBlock(blk, "sequencer")
+	if err != nil {
+		panic("bootstrap sequencer couldn't stake: " + err.Error())
+	}
+
+	log.Printf("\n\n---------------------------------------\n\nBootstrap sequencer staked.\n\n---------------------------------------\n")
+
+	return nil
+}
+
+func (d *Avail) stakeSequencer(activeParticipantsQuerier staking.ActiveParticipants) error {
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	if err != nil {
+		return err
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, d.signKey)
+	if err != nil {
+		return err
+	}
+
+	for retries := 0; retries < 10; retries++ {
+		// Submit staking transaction for execution by active sequencer.
+		err = d.txpool.AddTx(tx)
+		if err != nil {
+			d.logger.Error("failed to submit staking tx from sequencer; retrying...", "error", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		d.logger.Info("staking transaction submitted to txpool")
+		break
+	}
+
+	if err != nil {
+		panic("failed to stake sequencer")
+	}
+
+	// Syncer will be syncing the blockchain in the background, so once an active
+	// sequencer picks up the staking transaction from the txpool, it becomes
+	// effective and visible to us as well, via blockchain.
+	var staked bool
+	for !staked {
+		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+		if err != nil {
+			return err
+		}
+
+		// Wait a bit before checking again.
+		time.Sleep(1000 * time.Millisecond)
+	}
+
+	d.logger.Error("------------------------ SEQUENCER STAKED ------------------------")
+
+	return nil
 }
 
 func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {

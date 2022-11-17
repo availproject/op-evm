@@ -38,6 +38,7 @@ const (
 
 type Config struct {
 	AvailAddr string
+	Bootnode  bool
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -114,6 +115,14 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, fmt.Errorf("invalid avail mechanism type/s provided")
 		}
 
+		if d.nodeType == BootstrapSequencer && config.Bootnode {
+			return nil, fmt.Errorf("invalid avail node type provided: cannot specify bootstrap-sequencer type without -bootnode flag")
+		}
+
+		if d.nodeType == Sequencer && config.Bootnode {
+			d.nodeType = BootstrapSequencer
+		}
+
 		d.availClient, err = avail.NewClient(config.AvailAddr)
 		if err != nil {
 			return nil, err
@@ -144,7 +153,7 @@ func (d *Avail) Start() error {
 	stakingNode := staking.NewNode(d.blockchain, d.executor, d.logger, staking.NodeType(d.nodeType))
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
 
-	if d.nodeType == Sequencer {
+	if d.nodeType == Sequencer || d.nodeType == BootstrapSequencer {
 		// Only start the syncer for sequencer. Validator and Watch Tower are
 		// working purely out of Avail.
 		if err := d.syncer.Start(); err != nil {
@@ -154,22 +163,6 @@ func (d *Avail) Start() error {
 		// Ensure that sequencer always has balance
 		depositBalance(d.minerAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
 		d.logger.Error("automatic sequencer balance deposit active; remove this ASAP ...^")
-
-		participantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-		sequencerStaked, sequencerError := participantsQuerier.Contains(d.minerAddr, staking.Sequencer)
-		if sequencerError != nil {
-			d.logger.Error("failed to check if sequencer is staked", "err", sequencerError)
-			return sequencerError
-		}
-
-		if !sequencerStaked {
-			stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-			err := staking.Stake(d.blockchain, d.executor, d.logger, "sequencer", d.minerAddr, d.signKey, stakeAmount, 1_000_000, "sequencer")
-			if err != nil {
-				d.logger.Error("failure to build staking block", "error", err)
-				return err
-			}
-		}
 
 		go d.runSequencer(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	}

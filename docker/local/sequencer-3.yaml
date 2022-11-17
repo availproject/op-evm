@@ -20,7 +20,7 @@ seal: true
 tx_pool:
     price_limit: 0
     max_slots: 4096
-log_level: ERROR
+log_level: INFO
 restore_file: ""
 block_time_s: 4
 ibft_base_time_s: 10

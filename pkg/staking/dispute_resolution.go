@@ -10,8 +10,10 @@ import (
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement/contracts/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -27,13 +29,15 @@ type disputeResolution struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
+	sender     avail.Sender
 }
 
-func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) DisputeResolution {
+func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender avail.Sender, logger hclog.Logger) DisputeResolution {
 	return &disputeResolution{
 		blockchain: blockchain,
 		executor:   executor,
 		logger:     logger.ResetNamed("staking_dispute_resolution"),
+		sender:     sender,
 	}
 }
 
@@ -105,8 +109,12 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 
 	blk.AddTransactions(disputeResolutionTx)
 
-	// Write the block to the blockchain
-	if err := blk.Write("staking_fraud_dispute_resolution_modifier"); err != nil {
+	wBlk, err := blk.WriteAndReturnBlock("staking_fraud_dispute_resolution_modifier")
+	if err != nil {
+		return err
+	}
+
+	if err := dr.sendBlockToAvail(wBlk); err != nil {
 		return err
 	}
 
@@ -134,11 +142,26 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 
 	blk.AddTransactions(disputeResolutionTx)
 
-	// Write the block to the blockchain
-	if err := blk.Write("staking_fraud_dispute_resolution_modifier"); err != nil {
+	wBlk, err := blk.WriteAndReturnBlock("staking_fraud_dispute_resolution_modifier")
+	if err != nil {
 		return err
 	}
 
+	if err := dr.sendBlockToAvail(wBlk); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dr *disputeResolution) sendBlockToAvail(blk *types.Block) error {
+	f := dr.sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
+	if _, err := f.Result(); err != nil {
+		dr.logger.Error("Error while submitting dispute resolution block to avail", err)
+		return err
+	}
+
+	dr.logger.Info("Submitted dispute resolution block to avail", "block", blk.Header.Number)
 	return nil
 }
 

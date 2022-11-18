@@ -33,6 +33,7 @@ type Builder interface {
 
 	Build() (*types.Block, error)
 	Write(src string) error
+	WriteAndReturnBlock(src string) (*types.Block, error)
 }
 
 type blockBuilder struct {
@@ -158,6 +159,20 @@ func (bb *blockBuilder) Write(src string) error {
 	}
 
 	return nil
+}
+
+func (bb *blockBuilder) WriteAndReturnBlock(src string) (*types.Block, error) {
+	blk, err := bb.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	err = bb.blockchain.WriteBlock(blk, src)
+	if err != nil {
+		return nil, err
+	}
+
+	return blk, nil
 }
 
 func (bb *blockBuilder) setDefaults() {

@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -160,9 +162,13 @@ func TestSlashStaker(t *testing.T) {
 	maliciousStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(maliciousStakeErr)
 
-	dr := NewDisputeResolution(blockchain, executor, hclog.Default())
+	availClient, err := avail.NewClient("ws://127.0.0.1:9944/v1/json-rpc")
+	tAssert.NoError(err)
+	sender := avail.NewSender(availClient, signature.TestKeyringPairAlice)
 
-	err := dr.Begin(maliciousAddr, maliciousSignKey)
+	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
+
+	err = dr.Begin(maliciousAddr, maliciousSignKey)
 	tAssert.NoError(err)
 
 	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousAddr)

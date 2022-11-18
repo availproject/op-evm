@@ -4,9 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -20,19 +18,16 @@ func TestBeginDisputeResolution(t *testing.T) {
 	tAssert.NotNil(blockchain)
 
 	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
-	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
+	coinbaseAddr, _ := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	byzantineSequencerAddr, _ := test.NewAccount(t)
+	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	availClient, err := avail.NewClient("ws://127.0.0.1:9944/v1/json-rpc")
-	tAssert.NoError(err)
-	sender := avail.NewSender(availClient, signature.TestKeyringPairAlice)
-
+	sender := NewTestDisputeResolutionSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
-	err = dr.Begin(byzantineSequencerAddr, coinbaseSignKey)
+	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get()
@@ -60,15 +55,12 @@ func TestEndDisputeResolution(t *testing.T) {
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	availClient, err := avail.NewClient("ws://127.0.0.1:9944/v1/json-rpc")
-	tAssert.NoError(err)
-	sender := avail.NewSender(availClient, signature.TestKeyringPairAlice)
-
+	sender := NewTestDisputeResolutionSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	// BEGIN THE DISPUTE RESOLUTION
 
-	err = dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
+	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get()
@@ -110,15 +102,12 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	availClient, err := avail.NewClient("ws://127.0.0.1:9944/v1/json-rpc")
-	tAssert.NoError(err)
-	sender := avail.NewSender(availClient, signature.TestKeyringPairAlice)
-
+	sender := NewTestDisputeResolutionSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	// BEGIN THE DISPUTE RESOLUTION
 
-	err = dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
+	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get()

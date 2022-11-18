@@ -18,6 +18,37 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+type DisputeResolutionSender interface {
+	Send(blk *types.Block) error
+}
+
+type disputeResolutionSender struct {
+	sender avail.Sender
+}
+
+func (s *disputeResolutionSender) Send(blk *types.Block) error {
+	f := s.sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
+	if _, err := f.Result(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func NewDisputeResolutionSender(sender avail.Sender) DisputeResolutionSender {
+	return &disputeResolutionSender{sender: sender}
+}
+
+type testDisputeResolutionSender struct{}
+
+func (s *testDisputeResolutionSender) Send(blk *types.Block) error {
+	return nil
+}
+
+func NewTestDisputeResolutionSender() DisputeResolutionSender {
+	return &testDisputeResolutionSender{}
+}
+
 type DisputeResolution interface {
 	Get() ([]types.Address, error)
 	Contains(addr types.Address) (bool, error)
@@ -29,10 +60,10 @@ type disputeResolution struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
-	sender     avail.Sender
+	sender     DisputeResolutionSender
 }
 
-func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender avail.Sender, logger hclog.Logger) DisputeResolution {
+func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender DisputeResolutionSender, logger hclog.Logger) DisputeResolution {
 	return &disputeResolution{
 		blockchain: blockchain,
 		executor:   executor,
@@ -109,12 +140,16 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 
 	blk.AddTransactions(disputeResolutionTx)
 
-	wBlk, err := blk.WriteAndReturnBlock("staking_fraud_dispute_resolution_modifier")
+	fBlock, err := blk.Build()
 	if err != nil {
 		return err
 	}
 
-	if err := dr.sendBlockToAvail(wBlk); err != nil {
+	if err := dr.sender.Send(fBlock); err != nil {
+		return err
+	}
+
+	if err := dr.blockchain.WriteBlock(fBlock, "staking_fraud_dispute_resolution_modifier"); err != nil {
 		return err
 	}
 
@@ -142,26 +177,19 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 
 	blk.AddTransactions(disputeResolutionTx)
 
-	wBlk, err := blk.WriteAndReturnBlock("staking_fraud_dispute_resolution_modifier")
+	fBlock, err := blk.Build()
 	if err != nil {
 		return err
 	}
 
-	if err := dr.sendBlockToAvail(wBlk); err != nil {
+	if err := dr.sender.Send(fBlock); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func (dr *disputeResolution) sendBlockToAvail(blk *types.Block) error {
-	f := dr.sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
-	if _, err := f.Result(); err != nil {
-		dr.logger.Error("Error while submitting dispute resolution block to avail", err)
+	if err := dr.blockchain.WriteBlock(fBlock, "staking_fraud_dispute_resolution_modifier"); err != nil {
 		return err
 	}
 
-	dr.logger.Info("Submitted dispute resolution block to avail", "block", blk.Header.Number)
 	return nil
 }
 

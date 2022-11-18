@@ -2,7 +2,6 @@ package staking
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"math/big"
 	"time"
 
@@ -196,7 +195,7 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
 	if !ok {
-		return nil, errors.New("BeginDisputeResolution method doesn't exist in Staking contract ABI")
+		panic("BeginDisputeResolution method doesn't exist in Staking contract ABI. Contract is broken.")
 	}
 
 	selector := method.ID()
@@ -223,7 +222,7 @@ func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, g
 func EndDisputeResolutionTx(from types.Address, probationAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["EndDisputeResolution"]
 	if !ok {
-		return nil, errors.New("EndDisputeResolution method doesn't exist in Staking contract ABI")
+		panic("EndDisputeResolution method doesn't exist in Staking contract ABI. Contract is broken.")
 	}
 
 	selector := method.ID()

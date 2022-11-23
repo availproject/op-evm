@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          repository: maticnetwork/avail-settlement-contracts
+          path: third_party/avail-settlement-contracts
+          ssh-key: ${{ secrets.SSH_KEY }}
+          persist-credentials: true
+      - uses: actions/checkout@v3
+        with:
           submodules: 'recursive'
       - uses: actions/setup-go@v3
         with:
@@ -29,6 +35,12 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: maticnetwork/avail-settlement-contracts
+          path: third_party/avail-settlement-contracts
+          ssh-key: ${{ secrets.SSH_KEY }}
+          persist-credentials: true
       - uses: actions/checkout@v3
         with:
           submodules: 'recursive'

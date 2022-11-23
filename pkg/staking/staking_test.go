@@ -160,7 +160,7 @@ func TestSlashStaker(t *testing.T) {
 	maliciousStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(maliciousStakeErr)
 
-	sender := NewTestDisputeResolutionSender()
+	sender := NewTestAvailSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	err := dr.Begin(maliciousAddr, maliciousSignKey)

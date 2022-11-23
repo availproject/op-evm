@@ -9,44 +9,11 @@ import (
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/ethgo/abi"
 )
-
-type DisputeResolutionSender interface {
-	Send(blk *types.Block) error
-}
-
-type disputeResolutionSender struct {
-	sender avail.Sender
-}
-
-func (s *disputeResolutionSender) Send(blk *types.Block) error {
-	f := s.sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
-	if _, err := f.Result(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func NewDisputeResolutionSender(sender avail.Sender) DisputeResolutionSender {
-	return &disputeResolutionSender{sender: sender}
-}
-
-type testDisputeResolutionSender struct{}
-
-func (s *testDisputeResolutionSender) Send(blk *types.Block) error {
-	return nil
-}
-
-func NewTestDisputeResolutionSender() DisputeResolutionSender {
-	return &testDisputeResolutionSender{}
-}
 
 type DisputeResolution interface {
 	Get() ([]types.Address, error)
@@ -59,10 +26,10 @@ type disputeResolution struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
-	sender     DisputeResolutionSender
+	sender     AvailSender
 }
 
-func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender DisputeResolutionSender, logger hclog.Logger) DisputeResolution {
+func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender AvailSender, logger hclog.Logger) DisputeResolution {
 	return &disputeResolution{
 		blockchain: blockchain,
 		executor:   executor,

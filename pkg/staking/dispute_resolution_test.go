@@ -24,7 +24,7 @@ func TestBeginDisputeResolution(t *testing.T) {
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	sender := NewTestDisputeResolutionSender()
+	sender := NewTestAvailSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
@@ -55,7 +55,7 @@ func TestEndDisputeResolution(t *testing.T) {
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	sender := NewTestDisputeResolutionSender()
+	sender := NewTestAvailSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	// BEGIN THE DISPUTE RESOLUTION
@@ -102,7 +102,7 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	byzantineSequencerAddr, byzantineSequencerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
 
-	sender := NewTestDisputeResolutionSender()
+	sender := NewTestAvailSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	// BEGIN THE DISPUTE RESOLUTION

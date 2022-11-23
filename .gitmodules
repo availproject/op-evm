@@ -4,3 +4,6 @@
 [submodule "third_party/polygon-edge"]
 	path = third_party/polygon-edge
 	url = git@github.com:0x19/polygon-edge.git
+[submodule "third_party/avail-settlement-contracts"]
+	path = third_party/avail-settlement-contracts
+	url = git@github.com:maticnetwork/avail-settlement-contracts.git

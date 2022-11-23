@@ -77,7 +77,7 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logge
 
 }
 
-func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, slashAddr types.Address, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
@@ -87,7 +87,7 @@ func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 	blk.SetCoinbaseAddress(stakerAddr)
 	blk.SignWith(stakerKey)
 
-	tx, err := SlashStakerTx(stakerAddr, gasLimit)
+	tx, err := SlashStakerTx(stakerAddr, slashAddr, gasLimit)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func UnStakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) 
 	return tx, nil
 }
 
-func SlashStakerTx(from types.Address, gasLimit uint64) (*types.Transaction, error) {
+func SlashStakerTx(from types.Address, slashAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["slash"]
 	if !ok {
 		return nil, errors.New("unstake method doesn't exist in Staking contract ABI")
@@ -160,11 +160,21 @@ func SlashStakerTx(from types.Address, gasLimit uint64) (*types.Transaction, err
 
 	selector := method.ID()
 
+	encodedInput, encodeErr := method.Inputs.Encode(
+		map[string]interface{}{
+			"slashAddr":   slashAddr.Bytes(),
+			"slashAmount": big.NewInt(0).Mul(big.NewInt(1), ETH),
+		},
+	)
+	if encodeErr != nil {
+		return nil, encodeErr
+	}
+
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
-		Input:    selector,
+		Input:    append(selector, encodedInput...),
 		GasPrice: big.NewInt(10000),
 		Gas:      gasLimit,
 	}

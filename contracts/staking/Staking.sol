@@ -8,6 +8,7 @@ contract Staking {
 
     // Parameters
     uint256 public constant DEFAULT_STAKING_THRESHOLD = 1 ether;
+    uint256 public constant DEFAULT_MIN_SLASH_PERCENTAGE = 1;
     string public  constant NODE_SEQUENCER = "sequencer";
     string public  constant NODE_WATCHTOWER = "watchtower";
     string public  constant NODE_VALIDATOR = "validator";
@@ -16,6 +17,7 @@ contract Staking {
 
     // Properties
     uint256 public _minStakingThreshold;
+    uint256 public _slashPercentage;
 
     address[] public _participants;
     mapping(address => bool) public _addressToIsParticipant;
@@ -39,7 +41,7 @@ contract Staking {
     mapping(address => uint256) public _addressToSequencerIndex;
 
     address[] public _sequencers_in_probation;
-    mapping(address => bool) public _addressToIsSequencerInProbation;
+    mapping(address => bool) public _addressToIsSequencerInProbationAddr;
     mapping(address => uint256) public _addressToSequencerInProbationIndex;
 
     address[] public _watchtowers;
@@ -54,6 +56,10 @@ contract Staking {
     event Staked(address indexed account, uint256 amount);
     event Unstaked(address indexed account, uint256 amount);
     event Slashed(address indexed account, uint256 newAmount, uint256 slashedAmount);
+
+    // Fraud Dispute Resolution Events
+    event DisputeResolutionBegan(address indexed account);
+    event DisputeResolutionEnded(address indexed account);
 
     // Modifiers
     modifier onlyEOA() {
@@ -122,6 +128,10 @@ contract Staking {
 
     // VIEW FUNCTIONS 
 
+    function GetSlashPercentage() public view returns (uint256) {
+        return _getSlashPercentage();
+    }
+
     function GetMinNumSequencers() public view returns (uint256) {
         return _minimumNumSequencers;
     }
@@ -166,10 +176,6 @@ contract Staking {
         return _sequencers;
     }
 
-    function GetCurrentSequencersInProbation() public view returns (address[] memory) {
-        return _sequencers_in_probation;
-    }
-
     function GetCurrentWatchtowers() public view returns (address[] memory) {
         return _watchtowers;
     }
@@ -205,8 +211,33 @@ contract Staking {
     // -- END VIEW FUNCTIONS 
 
 
+    // PUBLIC FRAUD DISPUTE RESOLUTION FUNCTIONS
+
+    function GetCurrentSequencersInProbation() public view returns (address[] memory) {
+        return _sequencers_in_probation;
+    }
+
+    function GetIsSequencerInProbation(address sequencerAddr) public view returns (bool) {
+        return _isSequencerInProbation(sequencerAddr);
+    }
+
+    function BeginDisputeResolution(address sequencerAddr) public {
+        _appendToSequencersInProbationSet(sequencerAddr);
+        emit DisputeResolutionBegan(sequencerAddr);
+    }
+
+    function EndDisputeResolution(address sequencerAddr) public {
+        _deleteFromSequencersInProbationSet(sequencerAddr);
+        emit DisputeResolutionEnded(sequencerAddr);
+    }
+
+    // -- END FRAUD DISPUTE RESOLUTION FUNCTIONS
 
     // PUBLIC STAKING FUNCTIONS
+
+    function SetSlashPercentage(uint256 newPercentage) public onlyEOA {
+        _slashPercentage = newPercentage;
+    }
 
     function SetStakingMinThreshold(uint256 newThreshold) public onlyEOA {
         _minStakingThreshold = newThreshold;
@@ -221,8 +252,8 @@ contract Staking {
     }
 
     // TODO: Cannot be only staker but only watchtower for example
-    function slash(uint256 slashAmount) public onlyEOA onlyStaker {
-        _slash(slashAmount);
+    function slash(address slashAddr, uint256 slashAmount) public onlyEOA onlyStaker {
+        _slash(slashAddr, slashAmount);
     }
 
     // -- END PUBLIC STAKING FUNCTIONS
@@ -309,7 +340,7 @@ contract Staking {
     // - Make sure slashing amount is properly transferred to appropriate participants
     // - Append slashed with time interval into the mapping so next sequencer set won't include it.
     //
-    function _slash(uint256 slashAmount) private {
+    function _slash(address slashAddr, uint256 slashAmount) private {
         uint256 amount = _addressToStakedAmount[msg.sender];
 
         require(
@@ -328,6 +359,11 @@ contract Staking {
 
         payable(msg.sender).transfer(slashAmount);
         emit Slashed(msg.sender, newStakedAmount, slashAmount);
+
+        if(_isSequencerInProbation(slashAddr)) {
+            _deleteFromSequencersInProbationSet(slashAddr);
+            emit DisputeResolutionEnded(slashAddr);
+        }
     }
 
     function _deleteFromParticipants(address staker) private {
@@ -424,6 +460,38 @@ contract Staking {
         _validators.pop();
     }
 
+    function _appendToSequencersInProbationSet(address newMaliciousAddr) private {
+        _addressToIsSequencerInProbationAddr[newMaliciousAddr] = true;
+        _addressToSequencerInProbationIndex[newMaliciousAddr] = _sequencers_in_probation.length;
+        _sequencers_in_probation.push(newMaliciousAddr);
+    }
+
+    function _deleteFromSequencersInProbationSet(address participant) private {
+        require(
+            _isSequencerInProbation(participant),
+            "Address has to be in probation in order to delete it from the probation sequencers list."
+        );
+
+        require(
+            _addressToSequencerInProbationIndex[participant] < _sequencers_in_probation.length,
+            "malicious participant index out of range in mapping"
+        );
+
+        // index of removed address
+        uint256 index = _addressToSequencerInProbationIndex[participant];
+        uint256 lastIndex = _sequencers_in_probation.length - 1;
+
+        if (index != lastIndex) {
+            // exchange between the element and last to pop for delete
+            address lastAddr = _sequencers_in_probation[lastIndex];
+            _sequencers_in_probation[index] = lastAddr;
+            _addressToSequencerInProbationIndex[lastAddr] = index;
+        }
+
+        _addressToIsSequencerInProbationAddr[participant] = false;
+        _addressToSequencerInProbationIndex[participant] = 0;
+        _sequencers_in_probation.pop();
+    }
 
     // Append to participant set only if participant is not already set.
     // Due to possibility to be multi-node participant, we need to make this check.
@@ -451,6 +519,10 @@ contract Staking {
         _addressToIsValidator[newValidator] = true;
         _addressToValidatorIndex[newValidator] = _validators.length;
         _validators.push(newValidator);
+    }
+
+    function _isSequencerInProbation(address account) private view returns (bool) {
+        return _addressToIsSequencerInProbationAddr[account];
     }
 
     function _isParticipant(address account) private view returns (bool) {
@@ -529,6 +601,14 @@ contract Staking {
             return _minStakingThreshold;
         } else {
             return DEFAULT_STAKING_THRESHOLD;
+        }
+    }
+
+    function _getSlashPercentage() private view returns (uint256) {
+        if (_slashPercentage <= 0) {
+            return DEFAULT_MIN_SLASH_PERCENTAGE;
+        } else {
+            return _slashPercentage;
         }
     }
 

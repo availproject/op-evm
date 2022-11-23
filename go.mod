@@ -5,15 +5,17 @@ go 1.19
 replace (
 	github.com/0xPolygon/polygon-edge => ./third_party/polygon-edge
 	github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha
+	github.com/maticnetwork/avail-settlement-contracts => ./third_party/avail-settlement-contracts
 )
 
 require (
 	github.com/0xPolygon/polygon-edge v0.4.1
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.3
-	github.com/ethereum/go-ethereum v1.10.20
+	github.com/ethereum/go-ethereum v1.10.26
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/go-hclog v1.3.1
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/test-go/testify v1.1.4
 	github.com/umbracle/ethgo v0.1.4-0.20220722090909-c8ac32939570

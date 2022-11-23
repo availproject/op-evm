@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/contracts/staking"
+	"github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/ethgo/abi"
 

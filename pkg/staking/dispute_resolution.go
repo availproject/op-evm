@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
-	staking_contract "github.com/maticnetwork/avail-settlement/contracts/staking"
+	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/umbracle/ethgo/abi"

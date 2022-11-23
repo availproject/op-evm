@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	staking_contract "github.com/maticnetwork/avail-settlement/contracts/staking"
+	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )

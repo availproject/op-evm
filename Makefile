@@ -32,7 +32,7 @@ bootstrap-genesis:
 build-staking-contract:
 	cd $(STAKING_CONTRACT_PATH) && make build
 
-bootstrap-staking-contract:
+bootstrap-staking-contract: build-staking-contract
 	$(POLYGON_EDGE_BIN) genesis predeploy --chain $(POLYGON_EDGE_CONFIGS_DIR)/genesis.json \
 	--predeploy-address "0x0110000000000000000000000000000000000001" \
 	--artifacts-path "$(STAKING_CONTRACT_PATH)/artifacts/contracts/Staking.sol/Staking.json" \

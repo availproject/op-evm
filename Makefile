@@ -47,7 +47,6 @@ build-fraud-contract:
 	solc --bin tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
-
 build-server:
 	cd server && go build -o server
 
@@ -67,12 +66,6 @@ build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
-
-
-build2-staking-contract:
-	solc --abi contracts/staking/Staking.sol -o contracts/staking/ --overwrite
-	solc --bin contracts/staking/Staking.sol -o contracts/staking/ --overwrite
-	abigen --bin=./contracts/staking/Staking.bin --abi=./contracts/staking/Staking.abi --pkg=staking --out=./contracts/staking/Staking.go
 
 
 build-edge:

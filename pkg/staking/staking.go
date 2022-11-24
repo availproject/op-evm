@@ -25,7 +25,7 @@ var (
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
@@ -42,8 +42,16 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 	blk.AddTransactions(tx)
 
-	// Write the block to the blockchain
-	if err := blk.Write(src); err != nil {
+	fBlock, err := blk.Build()
+	if err != nil {
+		return err
+	}
+
+	if err := sender.Send(fBlock); err != nil {
+		return err
+	}
+
+	if err := bh.WriteBlock(fBlock, src); err != nil {
 		return err
 	}
 

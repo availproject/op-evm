@@ -101,9 +101,10 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	test.DepositBalance(t, stakerAddr, balance, blockchain, executor)
 
 	sequencerQuerier := NewActiveParticipantsQuerier(blockchain, executor, hclog.Default())
+	sender := NewTestAvailSender()
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), string(WatchTower), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
 	// Following test only queries contract to see if it's working.
@@ -113,7 +114,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert.True(staked)
 
 	// Staker that we are going to attempt to stake and unstake.
-	stakeErr := Stake(blockchain, executor, hclog.Default(), string(WatchTower), stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
+	stakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), stakerAddr, stakerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(stakeErr)
 
 	// Following test only queries contract to see if it's working.
@@ -153,14 +154,15 @@ func TestSlashStaker(t *testing.T) {
 	maliciousAddr, maliciousSignKey := test.NewAccount(t)
 	test.DepositBalance(t, maliciousAddr, balance, blockchain, executor)
 
+	sender := NewTestAvailSender()
+
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
-	maliciousStakeErr := Stake(blockchain, executor, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
+	maliciousStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(maliciousStakeErr)
 
-	sender := NewTestDisputeResolutionSender()
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
 	err := dr.Begin(maliciousAddr, maliciousSignKey)

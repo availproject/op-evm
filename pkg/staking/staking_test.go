@@ -126,7 +126,7 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	// DO THE UNSTAKE
 
 	// Staker that we are going to attempt to stake and unstake.
-	unStakeErr := UnStake(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
+	unStakeErr := UnStake(blockchain, executor, sender, hclog.Default(), coinbaseAddr, coinbaseSignKey, 1_000_000, "test")
 	tAssert.NoError(unStakeErr)
 
 	// Following test only queries contract to see if it's working.

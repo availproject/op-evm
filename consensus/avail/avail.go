@@ -149,7 +149,7 @@ func (d *Avail) Start() error {
 			}
 		}
 
-		go d.runSequencer(minerKeystore, minerAccount, minerPk)
+		go d.runSequencer(stakingNode, minerKeystore, minerAccount, minerPk)
 	}
 
 	if d.nodeType == Validator {
@@ -169,7 +169,7 @@ func (d *Avail) Start() error {
 			}
 		}
 
-		go d.runWatchTower(wtAccount, wtPK)
+		go d.runWatchTower(stakingNode, wtAccount, wtPK)
 	}
 
 	return nil

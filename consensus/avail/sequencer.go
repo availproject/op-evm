@@ -21,7 +21,7 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {
+func (d *Avail) runSequencer(stakingNode staking.Node, minerKeystore *keystore.KeyStore, miner accounts.Account, minerPK *keystore.Key) {
 	d.logger.Info("sequencer started")
 
 	for {
@@ -29,6 +29,9 @@ func (d *Avail) runSequencer(minerKeystore *keystore.KeyStore, miner accounts.Ac
 		select {
 		case <-d.nextNotify():
 		case <-d.closeCh:
+			if err := stakingNode.UnStake(minerPK.PrivateKey); err != nil {
+				d.logger.Error("failed to unstake the node: %s", err)
+			}
 			return
 		}
 

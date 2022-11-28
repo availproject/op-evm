@@ -42,17 +42,17 @@ services:
       - avail-settlement
     restart: on-failure
     
-  watchtower-1:
-    image: avail-settlement
-    entrypoint: ["/avail-settlement", "-config-file", "/configs/watchtower-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
-    depends_on:
-      - avail
-    ports:
-      - '40000:9632'
-      - '40002:8545'
-    networks:
-      - avail-settlement
-    restart: on-failure
+#  watchtower-1:
+#    image: avail-settlement
+#    entrypoint: ["/avail-settlement", "-config-file", "/configs/watchtower-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+#    depends_on:
+#      - avail
+#    ports:
+#      - '40000:9632'
+#      - '40002:8545'
+#    networks:
+#      - avail-settlement
+#    restart: on-failure
 
   avail:
     image: 0xpolygon/avail:v1.1.0

@@ -15,7 +15,7 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 	logger := d.logger.Named("watchtower")
-	watchTower := watchtower.New(d.blockchain, d.executor, types.Address(watchTowerAccount.Address), watchTowerPK.PrivateKey)
+	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(watchTowerAccount.Address), watchTowerPK.PrivateKey)
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {

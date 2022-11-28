@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 const (
@@ -34,6 +33,10 @@ const (
 
 	// For now hand coded address of the watch tower
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
+)
+
+var (
+	ETH = big.NewInt(1000000000000000000)
 )
 
 type Config struct {
@@ -115,7 +118,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, fmt.Errorf("invalid avail mechanism type/s provided")
 		}
 
-		if d.nodeType == BootstrapSequencer && config.Bootnode {
+		if d.nodeType == BootstrapSequencer && !config.Bootnode {
 			return nil, fmt.Errorf("invalid avail node type provided: cannot specify bootstrap-sequencer type without -bootnode flag")
 		}
 
@@ -150,20 +153,7 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
-	stakingNode := staking.NewNode(d.blockchain, d.executor, d.logger, staking.NodeType(d.nodeType))
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-
 	if d.nodeType == Sequencer || d.nodeType == BootstrapSequencer {
-		// Only start the syncer for sequencer. Validator and Watch Tower are
-		// working purely out of Avail.
-		if err := d.syncer.Start(); err != nil {
-			return err
-		}
-
-		// Ensure that sequencer always has balance
-		depositBalance(d.minerAddr, big.NewInt(0).Mul(big.NewInt(100), test.ETH), d.blockchain, d.executor)
-		d.logger.Error("automatic sequencer balance deposit active; remove this ASAP ...^")
-
 		go d.runSequencer(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	}
 
@@ -172,13 +162,17 @@ func (d *Avail) Start() error {
 	}
 
 	if d.nodeType == WatchTower {
-		_, wtAccount, wtPK, err := getAccountData(WatchTowerAddress)
+		wtAccount := accounts.Account{Address: common.Address(d.minerAddr)}
+		wtPK := &keystore.Key{PrivateKey: d.signKey}
+
+		activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+		staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
 		if err != nil {
 			return err
 		}
 
-		if stakingNode.ShouldStake(wtPK.PrivateKey) {
-			if err := stakingNode.Stake(stakeAmount, wtPK.PrivateKey); err != nil {
+		if !staked {
+			if err := d.stakeParticipant(activeParticipantsQuerier); err != nil {
 				d.logger.Error("failure to build staking block", "error", err)
 				return err
 			}
@@ -287,7 +281,7 @@ func getAccountData(address string) (*keystore.KeyStore, accounts.Account, *keys
 	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
 	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(address)})
 	if err != nil {
-		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load sequencer miner account: %s", err)
+		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load miner account: %s", err)
 	}
 
 	passpharse := "secret"

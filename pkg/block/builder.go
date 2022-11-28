@@ -204,7 +204,8 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	if bb.header.GasLimit == 0 && bb.parent.Number == 0 {
 		// This arbitrary gas limit comes from early unit tests that run with
 		// empty block.
-		bb.header.GasLimit = 4_715_000
+		//bb.header.GasLimit = 4_715_000
+		bb.header.GasLimit = 5_242_880
 	}
 
 	// Check if the gas limit needs to be calculated.

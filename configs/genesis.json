@@ -47,6 +47,7 @@
         "engine": {
             "avail": {
                 "mechanisms": [
+                    "bootstrap-sequencer",
                     "sequencer",
                     "validator"
                 ]

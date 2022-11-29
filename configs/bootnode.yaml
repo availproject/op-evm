@@ -2,7 +2,6 @@ chain_config: ./configs/genesis.json
 secrets_config: ""
 data_dir: "./data/avail-bootnode-1"
 block_gas_target: "0x0"
-avail_addr: "127.0.0.1:9944"
 grpc_addr: ":10000"
 jsonrpc_addr: ":10002"
 node_type: "sequencer"

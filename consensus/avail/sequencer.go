@@ -3,12 +3,12 @@ package avail
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-	"strings"
+	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
@@ -24,19 +24,36 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) {
+func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
 	defer availBlockStream.Close()
 
-	d.logger.Info("sequencer started")
+	// enable txpool p2p gossiping
+	d.txpool.SetSealing(true)
+
+	// start p2p syncing
+	go d.startSyncing()
+
+	d.logger.Debug("ensuring sequencer staked")
+	err := d.ensureSequencerStaked(activeParticipantsQuerier)
+	if err != nil {
+		d.logger.Error("error while ensuring sequencer staked", "error", err)
+		return
+	}
+
+	d.logger.Debug("ensured sequencer staked")
+	d.logger.Debug("sequencer started")
 
 	for blk := range availBlockStream.Chan() {
 		// Check if we need to stop.
 		select {
 		case <-d.closeCh:
+			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
+				d.logger.Error("failed to unstake the node: %s", err)
+			}
 			return
 		default:
 		}
@@ -71,42 +88,212 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 			panic("no staked sequencers")
 		}
 
-		// XXX: Debug
-		var sb strings.Builder
-		sb.WriteString("[")
-		for i, s := range sequencers {
-			sb.WriteString(s.String())
-			if i+1 < len(sequencers) {
-				sb.WriteString(", ")
-			}
-		}
-		sb.WriteString("]")
-		d.logger.Error("@@@@@@@@@@@ ACTIVE SEQUENCERS", "myAddress", myAccount.Address.String(), "activeSequencers", sb.String())
-		// XXX: End of Debug
-
 		// Is it my turn to generate next block?
 		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
 			header := d.blockchain.Header()
-			d.logger.Error("it's my turn; producing a block", "t", blk.Block.Header.Number)
+			d.logger.Debug("it's my turn; producing a block", "t", blk.Block.Header.Number)
 			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
 				d.logger.Error("failed to mine block", "err", err)
 			}
 
-			d.logger.Error("block produced")
-
 			continue
 		} else {
-			// XXX: This is just for debugging.
-			var activeSequencers []string
-			for _, s := range sequencers {
-				activeSequencers = append(activeSequencers, s.String())
-			}
-			d.logger.Debug("it's not my turn to produce a block", "t", blk.Block.Header.Number, "myAccount.Address", myAccount.Address.String(), "activeSequencers", activeSequencers)
+			d.logger.Debug("it's not my turn; skippin' a round", "t", blk.Block.Header.Number)
+		}
+	}
+}
+
+func (d *Avail) startSyncing() {
+	// Start the syncer
+	err := d.syncer.Start()
+	if err != nil {
+		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
+	}
+
+	syncFunc := func(blk *types.Block) bool {
+		d.txpool.ResetWithHeaders(blk.Header)
+		return false
+	}
+
+	err = d.syncer.Sync(syncFunc)
+	if err != nil {
+		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
+	}
+}
+
+func (d *Avail) ensureSequencerStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
+	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+	if err != nil {
+		return err
+	}
+
+	if staked {
+		d.logger.Debug("sequencer already staked")
+		return nil
+	}
+
+	if MechanismType(d.nodeType) == BootstrapSequencer {
+		return d.stakeBootstrapSequencer()
+	} else if MechanismType(d.nodeType) == Sequencer {
+		return d.stakeSequencer(activeParticipantsQuerier)
+	} else {
+		panic("invalid node type: " + d.nodeType)
+	}
+}
+
+// stakeBootstrapSequencer takes care of sequencer staking for the very first
+// bootstrap sequencer. This needs special handling, because there won't be any
+// other sequencer forging a block with staking transaction, therefore it must
+// be build by the bootstrap node itself.
+func (d *Avail) stakeBootstrapSequencer() error {
+	// First, build the staking block.
+	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
+	bb, err := blockBuilderFactory.FromBlockchainHead()
+	if err != nil {
+		return err
+	}
+
+	bb.SetCoinbaseAddress(d.minerAddr)
+	bb.SignWith(d.signKey)
+
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	if err != nil {
+		return err
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, d.signKey)
+	if err != nil {
+		return err
+	}
+
+	bb.AddTransactions(tx)
+	blk, err := bb.Build()
+	if err != nil {
+		return err
+	}
+
+	for {
+		err, malicious := d.sendBlockToAvail(blk)
+		if err != nil {
+			panic(err)
 		}
 
-		// TODO: What if node fails to publish a block on its turn?
-		// TODO: What if a node fails to get information about published block?
+		if !malicious {
+			break
+		}
 	}
+
+	err = d.blockchain.WriteBlock(blk, "sequencer")
+	if err != nil {
+		panic("bootstrap sequencer couldn't stake: " + err.Error())
+	}
+
+	return nil
+}
+
+func (d *Avail) stakeSequencer(activeParticipantsQuerier staking.ActiveParticipants) error {
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	if err != nil {
+		return err
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, d.signKey)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(10 * time.Second)
+
+	for retries := 0; retries < 10; retries++ {
+		staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+		if err != nil {
+			return err
+		}
+
+		if staked {
+			break
+		}
+
+		// Submit staking transaction for execution by active sequencer.
+		err = d.txpool.AddTx(tx)
+		if err != nil {
+			d.logger.Error("failed to submit staking tx from sequencer; retrying...", "error", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		d.logger.Info("staking transaction submitted to txpool")
+		time.Sleep(2 * time.Second)
+	}
+
+	if err != nil {
+		panic("failed to stake sequencer")
+	}
+
+	// Syncer will be syncing the blockchain in the background, so once an active
+	// sequencer picks up the staking transaction from the txpool, it becomes
+	// effective and visible to us as well, via blockchain.
+	var staked bool
+	for !staked {
+		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+		if err != nil {
+			return err
+		}
+
+		// Wait a bit before checking again.
+		time.Sleep(3 * time.Second)
+	}
+
+	return nil
+}
+
+func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
+	if err != nil {
+		return err
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, d.signKey)
+	if err != nil {
+		return err
+	}
+
+	for retries := 0; retries < 10; retries++ {
+		// Submit staking transaction for execution by active sequencer.
+		err = d.txpool.AddTx(tx)
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		break
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Syncer will be syncing the blockchain in the background, so once an active
+	// sequencer picks up the staking transaction from the txpool, it becomes
+	// effective and visible to us as well, via blockchain.
+	var staked bool
+	for !staked {
+		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
+		if err != nil {
+			return err
+		}
+
+		// Wait a bit before checking again.
+		time.Sleep(3 * time.Second)
+	}
+
+	return nil
 }
 
 func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
@@ -122,7 +309,6 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.Drop(tx)
-
 			continue
 		}
 
@@ -144,8 +330,6 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 		successful = append(successful, tx)
 	}
 
-	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
-
 	return successful
 }
 
@@ -164,7 +348,6 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	// calculate gas limit based on parent header
 	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 1")
 		return err
 	}
 
@@ -188,7 +371,6 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
 	if err != nil {
-		d.logger.Info("FAILING HERE? 3")
 		return err
 	}
 
@@ -212,7 +394,6 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	// write the seal of the block after all the fields are completed
 	header, err = block.WriteSeal(signKey.PrivateKey, blk.Header)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 5")
 		return err
 	}
 
@@ -222,13 +403,14 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
-	d.logger.Error("sending block to avail")
+	d.logger.Debug("sending block to avail")
 
 	err, malicious := d.sendBlockToAvail(blk)
 	if err != nil {
-		d.logger.Info("FAILING HERE? 6")
 		return err
 	}
+
+	d.logger.Debug("sent block to avail")
 
 	if malicious {
 		// Don't write malicious block into blockchain. It messes up the parent
@@ -236,19 +418,16 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 		return nil
 	}
 
-	d.logger.Error("writing block to blockchain")
+	d.logger.Debug("writing block to blockchain")
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(blk, "not-sure-what-source-yet-is"); err != nil {
-		d.logger.Info("FAILING HERE? 7")
+	if err := d.blockchain.WriteBlock(blk, "sequencer"); err != nil {
 		return err
 	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	d.txpool.ResetWithHeaders(blk.Header)
-
-	fmt.Printf("Written block information: %+v", blk.Header)
 
 	return nil
 }
@@ -257,20 +436,20 @@ func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
 	malicious := false
 	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 
-	// XXX: Test watch tower and validator. This breaks a block every now and then.
-	if rand.Intn(3) == 2 {
-		d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
-		blk.Header.StateRoot[0] = 42
-		malicious = true
-	}
+	/*
+		// XXX: Test watch tower and validator. This breaks a block every now and then.
+		if rand.Intn(3) == 2 {
+			d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
+			blk.Header.StateRoot[0] = 42
+			malicious = true
+		}
+	*/
 
-	d.logger.Info("Submitting block to avail...")
 	f := sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
 	if _, err := f.Result(); err != nil {
 		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err, malicious
 	}
 
-	d.logger.Info("Submitted block to avail", "block", blk.Header.Number)
 	return nil, malicious
 }

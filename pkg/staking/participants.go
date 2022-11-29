@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	staking_contract "github.com/maticnetwork/avail-settlement/contracts/staking"
+	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -38,7 +38,7 @@ func NewActiveParticipantsQuerier(blockchain *blockchain.Blockchain, executor *s
 	return &activeParticipantsQuerier{
 		blockchain: blockchain,
 		executor:   executor,
-		logger:     logger.ResetNamed("active_staking_participants_querier"),
+		logger:     logger.Named("active_staking_participants_querier"),
 	}
 }
 
@@ -68,7 +68,7 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 
 	switch nodeType {
 	case Sequencer:
-		addrs, err := QuerySequencers(transition, gasLimit, minerAddress)
+		addrs, err := QueryActiveSequencers(asq.blockchain, asq.executor, transition, gasLimit, minerAddress)
 		if err != nil {
 			asq.logger.Error("failed to query sequencers", "err", err)
 			return nil, err
@@ -141,10 +141,87 @@ func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address)
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+func QueryActiveSequencers(blockchain *blockchain.Blockchain, executor *state.Executor, t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	toReturn := []types.Address{}
+
+	addrs, err := QuerySequencers(t, gasLimit, from)
+	if err != nil {
+		return nil, err
+	}
+
+	parent := blockchain.Header()
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      from.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	probationGasLimit, err := blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := executor.BeginTxn(parent.StateRoot, header, from)
+	if err != nil {
+		return nil, err
+	}
+
+	probationAddrs, err := QuerySequencersInProbation(transition, probationGasLimit, from)
+	if err != nil {
+		return nil, err
+	}
+
+mainLoop:
+	for _, addr := range addrs {
+		for _, probationAddr := range probationAddrs {
+			if addr.String() == probationAddr.String() {
+				continue mainLoop
+			}
+		}
+
+		toReturn = append(toReturn, addr)
+	}
+
+	return toReturn, nil
+}
+
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencers"]
 	if !ok {
 		return nil, errors.New("GetCurrentSequencers method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	return DecodeParticipants(method, res.ReturnValue)
+}
+
+func QuerySequencersInProbation(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencersInProbation"]
+	if !ok {
+		return nil, errors.New("GetCurrentSequencersInProbation method doesn't exist in Staking contract ABI")
 	}
 
 	selector := method.ID()

@@ -24,7 +24,7 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) {
+func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
@@ -51,6 +51,9 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 		// Check if we need to stop.
 		select {
 		case <-d.closeCh:
+			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
+				d.logger.Error("failed to unstake the node: %s", err)
+			}
 			return
 		default:
 		}

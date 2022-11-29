@@ -1,7 +1,7 @@
-
-POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/main
+POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/polygon-edge
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
+STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
 
 ifndef $(GOPATH)
     GOPATH=$(shell go env GOPATH)
@@ -29,12 +29,16 @@ bootstrap-genesis:
 	--bootnode /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa \
 	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
 
-bootstrap-staking-contract:
+build-staking-contract:
+	cd $(STAKING_CONTRACT_PATH) && make build
+
+bootstrap-staking-contract: build-staking-contract
 	$(POLYGON_EDGE_BIN) genesis predeploy --chain $(POLYGON_EDGE_CONFIGS_DIR)/genesis.json \
 	--predeploy-address "0x0110000000000000000000000000000000000001" \
-	--artifacts-path "$(POLYGON_EDGE_CONFIGS_DIR)/../contracts/staking/staking.json" \
+	--artifacts-path "$(STAKING_CONTRACT_PATH)/artifacts/contracts/Staking.sol/Staking.json" \
 	--constructor-args "1" \
 	--constructor-args "10"
+	sed -i 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
@@ -42,7 +46,6 @@ build-fraud-contract:
 	solc --abi tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
 	solc --bin tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
-
 
 build-server:
 	cd server && go build -o server
@@ -65,12 +68,6 @@ build-contract:
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
 
 
-build-staking-contract:
-	solc --abi contracts/staking/Staking.sol -o contracts/staking/ --overwrite
-	solc --bin contracts/staking/Staking.sol -o contracts/staking/ --overwrite
-	abigen --bin=./contracts/staking/Staking.bin --abi=./contracts/staking/Staking.abi --pkg=staking --out=./contracts/staking/Staking.go
-
-
 build-edge:
 	cd third_party/polygon-edge && make build
 
@@ -79,7 +76,7 @@ tools-wallet:
 
 build: build-server build-client
 
-start-sequencer: build bootstrap-staking-contract
+start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
 	./server/server -config-file="./configs/bootnode.yaml"
 

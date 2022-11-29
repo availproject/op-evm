@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/syncer"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -152,8 +153,11 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+	stakingSender := staking.NewAvailSender(avail.NewSender(d.availClient, signature.TestKeyringPairAlice))
+	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
+
 	if d.nodeType == Sequencer || d.nodeType == BootstrapSequencer {
-		go d.runSequencer(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runSequencer(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	}
 
 	if d.nodeType == Validator {
@@ -177,7 +181,7 @@ func (d *Avail) Start() error {
 			}
 		}
 
-		go d.runWatchTower(wtAccount, wtPK)
+		go d.runWatchTower(stakingNode, wtAccount, wtPK)
 	}
 
 	return nil

@@ -9,9 +9,10 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *keystore.Key) {
+func (d *Avail) runWatchTower(stakingNode staking.Node, watchTowerAccount accounts.Account, watchTowerPK *keystore.Key) {
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 	logger := d.logger.Named("watchtower")
@@ -31,6 +32,9 @@ func (d *Avail) runWatchTower(watchTowerAccount accounts.Account, watchTowerPK *
 
 		select {
 		case <-d.closeCh:
+			if err := stakingNode.UnStake(watchTowerPK.PrivateKey); err != nil {
+				d.logger.Error("failed to unstake the node: %s", err)
+			}
 			availBlockStream.Close()
 			return
 		case availBlk = <-availBlockStream.Chan():

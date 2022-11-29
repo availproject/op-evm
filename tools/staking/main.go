@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	golog "github.com/ipfs/go-log/v2"
-	"github.com/maticnetwork/avail-settlement/contracts/staking"
+	"github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 )
 
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'

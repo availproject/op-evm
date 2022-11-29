@@ -15,8 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
+      - name: Trigger submodule update
+        env:
+          SSH_KEY_FOR_SUBMODULE: ${{secrets.AVAIL_SETTLEMENT_SECRET_KEY}}
+        run: |
+          mkdir $HOME/.ssh && echo "$SSH_KEY_FOR_SUBMODULE" > $HOME/.ssh/id_rsa && chmod 600 $HOME/.ssh/id_rsa && git submodule update --init --recursive
       - uses: actions/setup-go@v3
         with:
           go-version: 1.19
@@ -30,8 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
+      - name: Trigger submodule update
+        env:
+          SSH_KEY_FOR_SUBMODULE: ${{secrets.AVAIL_SETTLEMENT_SECRET_KEY}}
+        run: |
+          mkdir $HOME/.ssh && echo "$SSH_KEY_FOR_SUBMODULE" > $HOME/.ssh/id_rsa && chmod 600 $HOME/.ssh/id_rsa && git submodule update --init --recursive
       - uses: actions/setup-go@v3
         with:
           go-version: 1.19

@@ -31,7 +31,7 @@ COPY --from=builder /avail-settlement/third_party/polygon-edge/polygon-edge /pol
 
 # Configuration script generates secrets for the node & adjusts
 # the genesis.json bootnode list accordingly.
-RUN /configure.sh sequencer-1
+RUN /configure.sh -b sequencer-1
 RUN /configure.sh sequencer-2
 RUN /configure.sh sequencer-3
 RUN /configure.sh watchtower-1

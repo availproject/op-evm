@@ -46,7 +46,7 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			wt := watchtower.New(blockchain, executor, coinbaseAddr, signKey)
+			wt := watchtower.New(blockchain, executor, hclog.Default(), coinbaseAddr, signKey)
 
 			err = wt.Check(tc.block(blockBuilder))
 			switch {

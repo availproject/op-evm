@@ -30,12 +30,32 @@ func (v *verifier) VerifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	minerIsActiveSequencer, err := v.activeSequencers.Contains(signer, Sequencer)
+	activeSequencers, err := v.activeSequencers.Get(Sequencer)
 	if err != nil {
 		return err
 	}
 
+	// XXX: Is this ok? Verification of the very first signature is chicken-egg
+	// problem, because initially there are no sequencers staked and the first
+	// block needs to be passed through, in order to "register" the staking.
+	//
+	// This check can also function as an escape hatch to prevent blockchain
+	// halting in case all sequencers unstake for some reason.
+	if len(activeSequencers) == 0 {
+		v.logger.Warn("no active sequencers staked atm. - skipping signer verification")
+		return nil
+	}
+
+	minerIsActiveSequencer := false
+	for _, s := range activeSequencers {
+		if signer == s {
+			minerIsActiveSequencer = true
+			break
+		}
+	}
+
 	if !minerIsActiveSequencer {
+		v.logger.Error("failed to verify signer address", "address", signer)
 		return fmt.Errorf("signer address '%s' does not belong to active sequencers", signer)
 	}
 

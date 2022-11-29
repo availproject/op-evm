@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -222,78 +221,4 @@ func (d *Avail) Close() error {
 	close(d.closeCh)
 
 	return nil
-}
-
-func depositBalance(receiver types.Address, amount *big.Int, bchain *blockchain.Blockchain, executor *state.Executor) {
-	parent := bchain.Header()
-	if parent == nil {
-		panic("couldn't load header for HEAD block")
-	}
-
-	header := &types.Header{
-		ParentHash: parent.Hash,
-		Number:     parent.Number + 1,
-		Miner:      receiver.Bytes(),
-		Nonce:      types.Nonce{},
-		GasLimit:   parent.GasLimit,
-		Timestamp:  uint64(time.Now().Unix()),
-	}
-
-	transition, err := executor.BeginTxn(parent.StateRoot, header, receiver)
-	if err != nil {
-		panic("failed to begin transition: " + err.Error())
-	}
-
-	err = transition.SetAccountDirectly(receiver, &chain.GenesisAccount{Balance: amount})
-	if err != nil {
-		panic("failed to set account balance directly: " + err.Error())
-	}
-
-	// Commit the changes
-	_, root := transition.Commit()
-
-	// Update the header
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
-	// Build the actual block
-	// The header hash is computed inside `BuildBlock()`
-	blk := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header:   header,
-		Txns:     []*types.Transaction{},
-		Receipts: transition.Receipts(),
-	})
-
-	// Compute the hash, this is only a provisional hash since the final one
-	// is sealed after all the committed seals
-	blk.Header.ComputeHash()
-
-	err = bchain.WriteBlock(blk, "test")
-	if err != nil {
-		panic("failed to write balance transfer block: " + err.Error())
-	}
-}
-
-// TODO: This is just a demo implementation, to get miner & watch tower
-// addresses working. Implementing bare minimum out of which, when working
-// correctly we can extract into more proper functions in the future.
-func getAccountData(address string) (*keystore.KeyStore, accounts.Account, *keystore.Key, error) {
-	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
-	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(address)})
-	if err != nil {
-		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load miner account: %s", err)
-	}
-
-	passpharse := "secret"
-	keyjson, err := ks.Export(acc, passpharse, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	return ks, acc, privatekey, err
 }

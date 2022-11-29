@@ -2,6 +2,7 @@ package avail
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -99,11 +100,11 @@ func (d *Avail) runSequencer(myAccount accounts.Account, signKey *keystore.Key) 
 	}
 }
 
-func (d *Avail) startSyncing() error {
+func (d *Avail) startSyncing() {
 	// Start the syncer
 	err := d.syncer.Start()
 	if err != nil {
-		return err
+		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
 	}
 
 	syncFunc := func(blk *types.Block) bool {
@@ -113,10 +114,8 @@ func (d *Avail) startSyncing() error {
 
 	err = d.syncer.Sync(syncFunc)
 	if err != nil {
-		return err
+		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
 	}
-
-	return nil
 }
 
 func (d *Avail) ensureSequencerStaked(activeParticipantsQuerier staking.ActiveParticipants) error {

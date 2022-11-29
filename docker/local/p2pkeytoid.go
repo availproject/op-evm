@@ -3,11 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func main() {
@@ -16,7 +15,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	buf, err := ioutil.ReadFile(os.Args[1])
+	buf, err := os.ReadFile(os.Args[1])
 	if err != nil {
 		panic(err)
 	}

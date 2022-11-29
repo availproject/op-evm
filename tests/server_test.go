@@ -19,22 +19,24 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
 )
 
-type ServerContext struct {
-	servers     []serverInstance
+var ETH = big.NewInt(1000000000000000000)
+
+type Context struct {
+	servers     []instance
 	jsonRPCURLs []*url.URL
 }
 
-type serverInstance struct {
+type instance struct {
 	nodeType avail.MechanismType
 	config   *server.Config
 	server   *server.Server
 }
 
 // StartServers starts configured nodes
-func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*ServerContext, error) {
+func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
 	t.Helper()
 
-	ctx := &ServerContext{}
+	ctx := &Context{}
 
 	// Setup a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
@@ -42,11 +44,11 @@ func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	for _, nt := range nodeTypes {
 		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
 		if err != nil {
-			pa.Release()
+			_ = pa.Release()
 			return nil, err
 		}
 
-		si := serverInstance{
+		si := instance{
 			nodeType: nt,
 			config:   cfg,
 		}
@@ -61,7 +63,10 @@ func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	}
 
 	// Release allocated [TCP] ports to be used in Edge nodes.
-	pa.Release()
+	err := pa.Release()
+	if err != nil {
+		return nil, err
+	}
 
 	for i, si := range ctx.servers {
 		bootnodes := make(map[avail.MechanismType]string)
@@ -242,7 +247,10 @@ func startNode(t *testing.T, cfg *server.Config, availAddr string, nodeType avai
 	}
 
 	// Remove consensus from Edge to clean up our factory configuration.
-	server.UnRegisterConsensus(server.ConsensusType("avail"))
+	err = server.UnRegisterConsensus(server.ConsensusType("avail"))
+	if err != nil {
+		return nil, err
+	}
 
 	return serverInstance, nil
 }
@@ -284,11 +292,11 @@ func (pa *PortAllocator) Release() error {
 	return lastErr
 }
 
-func (sc *ServerContext) JSONRPCURLs() []*url.URL {
+func (sc *Context) JSONRPCURLs() []*url.URL {
 	return sc.jsonRPCURLs
 }
 
-func (sc *ServerContext) StopAll() {
+func (sc *Context) StopAll() {
 	for _, srvInstance := range sc.servers {
 		srvInstance.server.Close()
 	}

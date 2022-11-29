@@ -200,16 +200,13 @@ func (bb *blockBuilder) Build() (*types.Block, error) {
 	bb.header.Miner = bb.coinbase.Bytes()
 	bb.header.Timestamp = uint64(time.Now().Unix())
 
-	// Set arbitrary gas limit for the first block if not set yet.
+	// Copy gaslimit from genesis block if first post-genesis.
 	if bb.header.GasLimit == 0 && bb.parent.Number == 0 {
-		// This arbitrary gas limit comes from early unit tests that run with
-		// empty block.
-		//bb.header.GasLimit = 4_715_000
-		bb.header.GasLimit = 5_242_880
+		bb.header.GasLimit = bb.parent.GasLimit
 	}
 
-	// Check if the gas limit needs to be calculated.
-	if bb.header.GasLimit == 0 {
+	// Check if the gas limit needs to be calculated based on parent block.
+	if bb.header.GasLimit == 0 && bb.parent.Number != 0 {
 		// Calculate gas limit based on parent header.
 		bb.header.GasLimit, err = bb.blockchain.CalculateGasLimit(bb.parent.Number)
 		if err != nil {

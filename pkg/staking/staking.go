@@ -178,8 +178,7 @@ func SlashStakerTx(from types.Address, slashAddr types.Address, gasLimit uint64)
 
 	encodedInput, encodeErr := method.Inputs.Encode(
 		map[string]interface{}{
-			"slashAddr":   slashAddr.Bytes(),
-			"slashAmount": big.NewInt(0).Mul(big.NewInt(1), ETH),
+			"slashAddr": slashAddr.Bytes(),
 		},
 	)
 	if encodeErr != nil {

@@ -2,6 +2,7 @@ package staking
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 	"time"
 
@@ -12,12 +13,15 @@ import (
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
 type DisputeResolution interface {
 	Get() ([]types.Address, error)
 	Contains(addr types.Address) (bool, error)
+	GetSequencerAddr(addr types.Address) (types.Address, error)
+	GetWatchtowerAddr(addr types.Address) (types.Address, error)
 	Begin(probationAddr types.Address, signKey *ecdsa.PrivateKey) error
 	End(probationAddr types.Address, signKey *ecdsa.PrivateKey) error
 }
@@ -83,6 +87,72 @@ func (dr *disputeResolution) Contains(addr types.Address) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (dr *disputeResolution) GetSequencerAddr(watchtowerAddr types.Address) (types.Address, error) {
+	parent := dr.blockchain.Header()
+	minerAddress := types.BytesToAddress(parent.Miner)
+
+	dr.logger.Info("Got addresses", "Miner", minerAddress.String(), "Watchtower", watchtowerAddr.String())
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAddress.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := dr.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	transition, err := dr.executor.BeginTxn(parent.StateRoot, header, minerAddress)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	sequencerAddr, err := QueryDisputedSequencerAddr(transition, gasLimit, minerAddress, watchtowerAddr)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return sequencerAddr, nil
+}
+
+func (dr *disputeResolution) GetWatchtowerAddr(sequencerAddr types.Address) (types.Address, error) {
+	parent := dr.blockchain.Header()
+	minerAddress := types.BytesToAddress(parent.Miner)
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAddress.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := dr.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	transition, err := dr.executor.BeginTxn(parent.StateRoot, header, minerAddress)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	watchtowerAddr, err := QueryDisputedWatchtowerAddr(transition, gasLimit, minerAddress, sequencerAddr)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return watchtowerAddr, nil
 }
 
 func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.PrivateKey) error {
@@ -211,4 +281,100 @@ func EndDisputeResolutionTx(from types.Address, probationAddr types.Address, gas
 		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
 	}, nil
+}
+
+func QueryDisputedSequencerAddr(t *state.Transition, gasLimit uint64, from types.Address, watchtowerAddr types.Address) (types.Address, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetDisputedSequencerAddrs"]
+	if !ok {
+		return types.Address{}, errors.New("GetDisputedSequencerAddrs method doesn't exist in Staking contract ABI")
+	}
+
+	encodedInput, encodeErr := method.Inputs.Encode(
+		map[string]interface{}{
+			"watchtowerAddr": watchtowerAddr.Bytes(),
+		},
+	)
+	if encodeErr != nil {
+		return types.Address{}, encodeErr
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    append(selector, encodedInput...),
+		GasPrice: big.NewInt(5000),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	if res.Failed() {
+		return types.Address{}, res.Err
+	}
+
+	decodedResults, err := method.Outputs.Decode(res.ReturnValue)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	results, ok := decodedResults.(map[string]interface{})
+	if !ok {
+		return types.Address{}, errors.New("failed type assertion from decodedResults to map")
+	}
+
+	address, ok := results["0"].(ethgo.Address)
+	return types.Address(address), nil
+}
+
+func QueryDisputedWatchtowerAddr(t *state.Transition, gasLimit uint64, from types.Address, sequencerAddr types.Address) (types.Address, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetDisputedWatchtowerAddr"]
+	if !ok {
+		return types.Address{}, errors.New("GetDisputedWatchtowerAddr method doesn't exist in Staking contract ABI")
+	}
+
+	encodedInput, encodeErr := method.Inputs.Encode(
+		map[string]interface{}{
+			"sequencerAddr": sequencerAddr.Bytes(),
+		},
+	)
+	if encodeErr != nil {
+		return types.Address{}, encodeErr
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    append(selector, encodedInput...),
+		GasPrice: big.NewInt(5000),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	if res.Failed() {
+		return types.Address{}, res.Err
+	}
+
+	decodedResults, err := method.Outputs.Decode(res.ReturnValue)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	results, ok := decodedResults.(map[string]interface{})
+	if !ok {
+		return types.Address{}, errors.New("failed type assertion from decodedResults to map")
+	}
+
+	address, ok := results["0"].(ethgo.Address)
+	return types.Address(address), nil
 }

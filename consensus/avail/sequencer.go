@@ -190,64 +190,6 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	return nil
 }
 
-func (d *Avail) stakeSequencer(activeParticipantsQuerier staking.ActiveParticipants) error {
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
-	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
-	if err != nil {
-		return err
-	}
-
-	txSigner := &crypto.FrontierSigner{}
-	tx, err = txSigner.SignTx(tx, d.signKey)
-	if err != nil {
-		return err
-	}
-
-	time.Sleep(10 * time.Second)
-
-	for retries := 0; retries < 10; retries++ {
-		staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
-		if err != nil {
-			return err
-		}
-
-		if staked {
-			break
-		}
-
-		// Submit staking transaction for execution by active sequencer.
-		err = d.txpool.AddTx(tx)
-		if err != nil {
-			d.logger.Error("failed to submit staking tx from sequencer; retrying...", "error", err)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		d.logger.Info("staking transaction submitted to txpool")
-		time.Sleep(2 * time.Second)
-	}
-
-	if err != nil {
-		panic("failed to stake sequencer")
-	}
-
-	// Syncer will be syncing the blockchain in the background, so once an active
-	// sequencer picks up the staking transaction from the txpool, it becomes
-	// effective and visible to us as well, via blockchain.
-	var staked bool
-	for !staked {
-		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
-		if err != nil {
-			return err
-		}
-
-		// Wait a bit before checking again.
-		time.Sleep(3 * time.Second)
-	}
-
-	return nil
-}
-
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)

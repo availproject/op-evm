@@ -12,11 +12,21 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) runWatchTower(stakingNode staking.Node, watchTowerAccount accounts.Account, watchTowerPK *keystore.Key) {
+func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 	logger := d.logger.Named("watchtower")
-	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(watchTowerAccount.Address), watchTowerPK.PrivateKey)
+	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
+
+	d.logger.Debug("ensuring watchtower staked")
+	err := d.ensureStaked(activeParticipantsQuerier)
+	if err != nil {
+		d.logger.Error("error while ensuring sequencer staked", "error", err)
+		return
+	}
+
+	d.logger.Debug("ensured watchtower staked")
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
@@ -32,7 +42,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, watchTowerAccount accoun
 
 		select {
 		case <-d.closeCh:
-			if err := stakingNode.UnStake(watchTowerPK.PrivateKey); err != nil {
+			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
 				d.logger.Error("failed to unstake the node: %s", err)
 			}
 			availBlockStream.Close()

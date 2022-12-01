@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
@@ -115,7 +116,11 @@ func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		}
 
 		ctx.servers[i].server = srv
+
+		t.Logf("%d: started node %q", i, si.nodeType)
 	}
+
+	t.Logf("all %d nodes started", len(ctx.servers))
 
 	return ctx, nil
 }
@@ -212,7 +217,7 @@ func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType
 			Chain:            chainSpec,
 		},
 		DataDir:            rawConfig.DataDir,
-		Seal:               rawConfig.ShouldSeal,
+		Seal:               true, // Seal enables TxPool P2P gossiping
 		PriceLimit:         rawConfig.TxPool.PriceLimit,
 		MaxAccountEnqueued: 128,
 		MaxSlots:           rawConfig.TxPool.MaxSlots,
@@ -221,7 +226,6 @@ func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType
 		BlockTime:          rawConfig.BlockTime,
 		LogLevel:           hclog.Debug,
 		LogFilePath:        rawConfig.LogFilePath,
-		NodeType:           nodeType.String(),
 	}
 
 	return cfg, nil
@@ -290,6 +294,14 @@ func (pa *PortAllocator) Release() error {
 	}
 
 	return lastErr
+}
+
+func (sc *Context) GethClient() (*ethclient.Client, error) {
+	if len(sc.jsonRPCURLs) == 0 {
+		return nil, fmt.Errorf("no json-rpc URLs available")
+	}
+
+	return ethclient.Dial(sc.jsonRPCURLs[0].String())
 }
 
 func (sc *Context) JSONRPCURLs() []*url.URL {

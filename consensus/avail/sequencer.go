@@ -31,14 +31,8 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
 	defer availBlockStream.Close()
 
-	// enable txpool p2p gossiping
-	d.txpool.SetSealing(true)
-
-	// start p2p syncing
-	go d.startSyncing()
-
 	d.logger.Debug("ensuring sequencer staked")
-	err := d.ensureSequencerStaked(activeParticipantsQuerier)
+	err := d.ensureStaked(activeParticipantsQuerier)
 	if err != nil {
 		d.logger.Error("error while ensuring sequencer staked", "error", err)
 		return
@@ -121,22 +115,25 @@ func (d *Avail) startSyncing() {
 	}
 }
 
-func (d *Avail) ensureSequencerStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
-	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.Sequencer)
+func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
+	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
 	if err != nil {
 		return err
 	}
 
 	if staked {
-		d.logger.Debug("sequencer already staked")
+		d.logger.Debug("already staked")
 		return nil
 	}
 
-	if MechanismType(d.nodeType) == BootstrapSequencer {
+	switch MechanismType(d.nodeType) {
+	case BootstrapSequencer:
 		return d.stakeBootstrapSequencer()
-	} else if MechanismType(d.nodeType) == Sequencer {
-		return d.stakeSequencer(activeParticipantsQuerier)
-	} else {
+	case Sequencer:
+		return d.stakeParticipant(activeParticipantsQuerier)
+	case WatchTower:
+		return d.stakeParticipant(activeParticipantsQuerier)
+	default:
 		panic("invalid node type: " + d.nodeType)
 	}
 }

@@ -34,6 +34,9 @@ func main() {
 		log.Fatalf("failure to get node configuration: %s", err)
 	}
 
+	// Enable TxPool P2P gossiping
+	config.Seal = true
+
 	log.Printf("Server config: %+v", config)
 
 	// Attach the concensus to the server

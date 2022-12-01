@@ -153,6 +153,9 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+	// Start P2P syncing.
+	go d.startSyncing()
+
 	stakingSender := staking.NewAvailSender(avail.NewSender(d.availClient, signature.TestKeyringPairAlice))
 	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
 

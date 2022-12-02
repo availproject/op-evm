@@ -224,6 +224,7 @@ func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType
 		SecretsManager:     nil,
 		RestoreFile:        nil,
 		BlockTime:          rawConfig.BlockTime,
+		NodeType:           nodeType.String(),
 		LogLevel:           hclog.Debug,
 		LogFilePath:        rawConfig.LogFilePath,
 	}

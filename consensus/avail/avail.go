@@ -153,38 +153,25 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+
+	// Enable P2P gossiping.
+	d.txpool.SetSealing(true)
+
 	// Start P2P syncing.
 	go d.startSyncing()
 
 	stakingSender := staking.NewAvailSender(avail.NewSender(d.availClient, signature.TestKeyringPairAlice))
 	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
 
-	if d.nodeType == Sequencer || d.nodeType == BootstrapSequencer {
+	switch d.nodeType {
+	case Sequencer, BootstrapSequencer:
 		go d.runSequencer(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
-	}
-
-	if d.nodeType == Validator {
+	case Validator:
 		go d.runValidator()
-	}
-
-	if d.nodeType == WatchTower {
-		wtAccount := accounts.Account{Address: common.Address(d.minerAddr)}
-		wtPK := &keystore.Key{PrivateKey: d.signKey}
-
-		activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-		staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
-		if err != nil {
-			return err
-		}
-
-		if !staked {
-			if err := d.stakeParticipant(activeParticipantsQuerier); err != nil {
-				d.logger.Error("failure to build staking block", "error", err)
-				return err
-			}
-		}
-
-		go d.runWatchTower(stakingNode, wtAccount, wtPK)
+	case WatchTower:
+		go d.runWatchTower(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+	default:
+		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}
 
 	return nil

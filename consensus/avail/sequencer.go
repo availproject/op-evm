@@ -116,7 +116,19 @@ func (d *Avail) startSyncing() {
 }
 
 func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
-	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
+	var nodeType staking.NodeType
+	switch d.nodeType {
+	case "bootstrap-sequencer", "sequencer":
+		nodeType = staking.Sequencer
+	case "watchtower":
+		nodeType = staking.WatchTower
+	case "validator":
+		nodeType = staking.Validator
+	default:
+		return fmt.Errorf("unknown node type: %q", d.nodeType)
+	}
+
+	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
 	if err != nil {
 		return err
 	}
@@ -172,6 +184,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	}
 
 	for {
+		d.logger.Debug("sending block with staking tx to Avail")
 		err, malicious := d.sendBlockToAvail(blk)
 		if err != nil {
 			panic(err)
@@ -182,6 +195,8 @@ func (d *Avail) stakeBootstrapSequencer() error {
 		}
 	}
 
+	d.logger.Debug("writing block with staking tx to local blockchain")
+
 	err = d.blockchain.WriteBlock(blk, "sequencer")
 	if err != nil {
 		panic("bootstrap sequencer couldn't stake: " + err.Error())
@@ -191,6 +206,8 @@ func (d *Avail) stakeBootstrapSequencer() error {
 }
 
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
+	time.Sleep(5 * time.Second)
+
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
 	if err != nil {

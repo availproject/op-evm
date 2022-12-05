@@ -3,6 +3,7 @@ package staking
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -26,6 +27,10 @@ func (sas *staticActiveSequencers) Contains(addr types.Address, _ NodeType) (boo
 	}
 
 	return false, nil
+}
+
+func (dasq *staticActiveSequencers) GetBalance(_ types.Address) (*big.Int, error) {
+	return nil, nil
 }
 
 func Test_RandomizedSequencers(t *testing.T) {

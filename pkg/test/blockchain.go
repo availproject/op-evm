@@ -14,8 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -52,9 +50,6 @@ func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 	st := itrie.NewState(storage)
 
 	e := state.NewExecutor(c.Params, st, hclog.Default())
-
-	e.SetRuntime(precompiled.NewPrecompiled())
-	e.SetRuntime(evm.NewEVM())
 
 	return e
 }

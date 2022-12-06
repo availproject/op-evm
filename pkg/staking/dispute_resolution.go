@@ -327,7 +327,7 @@ func QueryDisputedSequencerAddr(t *state.Transition, gasLimit uint64, from types
 		return types.Address{}, errors.New("failed type assertion from decodedResults to map")
 	}
 
-	address, ok := results["0"].(ethgo.Address)
+	address, _ := results["0"].(ethgo.Address)
 	return types.Address(address), nil
 }
 
@@ -375,6 +375,6 @@ func QueryDisputedWatchtowerAddr(t *state.Transition, gasLimit uint64, from type
 		return types.Address{}, errors.New("failed type assertion from decodedResults to map")
 	}
 
-	address, ok := results["0"].(ethgo.Address)
+	address, _ := results["0"].(ethgo.Address)
 	return types.Address(address), nil
 }

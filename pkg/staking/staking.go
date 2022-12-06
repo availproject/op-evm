@@ -93,17 +93,17 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender
 
 }
 
-func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, slashAddr types.Address, gasLimit uint64, src string) error {
+func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, sequencerAddr types.Address, sequencerKey *ecdsa.PrivateKey, maliciousStakerAddr types.Address, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
 
-	blk.SetCoinbaseAddress(stakerAddr)
-	blk.SignWith(stakerKey)
+	blk.SetCoinbaseAddress(sequencerAddr)
+	blk.SignWith(sequencerKey)
 
-	tx, err := SlashStakerTx(stakerAddr, slashAddr, gasLimit)
+	tx, err := SlashStakerTx(sequencerAddr, maliciousStakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
@@ -168,17 +168,17 @@ func UnStakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) 
 	return tx, nil
 }
 
-func SlashStakerTx(from types.Address, slashAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
+func SlashStakerTx(sequencerAddr types.Address, maliciousStakerAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["slash"]
 	if !ok {
-		return nil, errors.New("unstake method doesn't exist in Staking contract ABI")
+		return nil, errors.New("Slash method doesn't exist in Staking contract ABI")
 	}
 
 	selector := method.ID()
 
 	encodedInput, encodeErr := method.Inputs.Encode(
 		map[string]interface{}{
-			"slashAddr": slashAddr.Bytes(),
+			"slashAddr": maliciousStakerAddr.Bytes(),
 		},
 	)
 	if encodeErr != nil {
@@ -186,7 +186,7 @@ func SlashStakerTx(from types.Address, slashAddr types.Address, gasLimit uint64)
 	}
 
 	tx := &types.Transaction{
-		From:     from,
+		From:     sequencerAddr,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
 		Input:    append(selector, encodedInput...),

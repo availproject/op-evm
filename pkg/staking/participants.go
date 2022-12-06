@@ -22,8 +22,10 @@ func (dasq *DumbActiveParticipants) Get(nodeType NodeType) ([]types.Address, err
 func (dasq *DumbActiveParticipants) Contains(_ types.Address, nodeType NodeType) (bool, error) {
 	return true, nil
 }
-
 func (dasq *DumbActiveParticipants) GetBalance(_ types.Address) (*big.Int, error) {
+	return nil, nil
+}
+func (dasq *DumbActiveParticipants) GetTotalStakedAmount() (*big.Int, error) {
 	return nil, nil
 }
 
@@ -31,6 +33,7 @@ type ActiveParticipants interface {
 	Get(nodeType NodeType) ([]types.Address, error)
 	Contains(addr types.Address, nodeType NodeType) (bool, error)
 	GetBalance(addr types.Address) (*big.Int, error)
+	GetTotalStakedAmount() (*big.Int, error)
 }
 
 type activeParticipantsQuerier struct {
@@ -143,6 +146,38 @@ func (asq *activeParticipantsQuerier) GetBalance(address types.Address) (*big.In
 	}
 
 	balance, err := QueryParticipantBalance(transition, gasLimit, minerAddress, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return balance, nil
+}
+
+func (asq *activeParticipantsQuerier) GetTotalStakedAmount() (*big.Int, error) {
+	parent := asq.blockchain.Header()
+	minerAddress := types.BytesToAddress(parent.Miner)
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAddress.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := asq.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := asq.executor.BeginTxn(parent.StateRoot, header, minerAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := QueryParticipantTotalStakedAmount(transition, gasLimit, minerAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +421,34 @@ func QueryParticipantBalance(t *state.Transition, gasLimit uint64, from types.Ad
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
 		Input:    append(selector, encodedInput...),
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	return new(big.Int).SetBytes(res.ReturnValue), nil
+}
+
+func QueryParticipantTotalStakedAmount(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentStakedAmount"]
+	if !ok {
+		return nil, errors.New("GetCurrentStakedAmount method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
 		GasPrice: big.NewInt(0),
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),

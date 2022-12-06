@@ -33,6 +33,10 @@ func (dasq *staticActiveSequencers) GetBalance(_ types.Address) (*big.Int, error
 	return nil, nil
 }
 
+func (dasq *staticActiveSequencers) GetTotalStakedAmount() (*big.Int, error) {
+	return nil, nil
+}
+
 func Test_RandomizedSequencers(t *testing.T) {
 
 	testCases := []struct {

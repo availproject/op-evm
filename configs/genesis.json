@@ -26,8 +26,11 @@
             },
             "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61": {
                 "balance": "0x3635c9adc5dea00000"
+            },
+            "0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864": {
+                "balance": "0x3635c9adc5dea00000"
             }
-        },
+    },
         "number": "0x0",
         "gasUsed": "0x70000",
         "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -47,6 +50,7 @@
         "engine": {
             "avail": {
                 "mechanisms": [
+                    "bootstrap-sequencer",
                     "sequencer",
                     "validator"
                 ]

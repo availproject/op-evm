@@ -46,7 +46,7 @@ func NewActiveParticipantsQuerier(blockchain *blockchain.Blockchain, executor *s
 	return &activeParticipantsQuerier{
 		blockchain: blockchain,
 		executor:   executor,
-		logger:     logger.ResetNamed("active_staking_participants_querier"),
+		logger:     logger.Named("active_staking_participants_querier"),
 	}
 }
 

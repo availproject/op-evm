@@ -15,6 +15,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/go-hclog v1.3.1
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/libp2p/go-libp2p v0.22.0
 	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/test-go/testify v1.1.4
@@ -118,7 +119,6 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.22.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.8.1 // indirect

@@ -18,9 +18,11 @@ const (
 )
 
 func main() {
+	var bootnode bool
 	var availAddr, path string
 	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
 	flag.StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
+	flag.BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
 
 	flag.Parse()
 
@@ -32,10 +34,13 @@ func main() {
 		log.Fatalf("failure to get node configuration: %s", err)
 	}
 
+	// Enable TxPool P2P gossiping
+	config.Seal = true
+
 	log.Printf("Server config: %+v", config)
 
 	// Attach the concensus to the server
-	err = server.RegisterConsensus(AvailConsensus, avail.Factory(avail.Config{AvailAddr: availAddr}))
+	err = server.RegisterConsensus(AvailConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
 	if err != nil {
 		log.Fatalf("failure to register consensus: %s", err)
 	}

@@ -78,7 +78,7 @@ build: build-server build-client
 
 start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -config-file="./configs/bootnode.yaml"
+	./server/server -bootstrap -config-file="./configs/bootnode.yaml"
 
 start-validator: build
 	rm -rf data/avail-node-1/blockchain/

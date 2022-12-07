@@ -1,0 +1,71 @@
+version: '3.5'
+
+services:
+  ## RUN NODES
+  ## Nodes must have the same names as folders in genesis-legde
+  sequencer-1:
+    image: avail-settlement
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    entrypoint: ["/avail-settlement", "-bootstrap", "-config-file", "/configs/sequencer-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+    depends_on:
+      - avail
+    ports:
+      - '10000:9632'
+      - '10002:8545'
+    networks:
+      - avail-settlement
+    restart: on-failure
+    
+  sequencer-2:
+    image: avail-settlement
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-2.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+    depends_on:
+      - avail
+    ports:
+     - '20000:9632'
+     - '20002:8545'
+    networks:
+      - avail-settlement
+    restart: on-failure
+    
+  sequencer-3:
+    image: avail-settlement
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/sequencer-3.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+    depends_on:
+      - avail
+    ports:
+      - '30000:9632'
+      - '30002:8545'
+    networks:
+      - avail-settlement
+    restart: on-failure
+    
+  watchtower-1:
+    image: avail-settlement
+    entrypoint: ["/avail-settlement", "-config-file", "/configs/watchtower-1.yaml", "-avail-addr", "ws://avail:9944/v1/json-rpc"]
+    depends_on:
+      - avail
+    ports:
+      - '40000:9632'
+      - '40002:8545'
+    networks:
+      - avail-settlement
+    restart: on-failure
+
+  avail:
+    image: 0xpolygon/avail:v1.1.0
+    entrypoint: ["/da/bin/data-avail", "--dev", "--rpc-external", "--ws-external", "--listen-addr", "/ip4/0.0.0.0/tcp/19944/ws"]
+    ports:
+    - '9944:19944'
+    volumes:
+      - avail:/data
+    networks:
+      - avail-settlement
+    restart: on-failure
+
+networks:
+  avail-settlement:
+    driver: bridge
+    name: avail-settlement

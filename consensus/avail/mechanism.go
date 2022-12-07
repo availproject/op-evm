@@ -5,21 +5,21 @@ import "fmt"
 type MechanismType string
 
 const (
-	//
+	BootstrapSequencer MechanismType = "bootstrap-sequencer"
+
 	Sequencer MechanismType = "sequencer"
 
-	//
 	Validator MechanismType = "validator"
 
-	//
 	WatchTower MechanismType = "watchtower"
 )
 
 // mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
 var mechanismTypes = map[string]MechanismType{
-	"sequencer":  Sequencer,
-	"validator":  Validator,
-	"watchtower": WatchTower,
+	"bootstrap-sequencer": BootstrapSequencer,
+	"sequencer":           Sequencer,
+	"validator":           Validator,
+	"watchtower":          WatchTower,
 }
 
 // String is a helper method for casting a MechanismType to a string representation

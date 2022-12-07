@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/syncer"
@@ -34,8 +35,13 @@ const (
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 )
 
+var (
+	ETH = big.NewInt(1000000000000000000)
+)
+
 type Config struct {
 	AvailAddr string
+	Bootnode  bool
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -50,8 +56,8 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	validatorKey     *ecdsa.PrivateKey // nolint:unused // Private key for the validator
-	validatorKeyAddr types.Address     // nolint:unused
+	signKey   *ecdsa.PrivateKey
+	minerAddr types.Address
 
 	interval uint64
 	txpool   *txpool.TxPool
@@ -71,6 +77,18 @@ type Avail struct {
 func Factory(config Config) func(params *consensus.Params) (consensus.Consensus, error) {
 	return func(params *consensus.Params) (consensus.Consensus, error) {
 		logger := params.Logger.Named("avail")
+
+		bs, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
+		if err != nil {
+			panic("can't find validator key! - " + err.Error())
+		}
+
+		validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+		if err != nil {
+			panic("validator key decoding failed: " + err.Error())
+		}
+
+		validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
 
 		asq := staking.NewActiveParticipantsQuerier(params.Blockchain, params.Executor, logger)
 
@@ -92,11 +110,20 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 				params.Blockchain,
 				time.Duration(params.BlockTime)*3*time.Second,
 			),
+			signKey:   validatorKey,
+			minerAddr: validatorAddr,
 		}
 
-		var err error
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
 			return nil, fmt.Errorf("invalid avail mechanism type/s provided")
+		}
+
+		if d.nodeType == BootstrapSequencer && !config.Bootnode {
+			return nil, fmt.Errorf("invalid avail node type provided: cannot specify bootstrap-sequencer type without -bootnode flag")
+		}
+
+		if d.nodeType == Sequencer && config.Bootnode {
+			d.nodeType = BootstrapSequencer
 		}
 
 		d.availClient, err = avail.NewClient(config.AvailAddr)
@@ -126,50 +153,25 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+
+	// Enable P2P gossiping.
+	d.txpool.SetSealing(true)
+
+	// Start P2P syncing.
+	go d.startSyncing()
+
 	stakingSender := staking.NewAvailSender(avail.NewSender(d.availClient, signature.TestKeyringPairAlice))
 	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
 
-	if d.nodeType == Sequencer {
-		// Only start the syncer for sequencer. Validator and Watch Tower are
-		// working purely out of Avail.
-		if err := d.syncer.Start(); err != nil {
-			return err
-		}
-
-		minerKeystore, minerAccount, minerPk, err := getAccountData(SequencerAddress)
-		if err != nil {
-			return err
-		}
-
-		if stakingNode.ShouldStake(minerPk.PrivateKey) {
-			if err := stakingNode.Stake(stakeAmount, minerPk.PrivateKey); err != nil {
-				d.logger.Error("failure to build staking block", "error", err)
-				return err
-			}
-		}
-
-		go d.runSequencer(stakingNode, minerKeystore, minerAccount, minerPk)
-	}
-
-	if d.nodeType == Validator {
+	switch d.nodeType {
+	case Sequencer, BootstrapSequencer:
+		go d.runSequencer(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+	case Validator:
 		go d.runValidator()
-	}
-
-	if d.nodeType == WatchTower {
-		_, wtAccount, wtPK, err := getAccountData(WatchTowerAddress)
-		if err != nil {
-			return err
-		}
-
-		if stakingNode.ShouldStake(wtPK.PrivateKey) {
-			if err := stakingNode.Stake(stakeAmount, wtPK.PrivateKey); err != nil {
-				d.logger.Error("failure to build staking block", "error", err)
-				return err
-			}
-		}
-
-		go d.runWatchTower(stakingNode, wtAccount, wtPK)
+	case WatchTower:
+		go d.runWatchTower(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+	default:
+		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}
 
 	return nil
@@ -213,28 +215,4 @@ func (d *Avail) Close() error {
 	close(d.closeCh)
 
 	return nil
-}
-
-// TODO: This is just a demo implementation, to get miner & watch tower
-// addresses working. Implementing bare minimum out of which, when working
-// correctly we can extract into more proper functions in the future.
-func getAccountData(address string) (*keystore.KeyStore, accounts.Account, *keystore.Key, error) {
-	ks := keystore.NewKeyStore("./data/wallets", keystore.StandardScryptN, keystore.StandardScryptP)
-	acc, err := ks.Find(accounts.Account{Address: common.HexToAddress(address)})
-	if err != nil {
-		return nil, accounts.Account{}, nil, fmt.Errorf("failure to load sequencer miner account: %s", err)
-	}
-
-	passpharse := "secret"
-	keyjson, err := ks.Export(acc, passpharse, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
-	if err != nil {
-		return nil, accounts.Account{}, nil, err
-	}
-
-	return ks, acc, privatekey, err
 }

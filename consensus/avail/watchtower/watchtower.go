@@ -42,11 +42,11 @@ type watchTower struct {
 	signKey *ecdsa.PrivateKey
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
+func New(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
 	return &watchTower{
 		blockchain:          blockchain,
 		executor:            executor,
-		logger:              hclog.Default(),
+		logger:              logger,
 		blockBuilderFactory: block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()),
 
 		account: account,
@@ -73,9 +73,10 @@ func (wt *watchTower) Check(blk *types.Block) error {
 
 func (wt *watchTower) Apply(blk *types.Block) error {
 	if err := wt.blockchain.WriteBlock(blk, block.SourceWatchTower); err != nil {
-		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
+		return fmt.Errorf("failed to write block: %w", err)
 	}
 
+	wt.logger.Info("Block committed to blockchain", "block_number", blk.Header.Number, "hash", blk.Header.Hash.String())
 	wt.logger.Debug("Received block header", "block_header", blk.Header)
 	wt.logger.Debug("Received block transactions", "block_transactions", blk.Transactions)
 

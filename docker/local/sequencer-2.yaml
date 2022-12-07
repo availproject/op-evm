@@ -1,0 +1,30 @@
+chain_config: ./configs/genesis.json
+secrets_config: ""
+data_dir: "./data/avail-sequencer-2"
+block_gas_target: "0x0"
+avail_addr: "avail:9944"
+grpc_addr: "0.0.0.0:9632"
+jsonrpc_addr: "0.0.0.0:8545"
+node_type: "sequencer"
+telemetry:
+    prometheus_addr: ""
+network:
+    no_discover: false
+    libp2p_addr: "0.0.0.0:1478"
+    nat_addr: ""
+    dns_addr: ""
+    max_peers: 40
+    max_outbound_peers: 32
+    max_inbound_peers: 8
+seal: true
+tx_pool:
+    price_limit: 0
+    max_slots: 4096
+log_level: INFO
+restore_file: ""
+block_time_s: 4
+ibft_base_time_s: 10
+headers:
+    access_control_allow_origins:
+        - '*'
+log_to: ""

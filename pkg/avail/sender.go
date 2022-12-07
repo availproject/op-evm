@@ -2,7 +2,6 @@ package avail
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -132,13 +131,11 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 			select {
 			case status := <-sub.Chan():
 				if status.IsFinalized {
-					log.Printf("submitted block is finalized.")
 					f.SetValue(Result{})
 					return
 				}
 			case err := <-sub.Err():
 				// TODO: Consider re-connecting subscription channel on error?
-				log.Printf("submitted block subscription returned an error: %s", err)
 				f.SetError(err)
 				return
 			}
@@ -323,22 +320,23 @@ func (s *sender) SubmitDataAndWaitForStatus(bs []byte, dstatus types.ExtrinsicSt
 		for {
 			select {
 			case status := <-sub.Chan():
+				_, err := dstatus.MarshalJSON()
+				if err != nil {
+					panic(err)
+				}
 				if dstatus.IsInBlock {
 					if status.IsInBlock {
-						log.Printf("submitted block is in block.")
 						f.SetValue(Result{})
 						return
 					}
 				} else if dstatus.IsReady {
 					if status.IsReady {
-						log.Printf("submitted block is ready.")
 						f.SetValue(Result{})
 						return
 					}
 				}
 			case err := <-sub.Err():
 				// TODO: Consider re-connecting subscription channel on error?
-				log.Printf("submitted block subscription returned an error: %s", err)
 				f.SetError(err)
 				return
 			}

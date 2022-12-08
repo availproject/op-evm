@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
+	commontoken "github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
@@ -24,13 +25,12 @@ const (
 )
 
 var (
-	ETH            = big.NewInt(1000000000000000000)
 	StakingAddress = common.HexToAddress("0x0110000000000000000000000000000000000001")
 	MinerAddress   = common.HexToAddress("0xF817d12e6933BbA48C14D4c992719B46aD9f5f61")
 )
 
 func toETH(wei *big.Int) *big.Int {
-	return big.NewInt(0).Div(wei, ETH)
+	return big.NewInt(0).Div(wei, commontoken.ETH)
 }
 
 // Test case description:

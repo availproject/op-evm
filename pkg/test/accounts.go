@@ -16,10 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-var (
-	ETH = big.NewInt(1000000000000000000)
-)
-
 func NewAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	t.Helper()
 

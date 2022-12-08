@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	golog "github.com/ipfs/go-log/v2"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	fraud "github.com/maticnetwork/avail-settlement/tools/fraud/contract"
 )
 
@@ -26,10 +27,6 @@ const (
 	ContractAccountHex      = "0x137De958553BB76FdFD8D64a55E8fA466768FE6a"
 )
 
-var (
-	ETH = big.NewInt(1000000000000000000)
-)
-
 func getHeaderByNumber(client *ethclient.Client, number *big.Int) (*types.Header, error) {
 	return client.HeaderByNumber(context.Background(), number)
 }
@@ -39,7 +36,7 @@ func headerNumbersMatch(sequencer *types.Header, validator *types.Header) bool {
 }
 
 func toETH(wei *big.Int) *big.Int {
-	return big.NewInt(0).Div(wei, ETH)
+	return big.NewInt(0).Div(wei, common.ETH)
 }
 
 // Test case description:
@@ -153,7 +150,7 @@ func main() {
 		ks,
 		genesisAccount,
 		ownerAccount,
-		ETH.Int64(), // Send 1 ETH
+		common.ETH.Int64(), // Send 1 ETH
 	)
 
 	if err != nil {
@@ -184,10 +181,10 @@ ownerBalanceTransferGoto:
 			log.Printf(
 				"Contract -> Check owner transfer balance update -> Current: %d | Wanted: %d \n",
 				toETH(ownerValidatorTransferBalance),
-				toETH(big.NewInt(0).Add(contractOwnerBalance, ETH)),
+				toETH(big.NewInt(0).Add(contractOwnerBalance, common.ETH)),
 			)
 
-			if toETH(ownerValidatorTransferBalance).Int64() == toETH(big.NewInt(0).Add(contractOwnerBalance, ETH)).Int64() {
+			if toETH(ownerValidatorTransferBalance).Int64() == toETH(big.NewInt(0).Add(contractOwnerBalance, common.ETH)).Int64() {
 				log.Printf(
 					"Contract -> Balance transfer confirmation successful! Total time took: %v \n",
 					time.Since(transferTime),

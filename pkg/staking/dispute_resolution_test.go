@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -17,7 +18,7 @@ func TestBeginDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	watchtowerAddr, watchtowerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, watchtowerAddr, balance, blockchain, executor)
 
@@ -26,7 +27,7 @@ func TestBeginDisputeResolution(t *testing.T) {
 
 	// In order to begin the dispute resolution, onlyWatchtower modifier needs to be met.
 	// In other words, we first need to stake watchtower as .Begin() can be called only by the staked watchtower.
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	sender := NewTestAvailSender()
 	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), watchtowerAddr, watchtowerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
@@ -67,7 +68,7 @@ func TestEndDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	watchtowerAddr, watchtowerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, watchtowerAddr, balance, blockchain, executor)
 
@@ -76,7 +77,7 @@ func TestEndDisputeResolution(t *testing.T) {
 
 	// In order to begin the dispute resolution, onlyWatchtower modifier needs to be met.
 	// In other words, we first need to stake watchtower as .Begin() can be called only by the staked watchtower.
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	sender := NewTestAvailSender()
 	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), watchtowerAddr, watchtowerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
@@ -120,7 +121,7 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	watchtowerAddr, watchtowerSignKey := test.NewAccount(t)
 	test.DepositBalance(t, watchtowerAddr, balance, blockchain, executor)
 
@@ -129,7 +130,7 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 
 	// In order to begin the dispute resolution, onlyWatchtower modifier needs to be met.
 	// In other words, we first need to stake watchtower as .Begin() can be called only by the staked watchtower.
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	sender := NewTestAvailSender()
 	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), watchtowerAddr, watchtowerSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)

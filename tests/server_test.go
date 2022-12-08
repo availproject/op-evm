@@ -18,9 +18,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
-
-var ETH = big.NewInt(1000000000000000000)
 
 type Context struct {
 	servers     []instance
@@ -195,7 +194,7 @@ func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType
 	}
 
 	chainSpec.Genesis.Alloc[minerAddr] = &chain.GenesisAccount{
-		Balance: big.NewInt(0).Mul(big.NewInt(1000), ETH),
+		Balance: big.NewInt(0).Mul(big.NewInt(1000), common.ETH),
 	}
 
 	cfg := &server.Config{

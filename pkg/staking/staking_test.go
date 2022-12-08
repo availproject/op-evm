@@ -152,32 +152,113 @@ func TestSlashStaker(t *testing.T) {
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	maliciousAddr, maliciousSignKey := test.NewAccount(t)
-	test.DepositBalance(t, maliciousAddr, balance, blockchain, executor)
+	sequencerAddr, sequencerSignKey := test.NewAccount(t)
+	test.DepositBalance(t, sequencerAddr, balance, blockchain, executor)
+
+	maliciousSequencerAddr, maliciousSignKey := test.NewAccount(t)
+	test.DepositBalance(t, maliciousSequencerAddr, balance, blockchain, executor)
 
 	sender := NewTestAvailSender()
 
 	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
+	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), coinbaseAddr, coinbaseSignKey, stakeAmount, 1_000_000, "test")
 	tAssert.NoError(coinbaseStakeErr)
 
-	maliciousStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), maliciousAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
-	tAssert.NoError(maliciousStakeErr)
+	// Sequencer that is going to slash the malicious sequencer
+	sequencerStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), sequencerAddr, sequencerSignKey, stakeAmount, 1_000_000, "test")
+	tAssert.NoError(sequencerStakeErr)
+
+	// Sequencer that pretends it's malicious
+	maliciousSequencerStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(Sequencer), maliciousSequencerAddr, maliciousSignKey, stakeAmount, 1_000_000, "test")
+	tAssert.NoError(maliciousSequencerStakeErr)
+
+	// Checking for the correct balance before and after slashing.
+	participantQuerier := NewActiveParticipantsQuerier(blockchain, executor, hclog.Default())
+
+	totalContractBalance, tcbErr := participantQuerier.GetTotalStakedAmount()
+	tAssert.NoError(tcbErr)
+
+	t.Logf("Contract balance before slashing: %v", totalContractBalance)
+	totalContractBalanceBefore, _ := new(big.Int).SetString("30000000000000000000", 10)
+	tAssert.Equal(totalContractBalance, totalContractBalanceBefore)
+
+	coinbaseBalance, cbErr := participantQuerier.GetBalance(coinbaseAddr)
+	tAssert.NoError(cbErr)
+
+	t.Logf("Coinbase contract balance before slashing: %v", coinbaseBalance)
+	coinbaseBalanceBefore, _ := new(big.Int).SetString("10000000000000000000", 10)
+	tAssert.Equal(coinbaseBalance, coinbaseBalanceBefore)
+
+	sequencerBalance, sbErr := participantQuerier.GetBalance(sequencerAddr)
+	tAssert.NoError(sbErr)
+	t.Logf("Sequencer contract balance before slashing: %v", sequencerBalance)
+
+	maliciousSequencerBalance, msbErr := participantQuerier.GetBalance(maliciousSequencerAddr)
+	tAssert.NoError(msbErr)
+	t.Logf("Malicious sequencer contract balance before slashing: %v", maliciousSequencerBalance)
+
+	parentHeader := blockchain.Header()
+	transition, tErr := executor.BeginTxn(parentHeader.StateRoot, parentHeader, coinbaseAddr)
+	tAssert.NoError(tErr)
+
+	balanceBefore := transition.GetBalance(coinbaseAddr)
+	t.Logf("Watchtower (recipient of fee) wallet balance before slashing: %v", balanceBefore)
+	watchtowerWalletBalanceBefore, _ := new(big.Int).SetString("990000000000000000000", 10)
+	tAssert.Equal(balanceBefore, watchtowerWalletBalanceBefore)
 
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
-	err := dr.Begin(maliciousAddr, maliciousSignKey)
+	err := dr.Begin(maliciousSequencerAddr, coinbaseSignKey)
 	tAssert.NoError(err)
 
-	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousAddr)
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousSequencerAddr)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.True(isProbationSequencer)
 
-	// Base staker, necessary for unstaking to be available (needs at least one active staker as a leftover)
-	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), coinbaseAddr, coinbaseSignKey, maliciousAddr, 1_000_000, "test")
+	// Must be executed with a correct sequencer (valid one), should fail if it's not.
+	// Slashing implements onSequencer modifier (decorator).
+	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), sequencerAddr, sequencerSignKey, maliciousSequencerAddr, 1_000_000, "test")
 	tAssert.NoError(coinbaseSlashErr)
 
-	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousAddr)
+	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousSequencerAddr)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
+
+	totalContractBalance, tcbErr = participantQuerier.GetTotalStakedAmount()
+	tAssert.NoError(tcbErr)
+
+	t.Logf("Contract balance after slashing: %v", totalContractBalance)
+	totalContractBalanceBefore, _ = new(big.Int).SetString("29900000000000000000", 10)
+	tAssert.Equal(totalContractBalance, totalContractBalanceBefore)
+
+	coinbaseBalance, cbErr = participantQuerier.GetBalance(coinbaseAddr)
+	tAssert.NoError(cbErr)
+
+	t.Logf("Coinbase contract balance after slashing: %v", coinbaseBalance)
+	coinbaseBalanceEnd, _ := new(big.Int).SetString("10000000000000000000", 10)
+	tAssert.Equal(coinbaseBalance, coinbaseBalanceEnd)
+
+	sequencerBalance, sbErr = participantQuerier.GetBalance(sequencerAddr)
+	tAssert.NoError(sbErr)
+	sequencerBalanceAfter, _ := new(big.Int).SetString("10000000000000000000", 10)
+	tAssert.Equal(sequencerBalance, sequencerBalanceAfter)
+
+	t.Logf("Sequencer contract balance after slashing: %v", sequencerBalance)
+
+	maliciousSequencerBalance, msbErr = participantQuerier.GetBalance(maliciousSequencerAddr)
+	tAssert.NoError(msbErr)
+	maliciousSequencerBalanceAfter, _ := new(big.Int).SetString("9900000000000000000", 10)
+	tAssert.Equal(maliciousSequencerBalance, maliciousSequencerBalanceAfter)
+
+	t.Logf("Malicious sequencer contract balance after slashing: %v", maliciousSequencerBalance)
+
+	parentHeader = blockchain.Header()
+	transition, tErr = executor.BeginTxn(parentHeader.StateRoot, parentHeader, coinbaseAddr)
+	tAssert.NoError(tErr)
+
+	balanceAfter := transition.GetBalance(coinbaseAddr)
+	t.Logf("Watchtower (recipient of fee) wallet balance after slashing: %v", balanceAfter)
+	watchtowerWalletBalanceAfter, _ := new(big.Int).SetString("990100000000000000000", 10)
+	tAssert.Equal(balanceAfter, watchtowerWalletBalanceAfter)
+
 }

@@ -30,10 +30,10 @@ type disputeResolution struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
-	sender     AvailSender
+	sender     Sender
 }
 
-func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender AvailSender, logger hclog.Logger) DisputeResolution {
+func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender Sender, logger hclog.Logger) DisputeResolution {
 	return &disputeResolution{
 		blockchain: blockchain,
 		executor:   executor,

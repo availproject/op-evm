@@ -401,8 +401,8 @@ func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
 		}
 	*/
 
-	f := sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
-	if _, err := f.Result(); err != nil {
+	err := sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	if err != nil {
 		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err, malicious
 	}

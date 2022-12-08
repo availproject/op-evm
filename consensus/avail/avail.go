@@ -160,7 +160,7 @@ func (d *Avail) Start() error {
 	// Start P2P syncing.
 	go d.startSyncing()
 
-	stakingSender := staking.NewAvailSender(avail.NewSender(d.availClient, signature.TestKeyringPairAlice))
+	stakingSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
 
 	switch d.nodeType {

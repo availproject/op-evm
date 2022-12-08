@@ -45,6 +45,13 @@ func (s *sender) Send(blk *edgetypes.Block) error {
 
 // SendAndWaitForStatus submits data to Avail and does not wait for the future blocks
 func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.ExtrinsicStatus) error {
+	// Only these three are supported for now.
+	// NOTE: If adding new types here, handle them correspondingly in the end of
+	//       the function as well!
+	if !dstatus.IsFinalized && !dstatus.IsReady && !dstatus.IsInBlock {
+		return fmt.Errorf("unsupported extrinsic status expectation: %#v", dstatus)
+	}
+
 	api := s.client.instance()
 
 	meta, err := api.RPC.State.GetMetadataLatest()
@@ -126,6 +133,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 			if err != nil {
 				panic(err)
 			}
+			// NOTE: See first line of this function for supported extrinsic status expectations.
 			switch {
 			case dstatus.IsFinalized && status.IsFinalized:
 				return nil
@@ -134,7 +142,9 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 			case dstatus.IsReady && status.IsReady:
 				return nil
 			default:
-				// TODO: Handle other statuses properly.
+				if status.IsDropped || status.IsInvalid {
+					return fmt.Errorf("unexpected extrinsic status from Avail: %#v", status)
+				}
 			}
 		case err := <-sub.Err():
 			// TODO: Consider re-connecting subscription channel on error?

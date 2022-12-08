@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	golog "github.com/ipfs/go-log/v2"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
 // curl  http://127.0.0.1:30002 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"txpool_content","params":[],"id":1}'
@@ -24,10 +25,6 @@ const (
 	TestAccountHex          = "0x65F0bDe66C970F391bd648B7ea22e1c193221c65"
 )
 
-var (
-	ETH = big.NewInt(1000000000000000000)
-)
-
 func getHeaderByNumber(client *ethclient.Client, number *big.Int) (*types.Header, error) {
 	return client.HeaderByNumber(context.Background(), number)
 }
@@ -37,7 +34,7 @@ func headerNumbersMatch(sequencer *types.Header, validator *types.Header) bool {
 }
 
 func toETH(wei *big.Int) *big.Int {
-	return big.NewInt(0).Div(wei, ETH)
+	return big.NewInt(0).Div(wei, common.ETH)
 }
 
 // Test case description:
@@ -141,7 +138,7 @@ func main() {
 		ks,
 		genesisAccount,
 		testAccount,
-		ETH.Int64(), // Send 1 ETH
+		common.ETH.Int64(), // Send 1 ETH
 	)
 
 	if err != nil {
@@ -165,8 +162,8 @@ func main() {
 	var genesisSequencerTransferBalance *big.Int
 	var testSequencerTransferBalance *big.Int
 
-	genesisSequencerNextBalance := toETH(new(big.Int).Sub(genesisSequencerCurrentBalance, ETH))
-	testSequencerNextBalance := toETH(new(big.Int).Add(testSequencerCurrentBalance, ETH))
+	genesisSequencerNextBalance := toETH(new(big.Int).Sub(genesisSequencerCurrentBalance, common.ETH))
+	testSequencerNextBalance := toETH(new(big.Int).Add(testSequencerCurrentBalance, common.ETH))
 
 	log.Printf(
 		"Sequencer -> Awaiting for balance confirmation. Target -> Genesis: %d | Test: %d",

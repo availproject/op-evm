@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -165,7 +166,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	bb.SetCoinbaseAddress(d.minerAddr)
 	bb.SignWith(d.signKey)
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
 	if err != nil {
 		return err
@@ -208,7 +209,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
 	time.Sleep(5 * time.Second)
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
 	if err != nil {
 		return err

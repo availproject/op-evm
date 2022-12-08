@@ -16,6 +16,7 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
 func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain) {
@@ -85,7 +86,7 @@ func getStakingContractBytecode(t *testing.T, basepath string) []byte {
 }
 
 func NewChain(t *testing.T, basepath string) *chain.Chain {
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	scBytecode := getStakingContractBytecode(t, basepath)
 
 	return &chain.Chain{

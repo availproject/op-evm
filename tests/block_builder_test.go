@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
@@ -152,7 +153,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 	address2, _ := test.NewAccount(t)
 
 	// Deposit 100 ETH to first account.
-	test.DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), test.ETH), bchain, executor)
+	test.DepositBalance(t, address, big.NewInt(0).Mul(big.NewInt(100), common.ETH), bchain, executor)
 
 	// Construct block.Builder w/ the blockchain instance that contains
 	// balance for our test account.
@@ -162,7 +163,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	amount := big.NewInt(0).Mul(big.NewInt(10), test.ETH)
+	amount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 
 	// Transfer 10 ETH from first account to second one.
 	tx := &types.Transaction{

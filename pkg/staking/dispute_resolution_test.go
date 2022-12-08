@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -17,7 +18,7 @@ func TestBeginDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	coinbaseAddr, _ := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
@@ -48,7 +49,7 @@ func TestEndDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	coinbaseAddr, _ := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
@@ -95,7 +96,7 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 

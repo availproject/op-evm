@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
+	commontoken "github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
@@ -51,12 +52,12 @@ func TestGetSetStakingThreshold(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), commontoken.ETH)
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)
 
-	defaultStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(1), ETH)
-	targetStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
+	defaultStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(1), commontoken.ETH)
+	targetStakingThresholdAmount := big.NewInt(0).Mul(big.NewInt(10), commontoken.ETH)
 
 	stakingThresholdQuerier := NewStakingThresholdQuerier(blockchain, executor, hclog.Default())
 
@@ -85,8 +86,8 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), commontoken.ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), commontoken.ETH)
 
 	// GET THE REQUIRED ADDRESSES
 
@@ -145,8 +146,8 @@ func TestSlashStaker(t *testing.T) {
 
 	// GET THE REQUIRED ADDRESSES
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), ETH)
-	balance := big.NewInt(0).Mul(big.NewInt(1000), ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), commontoken.ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(1000), commontoken.ETH)
 
 	coinbaseAddr, coinbaseSignKey := test.NewAccount(t)
 	test.DepositBalance(t, coinbaseAddr, balance, blockchain, executor)

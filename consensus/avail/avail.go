@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -33,10 +32,6 @@ const (
 
 	// For now hand coded address of the watch tower
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-)
-
-var (
-	ETH = big.NewInt(1000000000000000000)
 )
 
 type Config struct {

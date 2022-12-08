@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	commontoken "github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -19,7 +20,6 @@ import (
 var (
 	// staking contract address
 	AddrStakingContract = types.StringToAddress("0x0110000000000000000000000000000000000001")
-	ETH                 = big.NewInt(1000000000000000000)
 
 	MinSequencerCount = uint64(1)
 	MaxSequencerCount = common.MaxSafeJSInt
@@ -139,7 +139,7 @@ func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
+		Value:    big.NewInt(0).Mul(big.NewInt(10), commontoken.ETH), // 10 ETH
 		Input:    append(selector, encodedInput...),
 		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
@@ -179,7 +179,7 @@ func SlashStakerTx(from types.Address, slashAddr types.Address, gasLimit uint64)
 	encodedInput, encodeErr := method.Inputs.Encode(
 		map[string]interface{}{
 			"slashAddr":   slashAddr.Bytes(),
-			"slashAmount": big.NewInt(0).Mul(big.NewInt(1), ETH),
+			"slashAmount": big.NewInt(0).Mul(big.NewInt(1), commontoken.ETH),
 		},
 	)
 	if encodeErr != nil {

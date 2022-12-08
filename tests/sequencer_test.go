@@ -1,14 +1,15 @@
-package test
+package tests
 
 import (
 	"context"
 	"flag"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
 )

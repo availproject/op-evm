@@ -29,7 +29,7 @@ type node struct {
 	executor   *state.Executor
 	logger     hclog.Logger
 	nodeType   NodeType
-	sender     AvailSender
+	sender     Sender
 }
 
 func (n *node) ShouldStake(pkey *ecdsa.PrivateKey) bool {
@@ -67,7 +67,7 @@ func (n *node) UnStake(pkey *ecdsa.PrivateKey) error {
 	)
 }
 
-func NewNode(blockchain *blockchain.Blockchain, executor *state.Executor, sender AvailSender, logger hclog.Logger, nodeType NodeType) Node {
+func NewNode(blockchain *blockchain.Blockchain, executor *state.Executor, sender Sender, logger hclog.Logger, nodeType NodeType) Node {
 	return &node{
 		blockchain: blockchain,
 		executor:   executor,

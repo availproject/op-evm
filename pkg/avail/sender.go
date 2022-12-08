@@ -3,9 +3,9 @@ package avail
 import (
 	"fmt"
 
+	edgetypes "github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/maticnetwork/avail-settlement/pkg/future"
 )
 
 const (
@@ -16,12 +16,10 @@ const (
 	CallSubmitData = "DataAvailability.submit_data"
 )
 
-// Sender provides interface for sending blocks to Avail. It returns a Future
-// to query result of block finalisation.
+// Sender provides interface for sending blocks to Avail.
 type Sender interface {
-	SubmitData(bs []byte) future.Future[Result]
-	SubmitDataWithoutWatch(bs []byte) (*types.Hash, error)
-	SubmitDataAndWaitForStatus(bs []byte, status types.ExtrinsicStatus) future.Future[Result]
+	Send(blk *edgetypes.Block) error
+	SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error
 }
 
 // Result contains the final result of block data submission.
@@ -40,21 +38,30 @@ func NewSender(client Client, signingKeyPair signature.KeyringPair) Sender {
 	}
 }
 
-// SubmitData submits data to Avail and returns a Future with Result or an
-// error.
-func (s *sender) SubmitData(bs []byte) future.Future[Result] {
+// Send submits data to Avail.
+func (s *sender) Send(blk *edgetypes.Block) error {
+	return s.SendAndWaitForStatus(blk, types.ExtrinsicStatus{IsFinalized: true})
+}
+
+// SendAndWaitForStatus submits data to Avail and does not wait for the future blocks
+func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.ExtrinsicStatus) error {
+	// Only these three are supported for now.
+	// NOTE: If adding new types here, handle them correspondingly in the end of
+	//       the function as well!
+	if !dstatus.IsFinalized && !dstatus.IsReady && !dstatus.IsInBlock {
+		return fmt.Errorf("unsupported extrinsic status expectation: %#v", dstatus)
+	}
+
 	api := s.client.instance()
-	f := future.New[Result]()
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
-		f.SetError(err)
-		return f
+		return err
 	}
 
 	blob := Blob{
 		Magic: BlobMagic,
-		Data:  bs,
+		Data:  blk.MarshalRLP(),
 	}
 
 	var call types.Call
@@ -66,14 +73,12 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 		// requires further investigation to fix.
 		encodedBytes, err := types.EncodeToBytes(blob)
 		if err != nil {
-			f.SetError(err)
-			return f
+			return err
 		}
 
 		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
 		if err != nil {
-			f.SetError(err)
-			return f
+			return err
 		}
 	}
 
@@ -81,21 +86,18 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 
 	rv, err := api.RPC.State.GetRuntimeVersionLatest()
 	if err != nil {
-		f.SetError(err)
-		return f
+		return err
 	}
 
 	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
 	if err != nil {
-		f.SetError(err)
-		return f
+		return err
 	}
 
 	var accountInfo types.AccountInfo
 	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
 	if err != nil || !ok {
-		f.SetError(fmt.Errorf("couldn't fetch latest account storage info"))
-		return f
+		return fmt.Errorf("couldn't fetch latest account storage info")
 	}
 
 	nonce := uint32(accountInfo.Nonce)
@@ -114,234 +116,39 @@ func (s *sender) SubmitData(bs []byte) future.Future[Result] {
 
 	err = ext.Sign(s.signingKeyPair, o)
 	if err != nil {
-		f.SetError(err)
-		return f
+		return err
 	}
 
 	sub, err := api.RPC.Author.SubmitAndWatchExtrinsic(ext)
 	if err != nil {
-		f.SetError(err)
-		return f
+		return err
 	}
 
-	go func() {
-		defer sub.Unsubscribe()
+	defer sub.Unsubscribe()
 
-		for {
-			select {
-			case status := <-sub.Chan():
-				if status.IsFinalized {
-					f.SetValue(Result{})
-					return
-				}
-			case err := <-sub.Err():
-				// TODO: Consider re-connecting subscription channel on error?
-				f.SetError(err)
-				return
+	for {
+		select {
+		case status := <-sub.Chan():
+			_, err := dstatus.MarshalJSON()
+			if err != nil {
+				panic(err)
 			}
-		}
-	}()
-
-	return f
-}
-
-// SubmitDataWithoutWatch submits data to Avail and does not wait for the future blocks
-func (s *sender) SubmitDataWithoutWatch(bs []byte) (*types.Hash, error) {
-	api := s.client.instance()
-
-	meta, err := api.RPC.State.GetMetadataLatest()
-	if err != nil {
-		return nil, err
-	}
-
-	blob := Blob{
-		Magic: BlobMagic,
-		Data:  bs,
-	}
-
-	var call types.Call
-	{
-		// XXX: This encoding process is an inefficient hack to workaround
-		// problem in the encoding pipeline from client code to Avail server.
-		// `Blob` implements `scale.Encodeable` interface, but it it's passed
-		// directly to `types.NewCall()`, the server will return an error. This
-		// requires further investigation to fix.
-		encodedBytes, err := types.EncodeToBytes(blob)
-		if err != nil {
-			fmt.Printf("encode to bytes err: %s", err)
-			return nil, err
-		}
-
-		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
-		if err != nil {
-			fmt.Printf("new call err: %s", err)
-			return nil, err
-		}
-	}
-
-	ext := types.NewExtrinsic(call)
-
-	rv, err := api.RPC.State.GetRuntimeVersionLatest()
-	if err != nil {
-		fmt.Printf("get runtime version latest err: %s", err)
-		return nil, err
-	}
-
-	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
-	if err != nil {
-		fmt.Printf("create storage key err: %s", err)
-		return nil, err
-	}
-
-	var accountInfo types.AccountInfo
-	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
-	if err != nil || !ok {
-		fmt.Printf("get storage latest err: %s", err)
-		return nil, err
-	}
-
-	nonce := uint32(accountInfo.Nonce)
-
-	o := types.SignatureOptions{
-		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
-		// Hence BlockHash: Genesis Hash.
-		BlockHash:   s.client.GenesisHash(),
-		Era:         types.ExtrinsicEra{IsMortalEra: false},
-		GenesisHash: s.client.GenesisHash(),
-		Nonce:       types.NewUCompactFromUInt(uint64(nonce + 1)),
-		//Nonce:              types.NewUCompactFromUInt(nonce),
-		SpecVersion:        rv.SpecVersion,
-		Tip:                types.NewUCompactFromUInt(100),
-		AppID:              types.NewU32(BridgeAppID),
-		TransactionVersion: rv.TransactionVersion,
-	}
-
-	err = ext.Sign(s.signingKeyPair, o)
-	if err != nil {
-		fmt.Printf("sign err: %s", err)
-		return nil, err
-	}
-
-	hash, err := api.RPC.Author.SubmitExtrinsic(ext)
-	if err != nil {
-		fmt.Printf("submit extrinsic err: %s", err)
-		return nil, err
-	}
-
-	return &hash, nil
-}
-
-// SubmitDataWithoutWatch submits data to Avail and does not wait for the future blocks
-func (s *sender) SubmitDataAndWaitForStatus(bs []byte, dstatus types.ExtrinsicStatus) future.Future[Result] {
-	api := s.client.instance()
-	f := future.New[Result]()
-
-	meta, err := api.RPC.State.GetMetadataLatest()
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
-
-	blob := Blob{
-		Magic: BlobMagic,
-		Data:  bs,
-	}
-
-	var call types.Call
-	{
-		// XXX: This encoding process is an inefficient hack to workaround
-		// problem in the encoding pipeline from client code to Avail server.
-		// `Blob` implements `scale.Encodeable` interface, but it it's passed
-		// directly to `types.NewCall()`, the server will return an error. This
-		// requires further investigation to fix.
-		encodedBytes, err := types.EncodeToBytes(blob)
-		if err != nil {
-			f.SetError(err)
-			return f
-		}
-
-		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
-		if err != nil {
-			f.SetError(err)
-			return f
-		}
-	}
-
-	ext := types.NewExtrinsic(call)
-
-	rv, err := api.RPC.State.GetRuntimeVersionLatest()
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
-
-	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
-
-	var accountInfo types.AccountInfo
-	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
-	if err != nil || !ok {
-		f.SetError(fmt.Errorf("couldn't fetch latest account storage info"))
-		return f
-	}
-
-	nonce := uint32(accountInfo.Nonce)
-	o := types.SignatureOptions{
-		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
-		// Hence BlockHash: Genesis Hash.
-		BlockHash:          s.client.GenesisHash(),
-		Era:                types.ExtrinsicEra{IsMortalEra: false},
-		GenesisHash:        s.client.GenesisHash(),
-		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
-		SpecVersion:        rv.SpecVersion,
-		Tip:                types.NewUCompactFromUInt(100),
-		AppID:              types.NewU32(BridgeAppID),
-		TransactionVersion: rv.TransactionVersion,
-	}
-
-	err = ext.Sign(s.signingKeyPair, o)
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
-
-	sub, err := api.RPC.Author.SubmitAndWatchExtrinsic(ext)
-	if err != nil {
-		f.SetError(err)
-		return f
-	}
-
-	go func() {
-		defer sub.Unsubscribe()
-
-		for {
-			select {
-			case status := <-sub.Chan():
-				_, err := dstatus.MarshalJSON()
-				if err != nil {
-					panic(err)
+			// NOTE: See first line of this function for supported extrinsic status expectations.
+			switch {
+			case dstatus.IsFinalized && status.IsFinalized:
+				return nil
+			case dstatus.IsInBlock && status.IsInBlock:
+				return nil
+			case dstatus.IsReady && status.IsReady:
+				return nil
+			default:
+				if status.IsDropped || status.IsInvalid {
+					return fmt.Errorf("unexpected extrinsic status from Avail: %#v", status)
 				}
-				if dstatus.IsInBlock {
-					if status.IsInBlock {
-						f.SetValue(Result{})
-						return
-					}
-				} else if dstatus.IsReady {
-					if status.IsReady {
-						f.SetValue(Result{})
-						return
-					}
-				}
-			case err := <-sub.Err():
-				// TODO: Consider re-connecting subscription channel on error?
-				f.SetError(err)
-				return
 			}
+		case err := <-sub.Err():
+			// TODO: Consider re-connecting subscription channel on error?
+			return err
 		}
-	}()
-
-	return f
+	}
 }

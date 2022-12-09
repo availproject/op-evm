@@ -67,13 +67,11 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 			}
 
 			logger.Debug("submitting fraudproof", "block_hash", fp.Header.Hash)
-			f := availSender.SubmitDataAndWaitForStatus(fp.MarshalRLP(), avail_types.ExtrinsicStatus{IsInBlock: true})
-			go func() {
-				if _, err := f.Result(); err != nil {
-					logger.Error("submitting fraud proof to avail failed", err)
-				}
-				logger.Debug("submitted fraudproof", "block_hash", fp.Header.Hash)
-			}()
+			err = availSender.SendAndWaitForStatus(fp, avail_types.ExtrinsicStatus{IsInBlock: true})
+			if err != nil {
+				logger.Error("submitting fraud proof to avail failed", "error", err)
+			}
+			logger.Debug("submitted fraudproof", "block_hash", fp.Header.Hash)
 
 			// TODO: Write fraudproof to local chain
 

@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -60,7 +62,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	bb.SetCoinbaseAddress(d.minerAddr)
 	bb.SignWith(d.signKey)
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
 	if err != nil {
 		return err
@@ -78,16 +80,11 @@ func (d *Avail) stakeBootstrapSequencer() error {
 		return err
 	}
 
-	for {
-		d.logger.Debug("sending block with staking tx to Avail")
-		err, malicious := d.sendBlockToAvail(blk)
-		if err != nil {
-			panic(err)
-		}
-
-		if !malicious {
-			break
-		}
+	d.logger.Debug("sending block with staking tx to Avail")
+	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	if err != nil {
+		d.logger.Error("Error while submitting data to avail", "error", err)
+		panic(err)
 	}
 
 	d.logger.Debug("writing block with staking tx to local blockchain")
@@ -103,7 +100,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
 	time.Sleep(5 * time.Second)
 
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), staking.ETH)
+	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
 	if err != nil {
 		return err
@@ -140,6 +137,7 @@ func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActivePartici
 			return err
 		}
 
+		fmt.Printf("Not yet ready: %v", staked)
 		// Wait a bit before checking again.
 		time.Sleep(3 * time.Second)
 	}

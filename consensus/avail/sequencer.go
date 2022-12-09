@@ -222,19 +222,13 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 
 	d.logger.Debug("sending block to avail")
 
-	err, malicious := d.sendBlockToAvail(blk)
+	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
+		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err
 	}
 
 	d.logger.Debug("sent block to avail")
-
-	if malicious {
-		// Don't write malicious block into blockchain. It messes up the parent
-		// state of blocks when validator nor watch tower has it.
-		return nil
-	}
-
 	d.logger.Debug("writing block to blockchain")
 
 	// Write the block to the blockchain
@@ -252,18 +246,8 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
 	malicious := false
 	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-
-	/*
-		// XXX: Test watch tower and validator. This breaks a block every now and then.
-		if rand.Intn(3) == 2 {
-			d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
-			blk.Header.StateRoot[0] = 42
-			malicious = true
-		}
-	*/
-
-	f := sender.SubmitDataAndWaitForStatus(blk.MarshalRLP(), stypes.ExtrinsicStatus{IsInBlock: true})
-	if _, err := f.Result(); err != nil {
+	err := sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	if err != nil {
 		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err, malicious
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	commontoken "github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -19,13 +20,12 @@ import (
 var (
 	// staking contract address
 	AddrStakingContract = types.StringToAddress("0x0110000000000000000000000000000000000001")
-	ETH                 = big.NewInt(1000000000000000000)
 
 	MinSequencerCount = uint64(1)
 	MaxSequencerCount = common.MaxSafeJSInt
 )
 
-func Stake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
+func Stake(bh *blockchain.Blockchain, exec *state.Executor, sender Sender, logger hclog.Logger, nodeType string, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, amount *big.Int, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
@@ -59,7 +59,7 @@ func Stake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender, 
 
 }
 
-func UnStake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
+func UnStake(bh *blockchain.Blockchain, exec *state.Executor, sender Sender, logger hclog.Logger, stakerAddr types.Address, stakerKey *ecdsa.PrivateKey, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
@@ -93,17 +93,17 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, sender AvailSender
 
 }
 
-func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, sequencerAddr types.Address, sequencerKey *ecdsa.PrivateKey, maliciousStakerAddr types.Address, gasLimit uint64, src string) error {
+func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, activeSequencerAddr types.Address, activeSequencerSignKey *ecdsa.PrivateKey, maliciousStakerAddr types.Address, gasLimit uint64, src string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
 		return err
 	}
 
-	blk.SetCoinbaseAddress(sequencerAddr)
-	blk.SignWith(sequencerKey)
+	blk.SetCoinbaseAddress(activeSequencerAddr)
+	blk.SignWith(activeSequencerSignKey)
 
-	tx, err := SlashStakerTx(sequencerAddr, maliciousStakerAddr, gasLimit)
+	tx, err := SlashStakerTx(activeSequencerAddr, maliciousStakerAddr, gasLimit)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func StakeTx(from types.Address, amount *big.Int, nodeType string, gasLimit uint
 	tx := &types.Transaction{
 		From:     from,
 		To:       &AddrStakingContract,
-		Value:    big.NewInt(0).Mul(big.NewInt(10), ETH), // 10 ETH
+		Value:    big.NewInt(0).Mul(big.NewInt(10), commontoken.ETH), // 10 ETH
 		Input:    append(selector, encodedInput...),
 		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
@@ -168,7 +168,7 @@ func UnStakeTx(from types.Address, gasLimit uint64) (*types.Transaction, error) 
 	return tx, nil
 }
 
-func SlashStakerTx(sequencerAddr types.Address, maliciousStakerAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
+func SlashStakerTx(activeSequencerAddr types.Address, maliciousStakerAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking.StakingABI).Methods["slash"]
 	if !ok {
 		return nil, errors.New("Slash method doesn't exist in Staking contract ABI")
@@ -186,7 +186,7 @@ func SlashStakerTx(sequencerAddr types.Address, maliciousStakerAddr types.Addres
 	}
 
 	tx := &types.Transaction{
-		From:     sequencerAddr,
+		From:     activeSequencerAddr,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
 		Input:    append(selector, encodedInput...),

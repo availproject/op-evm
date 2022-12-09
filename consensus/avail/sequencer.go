@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -241,16 +240,4 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	d.txpool.ResetWithHeaders(blk.Header)
 
 	return nil
-}
-
-func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
-	malicious := false
-	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-	err := sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
-	if err != nil {
-		d.logger.Error("Error while submitting data to avail", "error", err)
-		return err, malicious
-	}
-
-	return nil, malicious
 }

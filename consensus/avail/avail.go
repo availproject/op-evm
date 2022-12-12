@@ -66,6 +66,9 @@ type Avail struct {
 	network        *network.Server // Reference to the networking layer
 	secretsManager secrets.SecretsManager
 	blockTime      time.Duration // Minimum block generation time in seconds
+
+	sender      avail.Sender
+	stakingNode staking.Node
 }
 
 // Factory returns the consensus factory method
@@ -136,6 +139,9 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
+		d.sender = avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
+		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.sender, d.logger, staking.NodeType(d.nodeType))
+
 		return d, nil
 	}
 }
@@ -155,16 +161,13 @@ func (d *Avail) Start() error {
 	// Start P2P syncing.
 	go d.startSyncing()
 
-	stakingSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-	stakingNode := staking.NewNode(d.blockchain, d.executor, stakingSender, d.logger, staking.NodeType(d.nodeType))
-
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
-		go d.runSequencer(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runSequencer(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	case Validator:
 		go d.runValidator()
 	case WatchTower:
-		go d.runWatchTower(stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runWatchTower(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

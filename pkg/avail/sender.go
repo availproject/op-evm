@@ -25,6 +25,21 @@ type Sender interface {
 // Result contains the final result of block data submission.
 type Result struct{}
 
+type testSender struct{}
+
+func (t *testSender) Send(blk *edgetypes.Block) error {
+	return nil
+}
+
+func (t *testSender) SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error {
+	return nil
+}
+
+// NewSender constructs an Avail block data sender.
+func NewTestSender() Sender {
+	return &testSender{}
+}
+
 type sender struct {
 	client         Client
 	signingKeyPair signature.KeyringPair

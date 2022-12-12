@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
@@ -15,11 +16,11 @@ import (
 func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType
 	switch d.nodeType {
-	case "bootstrap-sequencer", "sequencer":
+	case BootstrapSequencer, Sequencer:
 		nodeType = staking.Sequencer
-	case "watchtower":
+	case WatchTower:
 		nodeType = staking.WatchTower
-	case "validator":
+	case Validator:
 		nodeType = staking.Validator
 	default:
 		return fmt.Errorf("unknown node type: %q", d.nodeType)
@@ -83,7 +84,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	d.logger.Debug("sending block with staking tx to Avail")
 	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
-		d.logger.Error("Error while submitting data to avail", "error", err)
+		d.logger.Error("error while submitting data to avail", "error", err)
 		panic(err)
 	}
 
@@ -136,8 +137,6 @@ func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActivePartici
 		if err != nil {
 			return err
 		}
-
-		fmt.Printf("Not yet ready: %v", staked)
 		// Wait a bit before checking again.
 		time.Sleep(3 * time.Second)
 	}

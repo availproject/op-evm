@@ -72,7 +72,6 @@ data/avail-bootnode-1/trie/*
 data/avail-bootnode-1/trie
 data/avail-watchtower-1/trie
 tools/staking/staking
-consensus/avail/tmp/*
 
 node_modules
 contracts/stake/node_modules

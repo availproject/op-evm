@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 var (
@@ -89,11 +90,16 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 		return nil, err
 	}
 
+	fraudProofTxs, err := constructFraudproofTxs(wt.account, maliciousBlock)
+	if err != nil {
+		return nil, err
+	}
+
 	blk, err := builder.
 		SetCoinbaseAddress(wt.account).
 		SetGasLimit(maliciousBlock.Header.GasLimit).
 		SetExtraDataField(block.KeyFraudproof, maliciousBlock.Hash().Bytes()).
-		AddTransactions(constructFraudproofTxs(maliciousBlock)...).
+		AddTransactions(fraudProofTxs...).
 		SignWith(wt.signKey).
 		Build()
 
@@ -106,6 +112,20 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 
 // constructFraudproofTxs returns set of transactions that challenge the
 // malicious block and submit watchtower's stake.
-func constructFraudproofTxs(maliciousBlock *types.Block) []*types.Transaction {
-	return []*types.Transaction{}
+func constructFraudproofTxs(watchtowerAddress types.Address, maliciousBlock *types.Block) ([]*types.Transaction, error) {
+	bdrTx, err := constructBeginDisputeResolutionTx(watchtowerAddress, maliciousBlock)
+	if err != nil {
+		return []*types.Transaction{}, err
+	}
+
+	return []*types.Transaction{bdrTx}, nil
+}
+
+func constructBeginDisputeResolutionTx(watchtowerAddress types.Address, maliciousBlock *types.Block) (*types.Transaction, error) {
+	tx, err := staking.BeginDisputeResolutionTx(watchtowerAddress, types.BytesToAddress(maliciousBlock.Header.Miner), maliciousBlock.Header.GasLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }

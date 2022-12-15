@@ -3,18 +3,21 @@ package tests
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
 
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
+	"github.com/test-go/testify/assert"
 )
 
 func Test_Builder_Construction_FromParentHash(t *testing.T) {
@@ -256,4 +259,42 @@ func newBlockBuilder(t *testing.T) block.Builder {
 	}
 
 	return bb
+}
+
+func TestGetExtraDataFraudProofTarget(t *testing.T) {
+	tAssert := assert.New(t)
+
+	testCases := []struct {
+		name                string
+		input               types.Hash
+		expectedHash        types.Hash
+		expectedExistsState bool
+		expectedError       error
+	}{
+		{
+			name:                "zero address input",
+			input:               types.ZeroHash,
+			expectedHash:        types.ZeroHash,
+			expectedExistsState: false,
+		},
+		{
+			name:                "correct hash input",
+			input:               types.StringToHash("1234567890"),
+			expectedHash:        types.StringToHash("1234567890"),
+			expectedExistsState: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
+			key := keystore.NewKeyForDirectICAP(rand.Reader)
+			blk, err := newBlockBuilder(t).SetExtraDataField(block.KeyFraudProofOf, tc.input.Bytes()).SignWith(key.PrivateKey).Build()
+			tAssert.NoError(err)
+
+			hashValue, exists := block.GetExtraDataFraudProofTarget(blk.Header)
+
+			tAssert.Equal(tc.expectedExistsState, exists)
+			tAssert.Equal(tc.expectedHash.Bytes(), hashValue.Bytes())
+		})
+	}
 }

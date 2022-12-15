@@ -132,7 +132,7 @@ func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 	return extra, nil
 }
 
-func GetExtraDataFraudProofKey(h *types.Header) (types.Hash, bool) {
+func GetExtraDataFraudProofTarget(h *types.Header) (types.Hash, bool) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
 		return types.ZeroHash, false

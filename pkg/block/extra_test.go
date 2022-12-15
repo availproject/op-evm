@@ -1,17 +1,12 @@
 package block
 
 import (
-	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
-	"github.com/test-go/testify/assert"
 )
 
 func Test_ExtraData_Encoding(t *testing.T) {
@@ -92,58 +87,6 @@ func Test_ExtraData_Decoding(t *testing.T) {
 			if !reflect.DeepEqual(kv, tc.expected) {
 				t.Fatalf("expected %#v, got %#v", tc.expected, kv)
 			}
-		})
-	}
-}
-
-func TestExtraDataFraudProofKeyExists(t *testing.T) {
-	tAssert := assert.New(t)
-
-	testCases := []struct {
-		name                string
-		input               types.Hash
-		expectedHash        types.Hash
-		expectedExistsState bool
-		expectedError       error
-	}{
-		{
-			name:                "zero address input",
-			input:               types.ZeroHash,
-			expectedHash:        types.ZeroHash,
-			expectedExistsState: false,
-		},
-		{
-			name:                "correct hash input",
-			input:               types.StringToHash("1234567890"),
-			expectedHash:        types.StringToHash("1234567890"),
-			expectedExistsState: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
-			hdr := &types.Header{}
-
-			kv := make(map[string][]byte)
-			kv[KeyFraudProofOf] = tc.input.Bytes()
-
-			ve := &ValidatorExtra{}
-			kv[KeyExtraValidators] = ve.MarshalRLPTo(nil)
-
-			hdr.ExtraData = EncodeExtraDataFields(kv)
-
-			key := keystore.NewKeyForDirectICAP(crand.Reader)
-			miner := crypto.PubKeyToAddress(&key.PrivateKey.PublicKey)
-
-			hdr.Miner = miner.Bytes()
-
-			hdr, err := WriteSeal(key.PrivateKey, hdr)
-			tAssert.NoError(err)
-
-			hashValue, exists := GetExtraDataFraudProofKey(hdr)
-
-			tAssert.Equal(tc.expectedExistsState, exists)
-			tAssert.Equal(tc.expectedHash.Bytes(), hashValue.Bytes())
 		})
 	}
 }

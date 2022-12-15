@@ -132,24 +132,24 @@ func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 	return extra, nil
 }
 
-func GetExtraDataFraudProofKey(h *types.Header) (types.Hash, bool, error) {
+func GetExtraDataFraudProofKey(h *types.Header) (types.Hash, bool) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
-		return types.ZeroHash, false, err
+		return types.ZeroHash, false
 	}
 
 	data, exists := kv[KeyFraudProofOf]
 	if !exists {
-		return types.ZeroHash, false, nil
+		return types.ZeroHash, false
 	}
 
 	toReturn := types.BytesToHash(data)
 
 	if toReturn == types.ZeroHash {
-		return types.ZeroHash, false, nil
+		return types.ZeroHash, false
 	}
 
-	return toReturn, true, nil
+	return toReturn, true
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul

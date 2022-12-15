@@ -111,14 +111,12 @@ func TestExtraDataFraudProofKeyExists(t *testing.T) {
 			input:               types.ZeroHash,
 			expectedHash:        types.ZeroHash,
 			expectedExistsState: false,
-			expectedError:       nil,
 		},
 		{
 			name:                "correct hash input",
 			input:               types.StringToHash("1234567890"),
 			expectedHash:        types.StringToHash("1234567890"),
 			expectedExistsState: true,
-			expectedError:       nil,
 		},
 	}
 
@@ -142,13 +140,7 @@ func TestExtraDataFraudProofKeyExists(t *testing.T) {
 			hdr, err := WriteSeal(key.PrivateKey, hdr)
 			tAssert.NoError(err)
 
-			hashValue, exists, err := GetExtraDataFraudProofKey(hdr)
-
-			if tc.expectedError == nil {
-				tAssert.NoError(err)
-			} else {
-				tAssert.EqualError(tc.expectedError, err.Error())
-			}
+			hashValue, exists := GetExtraDataFraudProofKey(hdr)
 
 			tAssert.Equal(tc.expectedExistsState, exists)
 			tAssert.Equal(tc.expectedHash.Bytes(), hashValue.Bytes())

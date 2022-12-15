@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	// KEY_EXTRA_VALIDATORS is key that identifies the `ValidatorsExtra` object
+	// KeyExtraValidators is key that identifies the `ValidatorsExtra` object
 	// serialized in `ExtraData`.
-	KEY_EXTRA_VALIDATORS = "EXTRA_VALIDATORS"
+	KeyExtraValidators = "EXTRA_VALIDATORS"
 
-	// KEY_FRAUDPROOF_OF is key that identifies the fraudproof objected malicious
+	// KeyFraudProofOf is key that identifies the fraudproof objected malicious
 	// block hash in `ExtraData` of the fraudproof block header.
-	KEY_FRAUDPROOF_OF = "FRAUDPROOF_OF"
+	KeyFraudProofOf = "FRAUDPROOF_OF"
 )
 
 func EncodeExtraDataFields(data map[string][]byte) []byte {
@@ -88,7 +88,7 @@ func AssignExtraValidators(h *types.Header, validators []types.Address) error {
 	}
 
 	bs := ibftExtra.MarshalRLPTo(nil)
-	kv[KEY_EXTRA_VALIDATORS] = bs
+	kv[KeyExtraValidators] = bs
 
 	h.ExtraData = EncodeExtraDataFields(kv)
 
@@ -104,7 +104,7 @@ func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 
 	data := istanbulExtra.MarshalRLPTo(nil)
 
-	kv[KEY_EXTRA_VALIDATORS] = data
+	kv[KeyExtraValidators] = data
 
 	h.ExtraData = EncodeExtraDataFields(kv)
 
@@ -118,7 +118,7 @@ func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 		return nil, err
 	}
 
-	data, exists := kv[KEY_EXTRA_VALIDATORS]
+	data, exists := kv[KeyExtraValidators]
 	if !exists {
 		return nil, errors.New("no validators extra object found")
 	}
@@ -138,14 +138,14 @@ func GetExtraDataFraudProofKey(h *types.Header) (types.Hash, bool, error) {
 		return types.ZeroHash, false, err
 	}
 
-	data, exists := kv[KEY_FRAUDPROOF_OF]
+	data, exists := kv[KeyFraudProofOf]
 	if !exists {
 		return types.ZeroHash, false, nil
 	}
 
 	toReturn := types.BytesToHash(data)
 
-	if toReturn.String() == types.ZeroHash.String() {
+	if toReturn == types.ZeroHash {
 		return types.ZeroHash, false, nil
 	}
 

@@ -84,7 +84,7 @@ func (v *validator) ProcessFraudproof(blk *types.Block) error {
 		return err
 	}
 
-	hashBS, exists := extraDataKV[block.KEY_FRAUDPROOF_OF]
+	hashBS, exists := extraDataKV[block.KeyFraudProofOf]
 	if exists {
 		v.logger.Warn("**************** FRAUD PROOF FOUND ************************")
 

@@ -127,10 +127,10 @@ func TestExtraDataFraudProofKeyExists(t *testing.T) {
 			hdr := &types.Header{}
 
 			kv := make(map[string][]byte)
-			kv[KEY_FRAUDPROOF_OF] = tc.input.Bytes()
+			kv[KeyFraudProofOf] = tc.input.Bytes()
 
 			ve := &ValidatorExtra{}
-			kv[KEY_EXTRA_VALIDATORS] = ve.MarshalRLPTo(nil)
+			kv[KeyExtraValidators] = ve.MarshalRLPTo(nil)
 
 			hdr.ExtraData = EncodeExtraDataFields(kv)
 

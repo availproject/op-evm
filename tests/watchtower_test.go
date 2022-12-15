@@ -126,7 +126,7 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 
 				data, err := block.DecodeExtraDataFields(fpBlk.Header.ExtraData)
 				tAssert.NoError(err)
-				tAssert.Equal(blk.Hash(), types.BytesToHash(data[block.KeyFraudproof]))
+				tAssert.Equal(blk.Hash(), types.BytesToHash(data[block.KEY_FRAUDPROOF_OF]))
 			}
 
 		})

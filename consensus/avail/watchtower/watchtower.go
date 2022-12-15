@@ -98,7 +98,7 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 	blk, err := builder.
 		SetCoinbaseAddress(wt.account).
 		SetGasLimit(maliciousBlock.Header.GasLimit).
-		SetExtraDataField(block.KeyFraudproof, maliciousBlock.Hash().Bytes()).
+		SetExtraDataField(block.KEY_FRAUDPROOF_OF, maliciousBlock.Hash().Bytes()).
 		AddTransactions(fraudProofTxs...).
 		SignWith(wt.signKey).
 		Build()

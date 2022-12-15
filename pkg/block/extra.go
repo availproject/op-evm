@@ -9,14 +9,14 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-var (
-	// KeyExtraValidators is key that identifies the `ValidatorsExtra` object
+const (
+	// KEY_EXTRA_VALIDATORS is key that identifies the `ValidatorsExtra` object
 	// serialized in `ExtraData`.
-	KeyExtraValidators = "EXTRA_VALIDATORS"
+	KEY_EXTRA_VALIDATORS = "EXTRA_VALIDATORS"
 
-	// KeyFraudproof is key that identifies the fraudproof objected malicious
+	// KEY_FRAUDPROOF_OF is key that identifies the fraudproof objected malicious
 	// block hash in `ExtraData` of the fraudproof block header.
-	KeyFraudproof = "FRAUDPROOF_OF"
+	KEY_FRAUDPROOF_OF = "FRAUDPROOF_OF"
 )
 
 func EncodeExtraDataFields(data map[string][]byte) []byte {
@@ -88,7 +88,7 @@ func AssignExtraValidators(h *types.Header, validators []types.Address) error {
 	}
 
 	bs := ibftExtra.MarshalRLPTo(nil)
-	kv[KeyExtraValidators] = bs
+	kv[KEY_EXTRA_VALIDATORS] = bs
 
 	h.ExtraData = EncodeExtraDataFields(kv)
 
@@ -104,7 +104,7 @@ func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 
 	data := istanbulExtra.MarshalRLPTo(nil)
 
-	kv[KeyExtraValidators] = data
+	kv[KEY_EXTRA_VALIDATORS] = data
 
 	h.ExtraData = EncodeExtraDataFields(kv)
 
@@ -113,13 +113,12 @@ func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 
 // getValidatorExtra returns the istanbul extra data field from the passed in header
 func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
-
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
 		return nil, err
 	}
 
-	data, exists := kv[KeyExtraValidators]
+	data, exists := kv[KEY_EXTRA_VALIDATORS]
 	if !exists {
 		return nil, errors.New("no validators extra object found")
 	}
@@ -131,6 +130,26 @@ func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 	}
 
 	return extra, nil
+}
+
+func GetExtraDataFraudProofKey(h *types.Header) (types.Hash, bool, error) {
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return types.ZeroHash, false, err
+	}
+
+	data, exists := kv[KEY_FRAUDPROOF_OF]
+	if !exists {
+		return types.ZeroHash, false, nil
+	}
+
+	toReturn := types.BytesToHash(data)
+
+	if toReturn.String() == types.ZeroHash.String() {
+		return types.ZeroHash, false, nil
+	}
+
+	return toReturn, true, nil
 }
 
 // IstanbulExtra defines the structure of the extra field for Istanbul

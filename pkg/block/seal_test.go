@@ -13,10 +13,10 @@ func Test_WriteSeal(t *testing.T) {
 	hdr := &types.Header{}
 
 	kv := make(map[string][]byte)
-	kv[KeyFraudproof] = hdr.Hash.Bytes()
+	kv[KEY_FRAUDPROOF_OF] = hdr.Hash.Bytes()
 
 	ve := &ValidatorExtra{}
-	kv[KeyExtraValidators] = ve.MarshalRLPTo(nil)
+	kv[KEY_EXTRA_VALIDATORS] = ve.MarshalRLPTo(nil)
 
 	hdr.ExtraData = EncodeExtraDataFields(kv)
 

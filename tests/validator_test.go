@@ -51,7 +51,7 @@ func TestValidatorBlockCheck(t *testing.T) {
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor)
 			err = v.Check(tc.block(blockBuilder))
 			switch {
 			case err == nil && tc.errorMatcher == nil:
@@ -94,7 +94,7 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor)
 
 			err = v.Apply(tc.block(blockBuilder))
 			switch {
@@ -137,7 +137,7 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor)
 
 			err = v.ProcessFraudproof(tc.block(blockBuilder))
 			switch {

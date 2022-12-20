@@ -14,9 +14,6 @@ import (
 
 /****************************************************************************/
 
-// For now hand coded address of the sequencer
-const SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-
 var (
 	// ErrInvalidBlock is general error used when block structure is invalid
 	// or its field values are inconsistent.
@@ -42,17 +39,15 @@ type validator struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 
-	logger           hclog.Logger
-	sequencerAddress types.Address
+	logger hclog.Logger
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address) Validator {
+func New(blockchain *blockchain.Blockchain, executor *state.Executor) Validator {
 	return &validator{
 		blockchain: blockchain,
 		executor:   executor,
 
-		logger:           hclog.Default(),
-		sequencerAddress: sequencer,
+		logger: hclog.Default(),
 	}
 }
 
@@ -142,39 +137,39 @@ func (v *validator) verifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	if signer != v.sequencerAddress {
-		v.logger.Info("Passing, how is it possible? 222")
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
+	minerAddr := types.BytesToAddress(header.Miner)
+
+	if signer != minerAddr {
+		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, minerAddr)
 	}
 
-	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
+	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", minerAddr)
 
-	/*
-		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
-		if !ok {
-			return fmt.Errorf(
-				"unable to get parent header for block number %d",
-				header.Number,
-			)
-		}
+	/* 	parent, ok := v.blockchain.GetHeaderByNumber(header.Number - 1)
+	   	if !ok {
+	   		return fmt.Errorf(
+	   			"unable to get parent header for block number %d",
+	   			header.Number,
+	   		)
+	   	}
 
-		snap, err := i.getSnapshot(parent.Number)
-		if err != nil {
-			return err
-		}
+	   	snap, err := i.getSnapshot(parent.Number)
+	   	if err != nil {
+	   		return err
+	   	}
 
-		// verify all the header fields + seal
-		if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
-			return err
-		}
+	   	// verify all the header fields + seal
+	   	if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
+	   		return err
+	   	}
 
-		// verify the committed seals
-		if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
-			return err
-		}
+	   	// verify the committed seals
+	   	if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
+	   		return err
+	   	}
 
-		return nil
-	*/
+	   	return nil */
+
 	return nil
 }
 

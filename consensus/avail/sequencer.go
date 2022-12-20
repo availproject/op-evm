@@ -12,6 +12,7 @@ import (
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
@@ -26,6 +27,7 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
+	validator := validator.New(d.blockchain, d.executor)
 	defer availBlockStream.Close()
 
 	d.logger.Debug("ensuring sequencer staked")
@@ -35,10 +37,16 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 		return
 	}
 
+	callIdx, err := avail.FindCallIndex(d.availClient)
+	if err != nil {
+		d.logger.Error("error while finding call index from avail", "error", err)
+		return
+	}
+
 	d.logger.Debug("ensured sequencer staked")
 	d.logger.Debug("sequencer started")
 
-	for blk := range availBlockStream.Chan() {
+	for avail_blk := range availBlockStream.Chan() {
 		// Check if we need to stop.
 		select {
 		case <-d.closeCh:
@@ -66,7 +74,7 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 
 		// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
 		// time sensitive logic in sequencer, such as block generation timeouts.
-		t.Store(int64(blk.Block.Header.Number))
+		t.Store(int64(avail_blk.Block.Header.Number))
 
 		sequencers, err := activeSequencersQuerier.Get()
 		if err != nil {
@@ -79,17 +87,42 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 			panic("no staked sequencers")
 		}
 
+		blk, err := block.FromAvail(avail_blk, avail.BridgeAppID, callIdx)
+		if err != nil && err != block.ErrNoExtrinsicFound {
+			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
+			continue
+		}
+
+		if blk != nil {
+			err = validator.Check(blk)
+			if err != nil {
+				d.logger.Error("invalid block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+
+				fraudProofBlockHash, fraudKeyExists := block.GetExtraDataFraudProofTarget(blk.Header)
+				if !fraudKeyExists {
+					d.logger.Error("fraud key does not exist", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash)
+					continue
+				}
+
+				d.logger.Info("fraud proof block", "block hash", fraudProofBlockHash)
+				continue
+			}
+
+		}
+
+		//
+
 		// Is it my turn to generate next block?
 		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
 			header := d.blockchain.Header()
-			d.logger.Debug("it's my turn; producing a block", "t", blk.Block.Header.Number)
+			d.logger.Debug("it's my turn; producing a block", "t", avail_blk.Block.Header.Number)
 			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
 				d.logger.Error("failed to mine block", "err", err)
 			}
 
 			continue
 		} else {
-			d.logger.Debug("it's not my turn; skippin' a round", "t", blk.Block.Header.Number)
+			d.logger.Debug("it's not my turn; skippin' a round", "t", avail_blk.Block.Header.Number)
 		}
 	}
 }

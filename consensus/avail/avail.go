@@ -26,14 +26,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-const (
-	// For now hand coded address of the sequencer
-	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-
-	// For now hand coded address of the watch tower
-	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-)
-
 type Config struct {
 	AvailAddr string
 	Bootnode  bool
@@ -164,8 +156,6 @@ func (d *Avail) Start() error {
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
 		go d.runSequencer(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
-	case Validator:
-		go d.runValidator()
 	case WatchTower:
 		go d.runWatchTower(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	default:

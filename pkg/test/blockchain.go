@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
@@ -42,6 +43,46 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 	}
 
 	return executor, bchain
+}
+
+func NewBlockchainWithTxPool(t *testing.T, verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool) {
+	chain := NewChain(t, basepath)
+	executor := NewInMemExecutor(t, chain)
+
+	gr := executor.WriteGenesis(chain.Genesis.Alloc)
+	chain.Genesis.StateRoot = gr
+
+	// use the eip155 signer
+	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
+
+	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bchain.SetConsensus(verifier)
+	executor.GetHash = bchain.GetHashHelper
+
+	if err := bchain.ComputeGenesis(); err != nil {
+		t.Fatal(err)
+	}
+
+	txPool, err := txpool.NewTxPool(
+		hclog.Default(),
+		chain.Params.Forks.At(0),
+		NewTxpoolHub(executor.State(), bchain),
+		nil,
+		nil,
+		&txpool.Config{MaxSlots: 10, MaxAccountEnqueued: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txPool.SetSigner(signer)
+	txPool.Start()
+
+	return executor, bchain, txPool
 }
 
 func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {

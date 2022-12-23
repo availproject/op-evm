@@ -3,21 +3,17 @@ package avail
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -114,143 +110,6 @@ func (d *Avail) startSyncing() {
 	if err != nil {
 		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
 	}
-}
-
-func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
-	var nodeType staking.NodeType
-	switch d.nodeType {
-	case "bootstrap-sequencer", "sequencer":
-		nodeType = staking.Sequencer
-	case "watchtower":
-		nodeType = staking.WatchTower
-	case "validator":
-		nodeType = staking.Validator
-	default:
-		return fmt.Errorf("unknown node type: %q", d.nodeType)
-	}
-
-	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
-	if err != nil {
-		return err
-	}
-
-	if staked {
-		d.logger.Debug("already staked")
-		return nil
-	}
-
-	switch MechanismType(d.nodeType) {
-	case BootstrapSequencer:
-		return d.stakeBootstrapSequencer()
-	case Sequencer:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	case WatchTower:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	default:
-		panic("invalid node type: " + d.nodeType)
-	}
-}
-
-// stakeBootstrapSequencer takes care of sequencer staking for the very first
-// bootstrap sequencer. This needs special handling, because there won't be any
-// other sequencer forging a block with staking transaction, therefore it must
-// be build by the bootstrap node itself.
-func (d *Avail) stakeBootstrapSequencer() error {
-	// First, build the staking block.
-	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
-	bb, err := blockBuilderFactory.FromBlockchainHead()
-	if err != nil {
-		return err
-	}
-
-	bb.SetCoinbaseAddress(d.minerAddr)
-	bb.SignWith(d.signKey)
-
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
-	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
-	if err != nil {
-		return err
-	}
-
-	txSigner := &crypto.FrontierSigner{}
-	tx, err = txSigner.SignTx(tx, d.signKey)
-	if err != nil {
-		return err
-	}
-
-	bb.AddTransactions(tx)
-	blk, err := bb.Build()
-	if err != nil {
-		return err
-	}
-
-	for {
-		d.logger.Debug("sending block with staking tx to Avail")
-		err, malicious := d.sendBlockToAvail(blk)
-		if err != nil {
-			panic(err)
-		}
-
-		if !malicious {
-			break
-		}
-	}
-
-	d.logger.Debug("writing block with staking tx to local blockchain")
-
-	err = d.blockchain.WriteBlock(blk, "sequencer")
-	if err != nil {
-		panic("bootstrap sequencer couldn't stake: " + err.Error())
-	}
-
-	return nil
-}
-
-func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
-	time.Sleep(5 * time.Second)
-
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
-	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
-	if err != nil {
-		return err
-	}
-
-	txSigner := &crypto.FrontierSigner{}
-	tx, err = txSigner.SignTx(tx, d.signKey)
-	if err != nil {
-		return err
-	}
-
-	for retries := 0; retries < 10; retries++ {
-		// Submit staking transaction for execution by active sequencer.
-		err = d.txpool.AddTx(tx)
-		if err != nil {
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		break
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Syncer will be syncing the blockchain in the background, so once an active
-	// sequencer picks up the staking transaction from the txpool, it becomes
-	// effective and visible to us as well, via blockchain.
-	var staked bool
-	for !staked {
-		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
-		if err != nil {
-			return err
-		}
-
-		// Wait a bit before checking again.
-		time.Sleep(3 * time.Second)
-	}
-
-	return nil
 }
 
 func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
@@ -362,19 +221,13 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 
 	d.logger.Debug("sending block to avail")
 
-	err, malicious := d.sendBlockToAvail(blk)
+	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
+		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err
 	}
 
 	d.logger.Debug("sent block to avail")
-
-	if malicious {
-		// Don't write malicious block into blockchain. It messes up the parent
-		// state of blocks when validator nor watch tower has it.
-		return nil
-	}
-
 	d.logger.Debug("writing block to blockchain")
 
 	// Write the block to the blockchain
@@ -387,26 +240,4 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	d.txpool.ResetWithHeaders(blk.Header)
 
 	return nil
-}
-
-func (d *Avail) sendBlockToAvail(blk *types.Block) (error, bool) {
-	malicious := false
-	sender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-
-	/*
-		// XXX: Test watch tower and validator. This breaks a block every now and then.
-		if rand.Intn(3) == 2 {
-			d.logger.Warn("XXX - I'm gonna break a block submitted to Avail")
-			blk.Header.StateRoot[0] = 42
-			malicious = true
-		}
-	*/
-
-	err := sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
-	if err != nil {
-		d.logger.Error("Error while submitting data to avail", "error", err)
-		return err, malicious
-	}
-
-	return nil, malicious
 }

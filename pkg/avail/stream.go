@@ -21,7 +21,7 @@ type BlockStream struct {
 	offset uint64
 }
 
-func NewBlockStream(client Client, logger hclog.Logger, appID uint32, offset uint64) *BlockStream {
+func NewBlockStream(client Client, logger hclog.Logger, offset uint64) *BlockStream {
 	bs := &BlockStream{
 		closed:  new(atomic.Bool),
 		closeCh: make(chan struct{}),

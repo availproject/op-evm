@@ -14,7 +14,7 @@ import (
 
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
 	availSender := avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)

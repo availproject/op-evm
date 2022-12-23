@@ -1,17 +1,13 @@
 package avail
 
 import (
+	"fmt"
 	"sync/atomic"
-	"time"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
 )
-
-// pollInterval is the time to wait after latest head block has been
-// processed and before checking for new block head from Avail.
-var pollInterval = 15 * time.Second
 
 type BlockStream struct {
 	closed  *atomic.Bool
@@ -51,8 +47,59 @@ func (bs *BlockStream) Chan() <-chan *types.SignedBlock {
 }
 
 func (bs *BlockStream) watch() {
+	// Do we need to catch up with HEAD first?
+	if bs.offset > 0 {
+		err := bs.catchUp()
+		if err != nil {
+			return
+		}
+	} else {
+		bs.logger.Debug("bs.offset == 0; no need to catchUp")
+	}
+
+	for {
+		subscription, err := bs.api.RPC.Chain.SubscribeNewHeads()
+		if err != nil {
+			bs.logger.Error("failed to subscribe to new heads", "error", err)
+			return
+		}
+
+		for {
+			var hdr types.Header
+			select {
+			case <-bs.closeCh:
+				close(bs.dataCh)
+				return
+			case hdr = <-subscription.Chan():
+			case err = <-subscription.Err():
+				bs.logger.Error("error in Avail's new heads subscription; restarting", "error", err)
+				break
+			}
+
+			blockHash, err := bs.api.RPC.Chain.GetBlockHash(uint64(hdr.Number))
+			if err != nil {
+				bs.logger.Error("couldn't fetch block hash for block", "block_number", hdr.Number, "error", err)
+				continue
+			}
+
+			blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
+			if err != nil {
+				bs.logger.Error("couldn't fetch block", "block_number", hdr.Number, "block_hash", blockHash, "error", err)
+				continue
+			}
+
+			select {
+			case <-bs.closeCh:
+				close(bs.dataCh)
+				return
+			case bs.dataCh <- blk:
+			}
+		}
+	}
+}
+
+func (bs *BlockStream) catchUp() error {
 	var blockHash, previous types.Hash
-	var headReached bool
 
 	for {
 		latest, err := bs.api.RPC.Chain.GetBlockHashLatest()
@@ -61,22 +108,15 @@ func (bs *BlockStream) watch() {
 			continue
 		}
 
+		// Have we reached the HEAD?
 		if previous == latest {
-			headReached = true
-
-			// We have processed the latest head block. Time to sleep.
-			time.Sleep(pollInterval)
-			continue
+			return nil
 		}
 
-		if headReached || bs.offset == 0 {
-			blockHash = latest
-		} else {
-			blockHash, err = bs.api.RPC.Chain.GetBlockHash(bs.offset)
-			if err != nil {
-				bs.logger.Error("couldn't fetch block hash for block", "block_number", bs.offset, "error", err)
-				continue
-			}
+		blockHash, err = bs.api.RPC.Chain.GetBlockHash(bs.offset)
+		if err != nil {
+			bs.logger.Error("couldn't fetch block hash for block", "block_number", bs.offset, "error", err)
+			continue
 		}
 
 		blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
@@ -88,8 +128,7 @@ func (bs *BlockStream) watch() {
 		select {
 		case <-bs.closeCh:
 			close(bs.dataCh)
-			return
-
+			return fmt.Errorf("stream closed")
 		case bs.dataCh <- blk:
 		}
 

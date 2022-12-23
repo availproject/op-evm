@@ -42,7 +42,7 @@ func QueryAppID(client Client, applicationKey string) (types.U32, error) {
 		return 0, err
 	}
 
-	encodedBytes, err := types.EncodeToBytes("avail-settlement")
+	encodedBytes, err := types.EncodeToBytes(applicationKey)
 	if err != nil {
 		return 0, err
 	}

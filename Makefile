@@ -8,6 +8,9 @@ ifndef $(GOPATH)
     export GOPATH
 endif
 
+run-benchmarks:
+	go test ./tests -bench=. -run ^$$ -benchtime=10s
+
 bootstrap-config:
 	$(POLYGON_EDGE_BIN) server export --type yaml
 	mv default-config.yaml configs/edge-config.yaml
@@ -66,7 +69,6 @@ build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
-
 
 build-edge:
 	cd third_party/polygon-edge && make build

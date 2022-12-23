@@ -70,29 +70,30 @@ func (bs *BlockStream) watch() {
 			case <-bs.closeCh:
 				close(bs.dataCh)
 				return
+
 			case hdr = <-subscription.Chan():
+				blockHash, err := bs.api.RPC.Chain.GetBlockHash(uint64(hdr.Number))
+				if err != nil {
+					bs.logger.Error("couldn't fetch block hash for block", "block_number", hdr.Number, "error", err)
+					continue
+				}
+
+				blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
+				if err != nil {
+					bs.logger.Error("couldn't fetch block", "block_number", hdr.Number, "block_hash", blockHash, "error", err)
+					continue
+				}
+
+				select {
+				case <-bs.closeCh:
+					close(bs.dataCh)
+					return
+				case bs.dataCh <- blk:
+				}
+
 			case err = <-subscription.Err():
 				bs.logger.Error("error in Avail's new heads subscription; restarting", "error", err)
 				break
-			}
-
-			blockHash, err := bs.api.RPC.Chain.GetBlockHash(uint64(hdr.Number))
-			if err != nil {
-				bs.logger.Error("couldn't fetch block hash for block", "block_number", hdr.Number, "error", err)
-				continue
-			}
-
-			blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
-			if err != nil {
-				bs.logger.Error("couldn't fetch block", "block_number", hdr.Number, "block_hash", blockHash, "error", err)
-				continue
-			}
-
-			select {
-			case <-bs.closeCh:
-				close(bs.dataCh)
-				return
-			case bs.dataCh <- blk:
 			}
 		}
 	}

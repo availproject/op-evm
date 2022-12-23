@@ -12,7 +12,7 @@ import (
 type ValidatorSet []types.Address
 
 func (d *Avail) runValidator() {
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 1)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, uint32(d.availAppID), 1)
 	validator := validator.New(d.blockchain, d.executor, types.StringToAddress(SequencerAddress))
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
@@ -34,7 +34,7 @@ func (d *Avail) runValidator() {
 		case avail_blk = <-availBlockStream.Chan():
 		}
 
-		blk, err := block.FromAvail(avail_blk, avail.BridgeAppID, callIdx)
+		blk, err := block.FromAvail(avail_blk, d.availAppID, callIdx)
 		if err != nil {
 			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
 			continue

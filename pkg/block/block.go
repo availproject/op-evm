@@ -25,11 +25,11 @@ var (
 	ErrNoExtrinsicFound = errors.New("no compatible extrinsic found")
 )
 
-func FromAvail(avail_blk *avail_types.SignedBlock, appID uint32, callIdx avail_types.CallIndex) (*types.Block, error) {
+func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.U32, callIdx avail_types.CallIndex) (*types.Block, error) {
 	logger := hclog.Default().Named("block")
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
-		if extrinsic.Signature.AppID != avail_types.U32(appID) {
+		if extrinsic.Signature.AppID != appID {
 			logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
 			continue
 		}

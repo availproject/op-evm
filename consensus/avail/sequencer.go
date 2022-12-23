@@ -25,7 +25,7 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, avail.BridgeAppID, 0)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, uint32(d.availAppID), 0)
 	defer availBlockStream.Close()
 
 	d.logger.Debug("ensuring sequencer staked")

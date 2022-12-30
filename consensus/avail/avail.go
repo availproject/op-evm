@@ -11,13 +11,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/syncer"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,10 +40,9 @@ type Config struct {
 
 // Dev consensus protocol seals any new transaction immediately
 type Avail struct {
-	logger      hclog.Logger
-	availClient avail.Client
-	mechanisms  []MechanismType
-	nodeType    MechanismType
+	logger     hclog.Logger
+	mechanisms []MechanismType
+	nodeType   MechanismType
 
 	syncer syncer.Syncer // Reference to the sync protocol
 
@@ -67,8 +65,10 @@ type Avail struct {
 	secretsManager secrets.SecretsManager
 	blockTime      time.Duration // Minimum block generation time in seconds
 
-	sender      avail.Sender
-	stakingNode staking.Node
+	availAccount signature.KeyringPair
+	availClient  avail.Client
+	availSender  avail.Sender
+	stakingNode  staking.Node
 }
 
 // Factory returns the consensus factory method
@@ -139,8 +139,19 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		d.sender = avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
-		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.sender, d.logger, staking.NodeType(d.nodeType))
+		d.availAccount, err = avail.NewAccount()
+		if err != nil {
+			return nil, err
+		}
+
+		// 5 AVLs
+		err = avail.DepositBalance(d.availClient, d.availAccount, 5_000_000_000_000_000_000)
+		if err != nil {
+			return nil, err
+		}
+
+		d.availSender = avail.NewSender(d.availClient, d.availAccount)
+		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
 
 		return d, nil
 	}

@@ -82,7 +82,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	}
 
 	d.logger.Debug("sending block with staking tx to Avail")
-	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		d.logger.Error("error while submitting data to avail", "error", err)
 		panic(err)

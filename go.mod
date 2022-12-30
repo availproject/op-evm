@@ -19,8 +19,10 @@ require (
 	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/test-go/testify v1.1.4
+	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/umbracle/ethgo v0.1.4-0.20221117101647-b81ef2f07953
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
+	github.com/vedhavyas/go-subkey v1.0.3
 )
 
 require (
@@ -193,7 +195,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.37.0 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
-	github.com/vedhavyas/go-subkey v1.0.3 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect

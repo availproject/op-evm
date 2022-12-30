@@ -221,7 +221,7 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 
 	d.logger.Debug("sending block to avail")
 
-	err = d.sender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		d.logger.Error("Error while submitting data to avail", "error", err)
 		return err

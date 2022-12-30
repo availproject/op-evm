@@ -47,7 +47,7 @@ func NewTestAvail(t *testing.T, nodeType MechanismType) (*Avail, staking.ActiveP
 		nodeType:    nodeType,
 		signKey:     sequencerSignKey,
 		minerAddr:   sequencerAddr,
-		sender:      sender,
+		availSender: sender,
 		stakingNode: stakingNode,
 	}, asq
 }

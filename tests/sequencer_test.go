@@ -79,7 +79,7 @@ func Test_MultipleSequencers(t *testing.T) {
 }
 
 // nolint:unused
-func waitForPeers(t *testing.T, ethClient *ethclient.Client, minNodes int) {
+func waitForPeers(t testing.TB, ethClient *ethclient.Client, minNodes int) {
 	t.Helper()
 
 	for {

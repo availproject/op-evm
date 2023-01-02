@@ -18,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +28,10 @@ import (
 )
 
 const (
+	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
+	// data in Avail.
+	AvailApplicationKey = "avail-settlement"
+
 	// For now hand coded address of the sequencer
 	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 
@@ -51,8 +56,9 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	signKey   *ecdsa.PrivateKey
-	minerAddr types.Address
+	availAppID avail_types.U32
+	signKey    *ecdsa.PrivateKey
+	minerAddr  types.Address
 
 	interval uint64
 	txpool   *txpool.TxPool
@@ -139,7 +145,12 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		d.sender = avail.NewSender(d.availClient, signature.TestKeyringPairAlice)
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, signature.TestKeyringPairAlice)
+		if err != nil {
+			return nil, err
+		}
+
+		d.sender = avail.NewSender(d.availClient, d.availAppID, signature.TestKeyringPairAlice)
 		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.sender, d.logger, staking.NodeType(d.nodeType))
 
 		return d, nil

@@ -736,6 +736,7 @@ github.com/tklauser/numcpus v0.2.2 h1:oyhllyrScuYI6g+h/zUvNXNp1wy7x8qQy3t/piefld
 github.com/tklauser/numcpus v0.2.2/go.mod h1:x3qojaO3uyYt0i56EW/VUYs7uBvdl2fkfZFu0T9wgjM=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2nyfOP8=
+github.com/tyler-smith/go-bip39 v1.1.0/go.mod h1:gUYDtqQw1JS3ZJ8UWVcGTGqqr6YIN3CWg+kkNaLt55U=
 github.com/umbracle/ethgo v0.1.4-0.20221117101647-b81ef2f07953 h1:ep+lwZyyeh1iw8UojTxslDsqPw0305Vu6lOiEebWS8k=
 github.com/umbracle/ethgo v0.1.4-0.20221117101647-b81ef2f07953/go.mod h1:8QIHEG/YfGnW4I5AND2Znl9W0LU3tXR9IGqgmSieiGo=
 github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 h1:10Nbw6cACsnQm7r34zlpJky+IzxVLRk6MKTS2d3Vp0E=

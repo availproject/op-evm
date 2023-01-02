@@ -2,7 +2,6 @@ package avail
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -15,7 +14,7 @@ import (
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
-	availSender := avail.NewSender(d.availClient, d.availAppID, signature.TestKeyringPairAlice)
+
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
@@ -67,7 +66,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 			}
 
 			logger.Debug("submitting fraudproof", "block_hash", fp.Header.Hash)
-			err = availSender.SendAndWaitForStatus(fp, avail_types.ExtrinsicStatus{IsInBlock: true})
+			err = d.availSender.SendAndWaitForStatus(fp, avail_types.ExtrinsicStatus{IsInBlock: true})
 			if err != nil {
 				logger.Error("submitting fraud proof to avail failed", "error", err)
 			}

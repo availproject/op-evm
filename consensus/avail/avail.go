@@ -11,13 +11,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/syncer"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -28,6 +27,9 @@ import (
 )
 
 const (
+	// 1 AVL == 10^18 Avail fractions.
+	AVL = 1_000_000_000_000_000_000
+
 	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
 	// data in Avail.
 	AvailApplicationKey = "avail-settlement"
@@ -46,10 +48,9 @@ type Config struct {
 
 // Dev consensus protocol seals any new transaction immediately
 type Avail struct {
-	logger      hclog.Logger
-	availClient avail.Client
-	mechanisms  []MechanismType
-	nodeType    MechanismType
+	logger     hclog.Logger
+	mechanisms []MechanismType
+	nodeType   MechanismType
 
 	syncer syncer.Syncer // Reference to the sync protocol
 
@@ -73,8 +74,10 @@ type Avail struct {
 	secretsManager secrets.SecretsManager
 	blockTime      time.Duration // Minimum block generation time in seconds
 
-	sender      avail.Sender
-	stakingNode staking.Node
+	availAccount signature.KeyringPair
+	availClient  avail.Client
+	availSender  avail.Sender
+	stakingNode  staking.Node
 }
 
 // Factory returns the consensus factory method
@@ -145,13 +148,24 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, signature.TestKeyringPairAlice)
+		d.availAccount, err = avail.NewAccount()
 		if err != nil {
 			return nil, err
 		}
 
-		d.sender = avail.NewSender(d.availClient, d.availAppID, signature.TestKeyringPairAlice)
-		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.sender, d.logger, staking.NodeType(d.nodeType))
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+		if err != nil {
+			return nil, err
+		}
+
+		// 5 AVLs
+		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
+		if err != nil {
+			return nil, err
+		}
+
+		d.availSender = avail.NewSender(d.availClient, d.availAppID, d.availAccount)
+		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
 
 		return d, nil
 	}

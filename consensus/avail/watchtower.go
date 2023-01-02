@@ -14,7 +14,7 @@ import (
 
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, uint32(d.availAppID), 1)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
 	availSender := avail.NewSender(d.availClient, d.availAppID, signature.TestKeyringPairAlice)
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
@@ -43,7 +43,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 		select {
 		case <-d.closeCh:
 			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
-				d.logger.Error("failed to unstake the node: %s", err)
+				d.logger.Error("failed to unstake the node", "error", err)
 			}
 			availBlockStream.Close()
 			return

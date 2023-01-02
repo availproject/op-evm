@@ -12,7 +12,7 @@ import (
 type ValidatorSet []types.Address
 
 func (d *Avail) runValidator() {
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, uint32(d.availAppID), 1)
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
 	validator := validator.New(d.blockchain, d.executor, types.StringToAddress(SequencerAddress))
 
 	callIdx, err := avail.FindCallIndex(d.availClient)

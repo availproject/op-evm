@@ -33,12 +33,12 @@ type instance struct {
 }
 
 // StartServers starts configured nodes
-func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
+func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
 	t.Helper()
 
 	ctx := &Context{}
 
-	// Setup a [TCP] port allocator.
+	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
 	for _, nt := range nodeTypes {
@@ -102,16 +102,16 @@ func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		}
 
 		if !exists {
-			t.Fatal("at least one sequencer must be configured")
+			return nil, fmt.Errorf("at least one sequencer must be configured")
 		}
 
 		// Reset the bootnode list.
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(t, si.config, availAddr, si.nodeType)
+		srv, err := startNode(si.config, availAddr, si.nodeType)
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 
 		ctx.servers[i].server = srv
@@ -124,7 +124,7 @@ func StartNodes(t *testing.T, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	return ctx, nil
 }
 
-func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
+func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
 	t.Helper()
 
 	rawConfig := config.DefaultConfig()
@@ -224,15 +224,14 @@ func configureNode(t *testing.T, pa *PortAllocator, nodeType avail.MechanismType
 		RestoreFile:        nil,
 		BlockTime:          rawConfig.BlockTime,
 		NodeType:           nodeType.String(),
-		LogLevel:           hclog.Debug,
+		LogLevel:           hclog.Error,
 		LogFilePath:        rawConfig.LogFilePath,
 	}
 
 	return cfg, nil
 }
 
-func startNode(t *testing.T, cfg *server.Config, availAddr string, nodeType avail.MechanismType) (*server.Server, error) {
-	t.Helper()
+func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismType) (*server.Server, error) {
 
 	bootnode := false
 	if nodeType == avail.BootstrapSequencer {
@@ -242,12 +241,12 @@ func startNode(t *testing.T, cfg *server.Config, availAddr string, nodeType avai
 	// Attach the concensus to the Edge
 	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
 	if err != nil {
-		t.Fatalf("failure to register consensus: %s", err)
+		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}
 
 	serverInstance, err := server.NewServer(cfg)
 	if err != nil {
-		t.Fatalf("failure to start node: %s", err)
+		return nil, fmt.Errorf("failure to start node: %w", err)
 	}
 
 	// Remove consensus from Edge to clean up our factory configuration.
@@ -312,4 +311,18 @@ func (sc *Context) StopAll() {
 	for _, srvInstance := range sc.servers {
 		srvInstance.server.Close()
 	}
+}
+
+// FirstRPCURLForNodeType looks up and returns the url of the node for the node type
+func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.URL, error) {
+	if len(sc.servers) != len(sc.jsonRPCURLs) {
+		return nil, fmt.Errorf("servers and jsonRPCURLs have different lengths")
+	}
+	for i, srv := range sc.servers {
+		if srv.nodeType == nodeType {
+			return sc.jsonRPCURLs[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
 }

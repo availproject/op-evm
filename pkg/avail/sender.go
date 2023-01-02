@@ -114,14 +114,14 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		return fmt.Errorf("couldn't fetch latest account storage info")
 	}
 
-	nonce := uint32(accountInfo.Nonce)
+	nonce := uint64(accountInfo.Nonce)
 	o := types.SignatureOptions{
 		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
 		// Hence BlockHash: Genesis Hash.
 		BlockHash:          s.client.GenesisHash(),
 		Era:                types.ExtrinsicEra{IsMortalEra: false},
 		GenesisHash:        s.client.GenesisHash(),
-		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
+		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(100),
 		AppID:              s.appID,

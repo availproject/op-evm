@@ -14,6 +14,7 @@ import (
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
+
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
@@ -41,14 +42,14 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 		select {
 		case <-d.closeCh:
 			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
-				d.logger.Error("failed to unstake the node: %s", err)
+				d.logger.Error("failed to unstake the node", "error", err)
 			}
 			availBlockStream.Close()
 			return
 		case availBlk = <-availBlockStream.Chan():
 		}
 
-		blk, err := block.FromAvail(availBlk, avail.BridgeAppID, callIdx)
+		blk, err := block.FromAvail(availBlk, d.availAppID, callIdx)
 		if err != nil {
 			logger.Error("cannot extract Edge block from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 			continue

@@ -43,7 +43,7 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 		select {
 		case <-d.closeCh:
 			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
-				d.logger.Error("failed to unstake the node: %s", err)
+				d.logger.Error("failed to unstake the node", "error", err)
 			}
 			return
 		default:

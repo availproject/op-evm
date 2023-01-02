@@ -27,9 +27,9 @@ type BlockDataWatcher struct {
 }
 
 // NewBlockDataWatcher constructs and starts the watcher following Avail blocks.
-func NewBlockDataWatcher(client Client, appID uint32, handler BlockDataHandler) (*BlockDataWatcher, error) {
+func NewBlockDataWatcher(client Client, appID types.U32, handler BlockDataHandler) (*BlockDataWatcher, error) {
 	watcher := BlockDataWatcher{
-		appID:   types.U32(appID),
+		appID:   appID,
 		client:  client,
 		handler: handler,
 		stop:    make(chan struct{}),
@@ -85,8 +85,8 @@ func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, callIdx types
 			}
 
 			for i, extrinsic := range availBatch.Block.Extrinsics {
-				if extrinsic.Signature.AppID != types.U32(BridgeAppID) {
-					log.Printf("block %d extrinsic %d: AppID doesn't match (%d vs. %d)", head.Number, i, extrinsic.Signature.AppID, BridgeAppID)
+				if extrinsic.Signature.AppID != bw.appID {
+					log.Printf("block %d extrinsic %d: AppID doesn't match (%d vs. %d)", head.Number, i, extrinsic.Signature.AppID, bw.appID)
 					continue
 				}
 

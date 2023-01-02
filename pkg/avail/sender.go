@@ -9,9 +9,6 @@ import (
 )
 
 const (
-	// BridgeAppID is the Avail application ID for the bridge.
-	BridgeAppID = uint32(0)
-
 	// CallSubmitData is the RPC API call for submitting extrinsic data to Avail.
 	CallSubmitData = "DataAvailability.submit_data"
 )
@@ -41,13 +38,15 @@ func NewTestSender() Sender {
 }
 
 type sender struct {
+	appID          types.U32
 	client         Client
 	signingKeyPair signature.KeyringPair
 }
 
 // NewSender constructs an Avail block data sender.
-func NewSender(client Client, signingKeyPair signature.KeyringPair) Sender {
+func NewSender(client Client, appID types.U32, signingKeyPair signature.KeyringPair) Sender {
 	return &sender{
+		appID:          appID,
 		client:         client,
 		signingKeyPair: signingKeyPair,
 	}
@@ -125,7 +124,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(100),
-		AppID:              types.NewU32(BridgeAppID),
+		AppID:              s.appID,
 		TransactionVersion: rv.TransactionVersion,
 	}
 

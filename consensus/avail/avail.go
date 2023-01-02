@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +27,13 @@ import (
 )
 
 const (
+	// 1 AVL == 10^18 Avail fractions.
+	AVL = 1_000_000_000_000_000_000
+
+	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
+	// data in Avail.
+	AvailApplicationKey = "avail-settlement"
+
 	// For now hand coded address of the sequencer
 	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 
@@ -49,8 +57,9 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	signKey   *ecdsa.PrivateKey
-	minerAddr types.Address
+	availAppID avail_types.U32
+	signKey    *ecdsa.PrivateKey
+	minerAddr  types.Address
 
 	interval uint64
 	txpool   *txpool.TxPool
@@ -144,13 +153,18 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, err
 		}
 
-		// 5 AVLs
-		err = avail.DepositBalance(d.availClient, d.availAccount, 5_000_000_000_000_000_000)
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
 		if err != nil {
 			return nil, err
 		}
 
-		d.availSender = avail.NewSender(d.availClient, d.availAccount)
+		// 5 AVLs
+		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
+		if err != nil {
+			return nil, err
+		}
+
+		d.availSender = avail.NewSender(d.availClient, d.availAppID, d.availAccount)
 		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
 
 		return d, nil

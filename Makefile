@@ -9,7 +9,7 @@ ifndef $(GOPATH)
 endif
 
 run-benchmarks:
-	go test ./tests -bench=. -run ^$$ -benchtime=10s
+	go test ./tests -bench=. -run ^$$
 
 bootstrap-config:
 	$(POLYGON_EDGE_BIN) server export --type yaml

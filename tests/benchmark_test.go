@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/ethclient"
-
 	"github.com/maticnetwork/avail-settlement-contracts/testing/pkg/testtoken"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
 )
@@ -73,10 +72,6 @@ func Benchmark_SendingTransactions(b *testing.B) {
 
 	b.Run("TestToken.mint", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			auth, err := authOpts(ethClient, chainID, ks, ownerAccount)
-			if err != nil {
-				b.Fatal(err)
-			}
 			_, err = testToken.Mint(auth, ownerAccount.Address, big.NewInt(1))
 			if err != nil {
 				b.Fatal(err)
@@ -85,12 +80,8 @@ func Benchmark_SendingTransactions(b *testing.B) {
 	})
 }
 
+// nolint:unused
 func authOpts(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account) (*bind.TransactOpts, error) {
-	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
-	if err != nil {
-		return nil, err
-	}
-
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, err
@@ -116,7 +107,6 @@ func authOpts(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore,
 	if err != nil {
 		return nil, err
 	}
-	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(700000) // in units
 	auth.GasPrice = gasPrice

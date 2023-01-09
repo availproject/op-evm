@@ -153,20 +153,16 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, err
 		}
 
-		// 5 AVLs
-		err = avail.DepositBalance(d.availClient, d.availAccount, 10*AVL)
-		if err != nil {
-			return nil, err
-		}
-
-		/* XXX: Following is somehow broken atm. - fixing... - tuommaki
 		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
 		if err != nil {
 			return nil, err
 		}
-		*/
 
-		d.availAppID = avail.DefaultAppID
+		// 5 AVLs
+		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
+		if err != nil {
+			return nil, err
+		}
 
 		d.availSender = avail.NewSender(d.availClient, d.availAppID, d.availAccount)
 		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))

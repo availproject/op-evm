@@ -47,16 +47,24 @@ func (bs *BlockStream) Chan() <-chan *types.SignedBlock {
 }
 
 func (bs *BlockStream) watch() {
+	hdr, err := bs.api.RPC.Chain.GetHeaderLatest()
+	if err != nil {
+		bs.logger.Error("couldn't fetch latest block hash", "error", err)
+		return
+	}
+
 	// Do we need to catch up with HEAD first?
 	if bs.offset > 0 {
-		err := bs.catchUp()
+		err = bs.catchUp(bs.offset, uint64(hdr.Number))
 		if err != nil {
+			bs.logger.Error("unable to catch up!", "error", err)
 			return
 		}
 	} else {
 		bs.logger.Debug("bs.offset == 0; no need to catchUp")
 	}
 
+	latestBlockNumber := hdr.Number + 1
 	for {
 		subscription, err := bs.api.RPC.Chain.SubscribeNewHeads()
 		if err != nil {
@@ -64,6 +72,7 @@ func (bs *BlockStream) watch() {
 			return
 		}
 
+	receiveBlocksLoop:
 		for {
 			var hdr types.Header
 			select {
@@ -72,6 +81,25 @@ func (bs *BlockStream) watch() {
 				return
 
 			case hdr = <-subscription.Chan():
+				switch {
+				case hdr.Number < latestBlockNumber:
+					// Omit blocks that were already streamed
+					bs.logger.Debug("block already registered, skipping", "block_number", hdr.Number, "latestBlockNumber", latestBlockNumber)
+					continue
+				case hdr.Number > latestBlockNumber:
+					// Do we need to catch up the last processed block
+					// This can happen in two cases:
+					// 1) The connection was interrupted for a while
+					// 2) There was a delay when catching up with the offset
+					err = bs.catchUp(uint64(latestBlockNumber), uint64(hdr.Number))
+					if err != nil {
+						bs.logger.Error("unable to catch up!", "error", err)
+						return
+					}
+					latestBlockNumber = hdr.Number + 1
+					continue
+				}
+
 				blockHash, err := bs.api.RPC.Chain.GetBlockHash(uint64(hdr.Number))
 				if err != nil {
 					bs.logger.Error("couldn't fetch block hash for block", "block_number", hdr.Number, "error", err)
@@ -89,40 +117,29 @@ func (bs *BlockStream) watch() {
 					close(bs.dataCh)
 					return
 				case bs.dataCh <- blk:
+					latestBlockNumber = hdr.Number + 1
 				}
 
 			case err = <-subscription.Err():
 				bs.logger.Error("error in Avail's new heads subscription; restarting", "error", err)
-				break
+				break receiveBlocksLoop
 			}
 		}
 	}
 }
 
-func (bs *BlockStream) catchUp() error {
-	var blockHash, previous types.Hash
-
-	for {
-		latest, err := bs.api.RPC.Chain.GetBlockHashLatest()
+func (bs *BlockStream) catchUp(fromOffset, toOffset uint64) (err error) {
+	// Have we reached the HEAD?
+	for i := fromOffset; i <= toOffset; i++ {
+		blockHash, err := bs.api.RPC.Chain.GetBlockHash(i)
 		if err != nil {
-			bs.logger.Error("couldn't fetch latest block hash", "error", err)
-			continue
-		}
-
-		// Have we reached the HEAD?
-		if previous == latest {
-			return nil
-		}
-
-		blockHash, err = bs.api.RPC.Chain.GetBlockHash(bs.offset)
-		if err != nil {
-			bs.logger.Error("couldn't fetch block hash for block", "block_number", bs.offset, "error", err)
+			bs.logger.Error("couldn't fetch block hash for block", "block_number", i, "error", err)
 			continue
 		}
 
 		blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
 		if err != nil {
-			bs.logger.Error("couldn't fetch block", "block_number", bs.offset, "block_hash", blockHash, "error", err)
+			bs.logger.Error("couldn't fetch block", "block_number", i, "block_hash", blockHash, "error", err)
 			continue
 		}
 
@@ -132,8 +149,6 @@ func (bs *BlockStream) catchUp() error {
 			return fmt.Errorf("stream closed")
 		case bs.dataCh <- blk:
 		}
-
-		bs.offset = uint64(blk.Block.Header.Number) + 1
-		previous = blockHash
 	}
+	return nil
 }

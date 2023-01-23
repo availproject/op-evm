@@ -25,20 +25,33 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
-	defer availBlockStream.Close()
+
+	accBalance, err := avail.GetBalance(d.availClient, d.availAccount)
+	if err != nil {
+		panic(fmt.Sprintf("Balance failure: %s", err))
+	}
+
+	d.logger.Info("Current avail account", "balance", accBalance.Int64())
 
 	d.logger.Debug("ensuring sequencer staked")
-	err := d.ensureStaked(activeParticipantsQuerier)
+	err = d.ensureStaked(activeParticipantsQuerier)
 	if err != nil {
 		d.logger.Error("error while ensuring sequencer staked", "error", err)
 		return
 	}
 
-	d.logger.Debug("ensured sequencer staked")
+	d.logger.Debug("sequencer staked")
+
+	// BlockStream watcher must be started after the staking is done. Otherwise
+	// the stream is out-of-sync.
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
+	defer availBlockStream.Close()
+
 	d.logger.Debug("sequencer started")
 
 	for blk := range availBlockStream.Chan() {
+		d.logger.Debug("-----------------------------------------------------------------------------------------------------------------------------------------------")
+
 		// Check if we need to stop.
 		select {
 		case <-d.closeCh:
@@ -48,6 +61,13 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 			return
 		default:
 		}
+
+		accBalance, err := avail.GetBalance(d.availClient, d.availAccount)
+		if err != nil {
+			panic(fmt.Sprintf("Balance failure: %s", err))
+		}
+
+		d.logger.Info("Current avail account", "balance", accBalance.Int64())
 
 		// Periodically verify that we are staked, before proceeding with sequencer
 		// logic. In the unexpected case of being slashed and dropping below the
@@ -123,6 +143,8 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 			break
 		}
 
+		d.logger.Debug("found transaction from txpool", "hash", tx.Hash.String())
+
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.Drop(tx)
 			continue
@@ -130,10 +152,13 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 
 		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+				d.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				d.logger.Warn("transaction caused application error", "hash", tx.Hash.String())
 				d.txpool.Demote(tx)
 			} else {
+				d.logger.Error("transaction caused unknown error", "error", err)
 				d.txpool.Drop(tx)
 			}
 
@@ -212,6 +237,9 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	if err != nil {
 		return err
 	}
+
+	// Corrupt miner -> fraud check.
+	//header.Miner = types.ZeroAddress.Bytes()
 
 	blk.Header = header
 

@@ -19,6 +19,7 @@ seal: true
 tx_pool:
     price_limit: 0
     max_slots: 4096
+    max_account_enqueued: 10000
 log_level: DEBUG
 restore_file: ""
 block_time_s: 4

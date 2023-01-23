@@ -76,6 +76,9 @@ build-edge:
 tools-wallet:
 	cd tools/wallet && go build
 
+tools-account:
+	cd tools/accounts && go build
+
 build: build-server build-client
 
 start-sequencer: build
@@ -88,7 +91,7 @@ start-validator: build
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
-	./server/server -config-file="./configs/watchtower-1.yaml"
+	./server/server -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
 
 start-e2e: build-e2e
 	./tools/e2e/e2e
@@ -98,6 +101,12 @@ start-fraud: build-fraud
 
 start-staking: build-staking 
 	./tools/staking/staking
+
+create-sequencer-account: tools-account
+	./tools/accounts/accounts -balance 1000
+
+create-watchtower-account: tools-account
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

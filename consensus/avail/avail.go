@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -42,8 +43,9 @@ const (
 )
 
 type Config struct {
-	AvailAddr string
-	Bootnode  bool
+	AvailAddr       string
+	Bootnode        bool
+	AccountFilePath string
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -148,18 +150,17 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		d.availAccount, err = avail.NewAccount()
+		accountBytes, err := os.ReadFile(config.AccountFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failure to read account file '%s'", err)
+		}
+
+		d.availAccount, err = avail.NewAccountFromMnemonic(string(accountBytes))
 		if err != nil {
 			return nil, err
 		}
 
 		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-		if err != nil {
-			return nil, err
-		}
-
-		// 5 AVLs
-		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
 		if err != nil {
 			return nil, err
 		}

@@ -20,7 +20,7 @@ import (
 const walletsDir = "../data/wallets"
 
 func Benchmark_SendingTransactions(b *testing.B) {
-	b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
+	//b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 
@@ -86,10 +86,10 @@ func Benchmark_SendingTransactions(b *testing.B) {
 }
 
 func authOpts(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account) (*bind.TransactOpts, error) {
-	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
-	if err != nil {
-		return nil, err
-	}
+	/* 	nonce, err := client.PendingNonceAt(context.Background(), fromAccount.Address)
+	   	if err != nil {
+	   		return nil, err
+	   	} */
 
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -116,7 +116,7 @@ func authOpts(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore,
 	if err != nil {
 		return nil, err
 	}
-	auth.Nonce = big.NewInt(int64(nonce))
+	//auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)     // in wei
 	auth.GasLimit = uint64(700000) // in units
 	auth.GasPrice = gasPrice

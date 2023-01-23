@@ -2,10 +2,16 @@ package avail
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/tyler-smith/go-bip39"
+)
+
+const (
+	// 1 AVL == 10^18 Avail fractions.
+	AVL = 1_000_000_000_000_000_000
 )
 
 func NewAccount() (signature.KeyringPair, error) {
@@ -19,6 +25,15 @@ func NewAccount() (signature.KeyringPair, error) {
 		return signature.KeyringPair{}, err
 	}
 
+	keyPair, err := signature.KeyringPairFromSecret(mnemonic, 42)
+	if err != nil {
+		return signature.KeyringPair{}, err
+	}
+
+	return keyPair, nil
+}
+
+func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	keyPair, err := signature.KeyringPairFromSecret(mnemonic, 42)
 	if err != nil {
 		return signature.KeyringPair{}, err
@@ -110,4 +125,28 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64)
 			return err
 		}
 	}
+}
+
+func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) {
+	api := client.instance()
+
+	meta, err := api.RPC.State.GetMetadataLatest()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Account", account.PublicKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var accountInfo types.AccountInfo
+	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
+	if err != nil || !ok {
+		return nil, err
+	}
+
+	fmt.Printf("BALANCES: %d - %d - %d - %d \n", accountInfo.Data.Free.Uint64(), AVL, accountInfo.Data.Free.Uint64()/AVL, new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)))
+
+	return new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)), nil
 }

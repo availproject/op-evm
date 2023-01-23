@@ -99,6 +99,8 @@ func (d *Avail) stakeBootstrapSequencer() error {
 }
 
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
+	// Sleep time is added because we need to stake the participant after the peer discovery is
+	// fully setup. If removed, transaction will never go through from watchtower to sequencer.
 	time.Sleep(5 * time.Second)
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)

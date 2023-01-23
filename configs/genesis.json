@@ -29,6 +29,9 @@
             },
             "0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864": {
                 "balance": "0x3635c9adc5dea00000"
+            },
+            "0x91eBD9DB262d2D814c9983b5D4d3D3801AF3F007": {
+                "balance": "0x3635c9adc5dea00000"
             }
     },
         "number": "0x0",
@@ -59,6 +62,7 @@
         "blockGasTarget": 0
     },
     "bootnodes": [
-        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa"
+        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa",
+        "/ip4/127.0.0.1/tcp/30001/p2p/16Uiu2HAmLgJKjdhLUjH9wtH6AL8wysr3rYMgYku8tTvhBZ5mctVq"
     ]
 }

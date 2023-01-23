@@ -153,13 +153,13 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, err
 		}
 
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+		// 5 AVLs
+		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
 		if err != nil {
 			return nil, err
 		}
 
-		// 5 AVLs
-		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
 		if err != nil {
 			return nil, err
 		}

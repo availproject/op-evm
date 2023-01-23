@@ -25,8 +25,6 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
-	defer availBlockStream.Close()
 
 	d.logger.Debug("ensuring sequencer staked")
 	err := d.ensureStaked(activeParticipantsQuerier)
@@ -36,6 +34,12 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 	}
 
 	d.logger.Debug("ensured sequencer staked")
+
+	// BlockStream watcher must be started after the staking is done. Otherwise
+	// the stream is out-of-sync.
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
+	defer availBlockStream.Close()
+
 	d.logger.Debug("sequencer started")
 
 	for blk := range availBlockStream.Chan() {
@@ -125,15 +129,19 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.Drop(tx)
+			d.logger.Warn("transaction exceeded gas limit - dropped it", "hash", tx.Hash.String())
 			continue
 		}
 
 		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+				d.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				d.logger.Warn("transaction caused application error", "hash", tx.Hash.String())
 				d.txpool.Demote(tx)
 			} else {
+				d.logger.Error("transaction caused unknown error", "error", err)
 				d.txpool.Drop(tx)
 			}
 

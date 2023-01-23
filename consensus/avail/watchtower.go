@@ -27,6 +27,10 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 
 	d.logger.Debug("ensured watchtower staked")
 
+	// Stop P2P blockchain syncing and follow the blockstream only via Avail.
+	d.syncer.Close()
+	d.syncer = nil
+
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
 		panic(err)

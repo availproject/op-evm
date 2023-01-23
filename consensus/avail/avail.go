@@ -241,5 +241,9 @@ func (d *Avail) Seal(block *types.Block, ctx context.Context) (*types.Block, err
 func (d *Avail) Close() error {
 	close(d.closeCh)
 
+	if d.syncer != nil {
+		d.syncer.Close()
+	}
+
 	return nil
 }

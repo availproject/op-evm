@@ -4,7 +4,7 @@ go 1.19
 
 replace (
 	github.com/0xPolygon/polygon-edge => ./third_party/polygon-edge
-	github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha
+	github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha3
 	github.com/maticnetwork/avail-settlement-contracts => ./third_party/avail-settlement-contracts
 )
 

@@ -13,7 +13,6 @@ import (
 
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
 
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
@@ -26,6 +25,9 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 	}
 
 	d.logger.Debug("ensured watchtower staked")
+
+	// Start watching HEAD from Avail.
+	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
 
 	// Stop P2P blockchain syncing and follow the blockstream only via Avail.
 	d.syncer.Close()

@@ -87,11 +87,13 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.Block, error) {
 	builder, err := wt.blockBuilderFactory.FromParentHash(maliciousBlock.ParentHash())
 	if err != nil {
+		wt.logger.Info("IS ERROR HERE 1")
 		return nil, err
 	}
 
 	fraudProofTxs, err := constructFraudproofTxs(wt.account, maliciousBlock)
 	if err != nil {
+		wt.logger.Info("IS ERROR HERE 2")
 		return nil, err
 	}
 
@@ -104,6 +106,7 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 		Build()
 
 	if err != nil {
+		wt.logger.Info("IS ERROR HERE 3")
 		return nil, err
 	}
 

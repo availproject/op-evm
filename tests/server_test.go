@@ -33,7 +33,7 @@ type instance struct {
 }
 
 // StartServers starts configured nodes
-func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
+func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...avail.MechanismType) (*Context, error) {
 	t.Helper()
 
 	ctx := &Context{}
@@ -109,7 +109,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(si.config, availAddr, si.nodeType)
+		srv, err := startNode(si.config, availAddr, accountPath, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -224,22 +224,29 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 		RestoreFile:        nil,
 		BlockTime:          rawConfig.BlockTime,
 		NodeType:           nodeType.String(),
-		LogLevel:           hclog.Error,
+		LogLevel:           hclog.Info,
 		LogFilePath:        rawConfig.LogFilePath,
 	}
 
 	return cfg, nil
 }
 
-func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismType) (*server.Server, error) {
+func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail.MechanismType) (*server.Server, error) {
 
 	bootnode := false
 	if nodeType == avail.BootstrapSequencer {
 		bootnode = true
 	}
 
+	// Make sure that if watchtower is started, to apply correct watchtower account
+	// TODO: This is not the best way forward as we are using main accounts.
+	// We should create new accounts instead every time we run the test and point it correctly.
+	if nodeType == avail.WatchTower {
+		accountPath = fmt.Sprintf("%s-watchtower", accountPath)
+	}
+
 	// Attach the concensus to the Edge
-	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
+	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
 	if err != nil {
 		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}

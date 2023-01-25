@@ -103,6 +103,20 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
 			header := d.blockchain.Header()
 			d.logger.Debug("it's my turn; producing a block", "t", blk.Block.Header.Number)
+
+			if fraudProofKey, exists := block.GetExtraDataFraudProofTarget(header); exists {
+				d.logger.Info("GOT FRAUD PROOF KEY FOR", "BLOCK HASH", fraudProofKey)
+
+				dr := staking.NewDisputeResolution(d.blockchain, d.executor, d.availSender, d.logger)
+				minerAddr := types.BytesToAddress(header.Miner)
+				probationSequencer, probationSequencerErr := dr.Contains(minerAddr)
+				if probationSequencerErr != nil {
+					d.logger.Error("failure to check if miner address is in probation", "address", minerAddr)
+				}
+
+				d.logger.Info("probation sequencer", "addr", probationSequencer)
+			}
+
 			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
 				d.logger.Error("failed to mine block", "err", err)
 			}
@@ -236,6 +250,10 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	header, err = block.WriteSeal(signKey.PrivateKey, blk.Header)
 	if err != nil {
 		return err
+	}
+
+	if header.Number > 2 {
+		header.ExtraData = []byte{1, 2, 3}
 	}
 
 	// Corrupt miner -> fraud check.

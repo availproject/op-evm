@@ -32,7 +32,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
 
 	// Stop P2P blockchain syncing and follow the blockstream only via Avail.
-	d.syncer.Close()
+	//d.syncer.Close()
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
@@ -68,7 +68,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 			logger.Error("cannot extract Edge block from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 			continue
 		}
-
+		logger.Debug("GOT", "MINER ADDR", blk.Header.Miner)
 		err = watchTower.Check(blk)
 		if err != nil {
 			logger.Debug("block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)

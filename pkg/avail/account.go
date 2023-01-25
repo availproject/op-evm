@@ -146,7 +146,7 @@ func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) 
 		return nil, err
 	}
 
-	fmt.Printf("BALANCES: %d - %d - %d - %d \n", accountInfo.Data.Free.Uint64(), AVL, accountInfo.Data.Free.Uint64()/AVL, new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)))
+	//fmt.Printf("BALANCES: %d - %d - %d - %d \n", accountInfo.Data.Free.Uint64(), AVL, accountInfo.Data.Free.Uint64()/AVL, new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)))
 
 	return new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)), nil
 }

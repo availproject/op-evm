@@ -31,7 +31,7 @@ func Benchmark_SendingTransactions(b *testing.B) {
 	}
 
 	b.Log("starting nodes")
-	ctx, err := StartNodes(b, addr, *genesisCfgPath, *availAddr, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+	ctx, err := StartNodes(b, addr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
 	if err != nil {
 		b.Fatal(err)
 	}

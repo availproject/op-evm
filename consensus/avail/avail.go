@@ -160,8 +160,15 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, err
 		}
 
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-		if err != nil {
+		if d.availAppID, err = avail.QueryAppID(d.availClient, AvailApplicationKey); err != nil {
+			if err == avail.ErrAppIDNotFound {
+				d.logger.Debug("Application key not found. Creating new one...", "app_key", AvailApplicationKey)
+				d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			return nil, err
 		}
 

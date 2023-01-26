@@ -22,6 +22,9 @@ type transitionInterface interface {
 }
 
 func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
+	enableBlockProductionCh := make(chan bool)
+	go d.runWriteBlocksLoop(enableBlockProductionCh, myAccount, signKey)
+
 	t := new(atomic.Int64)
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
@@ -85,15 +88,41 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 
 		// Is it my turn to generate next block?
 		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
-			header := d.blockchain.Header()
-			d.logger.Debug("it's my turn; producing a block", "t", blk.Block.Header.Number)
-			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
-				d.logger.Error("failed to mine block", "err", err)
-			}
+			d.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+			enableBlockProductionCh <- true
 
 			continue
 		} else {
-			d.logger.Debug("it's not my turn; skippin' a round", "t", blk.Block.Header.Number)
+			d.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+			enableBlockProductionCh <- false
+		}
+	}
+}
+
+// runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
+func (d *Avail) runWriteBlocksLoop(enableBlockProductionCh chan bool, myAccount accounts.Account, signKey *keystore.Key) {
+	t := time.NewTicker(time.Duration(d.blockProductionIntervalSec) * time.Second)
+	defer t.Stop()
+
+	enabled := false
+	for {
+		select {
+		case <-t.C:
+			if !enabled {
+				continue
+			}
+
+			d.logger.Debug("writing a new block", "myAccount.Address", myAccount.Address)
+			if err := d.writeNewBlock(myAccount, signKey); err != nil {
+				d.logger.Error("failed to mine block", "err", err)
+			}
+		case e := <-enableBlockProductionCh:
+			d.logger.Debug("sequencer block producing status", "enabled", e)
+			enabled = e
+
+		case <-d.closeCh:
+			d.logger.Debug("received stop signal")
+			return
 		}
 	}
 }
@@ -116,9 +145,7 @@ func (d *Avail) startSyncing() {
 	}
 }
 
-func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var successful []*types.Transaction
-
+func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) (successful []*types.Transaction) {
 	d.txpool.Prepare()
 
 	for {
@@ -134,17 +161,17 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 		}
 
 		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+			switch err.(type) {
+			case *state.GasLimitReachedTransitionApplicationError:
 				d.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
-				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				return
+			case *state.TransitionApplicationError:
 				d.logger.Warn("transaction caused application error", "hash", tx.Hash.String())
 				d.txpool.Demote(tx)
-			} else {
+			default:
 				d.logger.Error("transaction caused unknown error", "error", err)
 				d.txpool.Drop(tx)
 			}
-
 			continue
 		}
 
@@ -154,12 +181,14 @@ func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterfac
 		successful = append(successful, tx)
 	}
 
-	return successful
+	return
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key, parent *types.Header) error {
+func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key) error {
+	parent := d.blockchain.Header()
+
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,

@@ -614,8 +614,8 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
-github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha3 h1:0oEYxArrr4RXAK1ISztLDbEIKpSE5Eb/Agn9NRwh+nM=
-github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.0-avail-alpha3/go.mod h1:MDzvG8lkzMGRaO4qzvxdfJtlDtukRPqNVWG9HJybVt0=
+github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.12-avail-1.3 h1:1wmTLWxDE3iY1bmB55RgS/Xn5nM9N8AMtCrYMOiwiu0=
+github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.12-avail-1.3/go.mod h1:5g1oM4Zu3BOaLpsKQ+O8PAv2kNuq+kPcA1VzFbsSqxE=
 github.com/prometheus/client_golang v0.8.0/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=
 github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=
 github.com/prometheus/client_golang v1.0.0/go.mod h1:db9x61etRT2tGnBNRi70OPL5FsnadC4Ky3P0J6CfImo=

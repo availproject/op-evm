@@ -8,6 +8,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/rpc/chain"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 // BlockDataHandler is a function type for a callback invoked on new block.
@@ -20,14 +21,14 @@ type BlockDataHandler interface {
 // Avail and filters extrinsics with embedded `Blob` data, invoking handler with
 // the decoded `Blob`.
 type BlockDataWatcher struct {
-	appID   types.U32
+	appID   types.UCompact
 	client  Client
 	handler BlockDataHandler
 	stop    chan struct{}
 }
 
 // NewBlockDataWatcher constructs and starts the watcher following Avail blocks.
-func NewBlockDataWatcher(client Client, appID types.U32, handler BlockDataHandler) (*BlockDataWatcher, error) {
+func NewBlockDataWatcher(client Client, appID types.UCompact, handler BlockDataHandler) (*BlockDataWatcher, error) {
 	watcher := BlockDataWatcher{
 		appID:   appID,
 		client:  client,
@@ -85,8 +86,8 @@ func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, callIdx types
 			}
 
 			for i, extrinsic := range availBatch.Block.Extrinsics {
-				if extrinsic.Signature.AppID != bw.appID {
-					log.Printf("block %d extrinsic %d: AppID doesn't match (%d vs. %d)", head.Number, i, extrinsic.Signature.AppID, bw.appID)
+				if extrinsic.Signature.AppID.Int64() != bw.appID.Int64() {
+					log.Printf("block %d extrinsic %d: AppID doesn't match (%d vs. %d)", head.Number, i, extrinsic.Signature.AppID.Int64(), bw.appID.Int64())
 					continue
 				}
 
@@ -104,7 +105,7 @@ func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, callIdx types
 					// code to Avail server. See more information about this in
 					// sender.SubmitData().
 					var bs types.Bytes
-					err = types.DecodeFromBytes(extrinsic.Method.Args, &bs)
+					err = codec.Decode(extrinsic.Method.Args, &bs)
 					if err != nil {
 						// Don't invoke HandleError() on this because there is no
 						// way of filtering uninteresting extrinsics / method.Args

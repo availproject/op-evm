@@ -78,6 +78,8 @@ type Avail struct {
 	availClient  avail.Client
 	availSender  avail.Sender
 	stakingNode  staking.Node
+
+	blockProductionIntervalSec uint64
 }
 
 // Factory returns the consensus factory method
@@ -119,6 +121,8 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			),
 			signKey:   validatorKey,
 			minerAddr: validatorAddr,
+
+			blockProductionIntervalSec: 1,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -146,6 +150,16 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			}
 
 			d.interval = interval
+		}
+
+		blockProductionIntervalSecRaw, ok := params.Config.Config["interval"]
+		if ok {
+			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
+			if !ok {
+				return nil, fmt.Errorf("interval expected int")
+			}
+
+			d.blockProductionIntervalSec = blockProductionIntervalSec
 		}
 
 		d.availAccount, err = avail.NewAccount()

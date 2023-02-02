@@ -36,7 +36,7 @@ func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipant
 		return nil
 	}
 
-	switch MechanismType(d.nodeType) {
+	switch d.nodeType {
 	case BootstrapSequencer:
 		return d.stakeBootstrapSequencer()
 	case Sequencer:
@@ -99,7 +99,18 @@ func (d *Avail) stakeBootstrapSequencer() error {
 }
 
 func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
-	time.Sleep(5 * time.Second)
+	for {
+		addrs, err := activeParticipantsQuerier.Get(staking.NodeType(d.nodeType))
+		if err != nil {
+			return err
+		}
+		if len(addrs) > 1 {
+			break
+		}
+
+		d.logger.Info("Waiting for at least 1 peer to come up before starting")
+		time.Sleep(1 * time.Second)
+	}
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)

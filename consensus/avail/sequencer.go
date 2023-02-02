@@ -21,12 +21,12 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
+func (d *Avail) runSequencer(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
 	enableBlockProductionCh := make(chan bool)
 	go d.runWriteBlocksLoop(enableBlockProductionCh, myAccount, signKey)
 
 	t := new(atomic.Int64)
-	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
 
 	d.logger.Debug("ensuring sequencer staked")
@@ -49,7 +49,7 @@ func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Accoun
 		// Check if we need to stop.
 		select {
 		case <-d.closeCh:
-			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
+			if err := d.stakingNode.UnStake(signKey.PrivateKey); err != nil {
 				d.logger.Error("failed to unstake the node", "error", err)
 			}
 			return

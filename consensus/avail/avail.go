@@ -193,6 +193,11 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+	var (
+		activeParticipantsQuerier = staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+		account                   = accounts.Account{Address: common.Address(d.minerAddr)}
+		key                       = &keystore.Key{PrivateKey: d.signKey}
+	)
 
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
@@ -202,11 +207,11 @@ func (d *Avail) Start() error {
 
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
-		go d.runSequencer(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runSequencer(activeParticipantsQuerier, account, key)
 	case Validator:
 		go d.runValidator()
 	case WatchTower:
-		go d.runWatchTower(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runWatchTower(activeParticipantsQuerier, account, key)
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

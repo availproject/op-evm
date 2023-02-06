@@ -39,6 +39,9 @@ const (
 
 	// For now hand coded address of the watch tower
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
+
+	// StakingPollPeersIntervalMs interval to wait for when waiting for peer sto come up before staking
+	StakingPollPeersIntervalMs = 200
 )
 
 type Config struct {
@@ -152,11 +155,11 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		blockProductionIntervalSecRaw, ok := params.Config.Config["interval"]
+		blockProductionIntervalSecRaw, ok := params.Config.Config["blockProductionIntervalSec"]
 		if ok {
 			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
 			if !ok {
-				return nil, fmt.Errorf("interval expected int")
+				return nil, fmt.Errorf("blockProductionIntervalSec expected int")
 			}
 
 			d.blockProductionIntervalSec = blockProductionIntervalSec

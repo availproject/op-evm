@@ -109,7 +109,7 @@ func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActivePartici
 		}
 
 		d.logger.Info("Waiting for at least 1 peer to come up before starting")
-		time.Sleep(1 * time.Second)
+		time.Sleep(StakingPollPeersIntervalMs * time.Millisecond)
 	}
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)

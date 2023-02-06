@@ -25,18 +25,18 @@ func (d *Avail) runValidator() {
 	// TODO: Figure out where do we need state cycle and how to implement it.
 	// Current version only starts the cycles for the future, doing nothing with it.
 	for {
-		var avail_blk *avail_types.SignedBlock
+		var availBlk *avail_types.SignedBlock
 
 		select {
 		case <-d.closeCh:
 			availBlockStream.Close()
 			return
-		case avail_blk = <-availBlockStream.Chan():
+		case availBlk = <-availBlockStream.Chan():
 		}
 
-		blk, err := block.FromAvail(avail_blk, d.availAppID, callIdx)
+		blk, err := block.FromAvail(availBlk, d.availAppID, callIdx)
 		if err != nil {
-			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
+			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", availBlk.Block.Header.Number, "error", err)
 			continue
 		}
 

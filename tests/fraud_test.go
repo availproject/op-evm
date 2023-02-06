@@ -31,7 +31,7 @@ func Test_Fraud(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.WatchTower)
+	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.WatchTower)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +58,9 @@ func Test_Fraud(t *testing.T) {
 		// Cleanup timeout context.
 		cancel()
 
-		// Wait for 5 blocks
-		if bNum > 2 {
-			break
+		// Wait for 10 blocks
+		if bNum > 10 {
+			t.Fatal("Could not receive successful confirmation that fraud block was processed in 10 blocks.")
 		}
 
 		time.Sleep(time.Second)

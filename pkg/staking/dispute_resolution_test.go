@@ -37,12 +37,12 @@ func TestBeginDisputeResolution(t *testing.T) {
 	err := dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
 	tAssert.NoError(err)
 
-	probationSequencers, err := dr.Get()
+	probationSequencers, err := dr.Get(Sequencer)
 	tAssert.NoError(err)
 
 	t.Logf("Probation Sequencers: %v \n", probationSequencers)
 
-	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.True(isProbationSequencer)
 
@@ -89,12 +89,12 @@ func TestEndDisputeResolution(t *testing.T) {
 	err := dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
 	tAssert.NoError(err)
 
-	probationSequencers, err := dr.Get()
+	probationSequencers, err := dr.Get(Sequencer)
 	tAssert.NoError(err)
 
 	t.Logf("Probation Sequencers: %v \n", probationSequencers)
 
-	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.True(isProbationSequencer)
 
@@ -103,12 +103,12 @@ func TestEndDisputeResolution(t *testing.T) {
 	err = dr.End(byzantineSequencerAddr, watchtowerSignKey)
 	tAssert.NoError(err)
 
-	probationSequencers, err = dr.Get()
+	probationSequencers, err = dr.Get(Sequencer)
 	tAssert.NoError(err)
 
 	t.Logf("Probation Sequencers: %v \n", probationSequencers)
 
-	isProbationSequencer, isProbationSequencerErr = dr.Contains(byzantineSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr = dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
 }
@@ -142,12 +142,12 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
-	probationSequencers, err := dr.Get()
+	probationSequencers, err := dr.Get(Sequencer)
 	tAssert.NoError(err)
 
 	t.Logf("Probation Sequencers: %v \n", probationSequencers)
 
-	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
 
@@ -157,16 +157,16 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	// Error will be under the receipt, not here as a failure to apply the transaction.
 	tAssert.NoError(err)
 
-	probationSequencers, err = dr.Get()
+	probationSequencers, err = dr.Get(Sequencer)
 	tAssert.NoError(err)
 
 	t.Logf("Probation Sequencers: %v \n", probationSequencers)
 
-	isProbationSequencer, isProbationSequencerErr = dr.Contains(watchtowerAddr)
-	tAssert.NoError(isProbationSequencerErr)
-	tAssert.False(isProbationSequencer)
+	isProbationWatchtower, isProbationWatchtowerErr := dr.Contains(watchtowerAddr, WatchTower)
+	tAssert.NoError(isProbationWatchtowerErr)
+	tAssert.False(isProbationWatchtower)
 
-	isProbationSequencer, isProbationSequencerErr = dr.Contains(byzantineSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr = dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
 }

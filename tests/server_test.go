@@ -1,13 +1,17 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"net/netip"
 	"net/url"
+	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
@@ -18,7 +22,13 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	avail_client "github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
+)
+
+const (
+	// 1 AVL == 10^18 Avail fractions.
+	AVL = 1_000_000_000_000_000_000
 )
 
 type Context struct {
@@ -27,9 +37,10 @@ type Context struct {
 }
 
 type instance struct {
-	nodeType avail.MechanismType
-	config   *server.Config
-	server   *server.Server
+	nodeType    avail.MechanismType
+	accountPath string
+	config      *server.Config
+	server      *server.Server
 }
 
 // StartServers starts configured nodes
@@ -41,7 +52,46 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
+	nodeNameHelper := map[avail.MechanismType]int{
+		avail.BootstrapSequencer: 0,
+		avail.Sequencer:          0,
+		avail.WatchTower:         0,
+	}
+
+	var accountWg sync.WaitGroup
+
+	availClient, err := avail_client.NewClient(availAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	var nonceIncrement uint64
 	for _, nt := range nodeTypes {
+		nodeNameHelper[nt] = nodeNameHelper[nt] + 1
+		nodeName := fmt.Sprintf("%s-%d", nt, nodeNameHelper[nt])
+		accountWg.Add(1)
+
+		go func(nodeName string, nonceIncrement uint64) {
+			defer accountWg.Done()
+			// Initiate creation of the avail account if not present
+			_, err := createAvailAccount(t, availClient, availAddr, nt.String(), nodeName, nonceIncrement)
+			if err != nil {
+				t.Fatalf("failed to create new avail account: %s", err)
+				return
+			}
+		}(nodeName, nonceIncrement)
+
+		nonceIncrement++
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	t.Log("Waiting for Avail accounts to be created...")
+	accountWg.Wait()
+	t.Log("Avail accounts created")
+
+	for _, nt := range nodeTypes {
+		nodeName := fmt.Sprintf("%s-%d", nt, nodeNameHelper[nt])
+
 		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
 		if err != nil {
 			_ = pa.Release()
@@ -49,8 +99,9 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 		}
 
 		si := instance{
-			nodeType: nt,
-			config:   cfg,
+			nodeType:    nt,
+			config:      cfg,
+			accountPath: nodeName,
 		}
 
 		u, err := url.Parse("http://" + cfg.JSONRPC.JSONRPCAddr.String() + "/")
@@ -63,7 +114,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	}
 
 	// Release allocated [TCP] ports to be used in Edge nodes.
-	err := pa.Release()
+	err = pa.Release()
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +160,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
+		accountPath := fmt.Sprintf("../data/test-accounts/%s", si.accountPath)
 		srv, err := startNode(si.config, availAddr, accountPath, si.nodeType)
 		if err != nil {
 			return nil, err
@@ -122,6 +174,54 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	t.Logf("all %d nodes started", len(ctx.servers))
 
 	return ctx, nil
+}
+
+func createAvailAccount(t testing.TB, availClient avail_client.Client, availAddr, nodeType, nodeName string, nonceIncrement uint64) (string, error) {
+	var accountPath string
+
+	path := fmt.Sprintf("../data/test-accounts/%s", nodeName)
+
+	// If file exists, make sure that we return the file and not go through account creation process.
+	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
+	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		// In case that account path exists but is not visible in Avail (restart)
+		// make sure to go through the process of the account creation.
+		if ok, err := avail_client.AccountExistsFromMnemonic(availClient, path); err == nil && ok {
+			return path, nil
+		}
+	}
+
+	availAccount, err := avail_client.NewAccount()
+	if err != nil {
+		return accountPath, err
+	}
+
+	err = avail_client.DepositBalance(availClient, availAccount, 15*AVL, nonceIncrement)
+	if err != nil {
+		return accountPath, err
+	}
+
+	if _, err := avail_client.QueryAppID(availClient, avail.AvailApplicationKey); err != nil {
+		if err == avail_client.ErrAppIDNotFound {
+			_, err = avail_client.EnsureApplicationKeyExists(availClient, avail.AvailApplicationKey, availAccount)
+			if err != nil {
+				return accountPath, err
+			}
+		}
+
+		return accountPath, err
+	}
+
+	log.Printf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
+
+	if err := os.WriteFile(path, []byte(availAccount.URI), 0644); err != nil {
+		return accountPath, err
+	}
+
+	log.Printf("Successfuly written mnemonic into '%s'", path)
+
+	return accountPath, nil
 }
 
 func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
@@ -232,17 +332,9 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 }
 
 func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail.MechanismType) (*server.Server, error) {
-
 	bootnode := false
 	if nodeType == avail.BootstrapSequencer {
 		bootnode = true
-	}
-
-	// Make sure that if watchtower is started, to apply correct watchtower account
-	// TODO: This is not the best way forward as we are using main accounts.
-	// We should create new accounts instead every time we run the test and point it correctly.
-	if nodeType == avail.WatchTower {
-		accountPath = fmt.Sprintf("%s-watchtower", accountPath)
 	}
 
 	// Attach the concensus to the Edge

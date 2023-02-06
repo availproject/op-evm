@@ -3,6 +3,7 @@ package avail
 import (
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -42,7 +43,34 @@ func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
-func DepositBalance(client Client, account signature.KeyringPair, amount uint64) error {
+func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
+	accountBytes, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("failure to read account file '%s'", err)
+	}
+
+	account, err := NewAccountFromMnemonic(string(accountBytes))
+	if err != nil {
+		return false, err
+	}
+
+	api := client.instance()
+
+	meta, err := api.RPC.State.GetMetadataLatest()
+	if err != nil {
+		return false, err
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Account", account.PublicKey, nil)
+	if err != nil {
+		return false, err
+	}
+
+	var accountInfo types.AccountInfo
+	return api.RPC.State.GetStorageLatest(key, &accountInfo)
+}
+
+func DepositBalance(client Client, account signature.KeyringPair, amount uint64, nonceIncrement uint64) error {
 	api := client.instance()
 
 	meta, err := api.RPC.State.GetMetadataLatest()
@@ -79,13 +107,19 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64)
 		return err
 	}
 
-	nonce := uint32(accountInfo.Nonce)
+	nonce := uint64(accountInfo.Nonce)
+
+	if nonceIncrement > 0 {
+		nonce = nonce + nonceIncrement
+	}
+
+	fmt.Printf("Nonce increment: %d \n", nonce)
 
 	o := types.SignatureOptions{
 		BlockHash:          genesisHash,
 		Era:                types.ExtrinsicEra{IsMortalEra: false},
 		GenesisHash:        genesisHash,
-		Nonce:              types.NewUCompactFromUInt(uint64(nonce)),
+		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(0),
 		AppID:              types.NewU32(0),
@@ -103,6 +137,8 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Extrinsic submitted: %d \n", nonce)
 
 	defer sub.Unsubscribe()
 

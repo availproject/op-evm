@@ -34,21 +34,23 @@ func (d *Avail) runValidator() {
 		case avail_blk = <-availBlockStream.Chan():
 		}
 
-		blk, err := block.FromAvail(avail_blk, d.availAppID, callIdx)
+		blks, err := block.FromAvail(avail_blk, d.availAppID, callIdx)
 		if err != nil {
 			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
 			continue
 		}
 
-		err = validator.Check(blk)
-		if err != nil {
-			d.logger.Error("invalid block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-			continue
-		}
+		for _, blk := range blks {
+			err = validator.Check(blk)
+			if err != nil {
+				d.logger.Error("invalid block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+				continue
+			}
 
-		err = validator.Apply(blk)
-		if err != nil {
-			d.logger.Error("cannot apply block to blockchain", "block_nubmer", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+			err = validator.Apply(blk)
+			if err != nil {
+				d.logger.Error("cannot apply block to blockchain", "block_nubmer", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+			}
 		}
 	}
 }

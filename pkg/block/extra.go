@@ -17,6 +17,8 @@ const (
 	// KeyFraudProofOf is key that identifies the fraudproof objected malicious
 	// block hash in `ExtraData` of the fraudproof block header.
 	KeyFraudProofOf = "FRAUDPROOF_OF"
+
+	KeyBeginDisputeResolutionOf = "BEGINDISPUTERESOLUTION_OF"
 )
 
 func EncodeExtraDataFields(data map[string][]byte) []byte {
@@ -147,6 +149,26 @@ func GetExtraDataFraudProofTarget(h *types.Header) (types.Hash, bool) {
 
 	if toReturn == types.ZeroHash {
 		return types.ZeroHash, false
+	}
+
+	return toReturn, true
+}
+
+func GetExtraDataBeginDisputeResolutionTarget(h *types.Header) (types.Address, bool) {
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return types.ZeroAddress, false
+	}
+
+	data, exists := kv[KeyBeginDisputeResolutionOf]
+	if !exists {
+		return types.ZeroAddress, false
+	}
+
+	toReturn := types.BytesToAddress(data)
+
+	if toReturn == types.ZeroAddress {
+		return types.ZeroAddress, false
 	}
 
 	return toReturn, true

@@ -1,8 +1,6 @@
 package avail
 
 import (
-	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/types"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -15,9 +13,8 @@ import (
 
 func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-
 	logger := d.logger.Named("watchtower")
-	watchTower := watchtower.New(d.blockchain, d.executor, logger, types.Address(myAccount.Address), signKey.PrivateKey)
+	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
 	d.logger.Debug("ensuring watchtower staked")
 	err := d.ensureStaked(activeParticipantsQuerier)
@@ -56,44 +53,63 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 		case availBlk = <-availBlockStream.Chan():
 		}
 
-		accBalance, err := avail.GetBalance(d.availClient, d.availAccount)
-		if err != nil {
-			panic(fmt.Sprintf("Balance failure: %s", err))
-		}
+		/* 		accBalance, err := avail.GetBalance(d.availClient, d.availAccount)
+		   		if err != nil {
+		   			panic(fmt.Sprintf("Balance failure: %s", err))
+		   		}
 
-		d.logger.Info("Current avail account", "balance", accBalance.Int64())
+		   		d.logger.Info("Current avail account", "balance", accBalance.Int64()) */
 
-		blk, err := block.FromAvail(availBlk, d.availAppID, callIdx)
+		blks, err := block.FromAvail(availBlk, d.availAppID, callIdx)
 		if err != nil {
 			logger.Error("cannot extract Edge block from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 			continue
 		}
-		logger.Debug("GOT", "MINER ADDR", blk.Header.Miner)
-		err = watchTower.Check(blk)
-		if err != nil {
-			logger.Debug("block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
-			fp, err := watchTower.ConstructFraudproof(blk)
+		fraudProof := false
+
+	blksLoop:
+		for _, blk := range blks {
+			err = watchTower.Check(blk)
 			if err != nil {
-				logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-				continue
+				logger.Info("block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+
+				fp, err := watchTower.ConstructFraudproof(blk)
+				if err != nil {
+					logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+					continue
+				}
+
+				logger.Info("submitting fraudproof", "block_hash", fp, "err", err)
+				logger.Info("submitting fraudproof", "block_hash", fp.Header.Hash)
+
+				err = d.availSender.SendAndWaitForStatus(fp, avail_types.ExtrinsicStatus{IsInBlock: true})
+				if err != nil {
+					logger.Error("submitting fraud proof to avail failed", "error", err)
+					continue
+				}
+
+				logger.Info("submitted fraudproof", "block_number", fp.Header.Number, "block_hash", fp.Header.Hash, "txns", len(fp.Transactions))
+
+				err = watchTower.Apply(fp)
+				if err != nil {
+					logger.Error("cannot apply fraud block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+				}
+				fraudProof = true
+				continue blksLoop
 			}
 
-			logger.Debug("submitting fraudproof", "block_hash", fp.Header.Hash)
-			err = d.availSender.SendAndWaitForStatus(fp, avail_types.ExtrinsicStatus{IsInBlock: true})
+			err = watchTower.Apply(blk)
 			if err != nil {
-				logger.Error("submitting fraud proof to avail failed", "error", err)
+				logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 			}
-			logger.Debug("submitted fraudproof", "block_hash", fp.Header.Hash)
 
-			// TODO: Write fraudproof to local chain
+			if fraudProof {
+				// Basically sequencer will get into the fraud proof state and won't be discovered as block that follows
+				// will be corrupted so once fraud proof is pushed, p
+				return
 
-			continue
-		}
-
-		err = watchTower.Apply(blk)
-		if err != nil {
-			logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+			}
 		}
 	}
 }

@@ -3,6 +3,7 @@ package staking
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -18,8 +19,8 @@ import (
 )
 
 type DisputeResolution interface {
-	Get() ([]types.Address, error)
-	Contains(addr types.Address) (bool, error)
+	Get(nodeType NodeType) ([]types.Address, error)
+	Contains(addr types.Address, nodeType NodeType) (bool, error)
 	GetSequencerAddr(addr types.Address) (types.Address, error)
 	GetWatchtowerAddr(addr types.Address) (types.Address, error)
 	Begin(probationAddr types.Address, signKey *ecdsa.PrivateKey) error
@@ -42,7 +43,7 @@ func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Exe
 	}
 }
 
-func (dr *disputeResolution) Get() ([]types.Address, error) {
+func (dr *disputeResolution) Get(nodeType NodeType) ([]types.Address, error) {
 	parent := dr.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
 
@@ -66,16 +67,28 @@ func (dr *disputeResolution) Get() ([]types.Address, error) {
 		return nil, err
 	}
 
-	probationAddrs, err := QuerySequencersInProbation(transition, gasLimit, minerAddress)
-	if err != nil {
-		return nil, err
+	switch nodeType {
+	case Sequencer:
+		probationAddrs, err := QuerySequencersInProbation(transition, gasLimit, minerAddress)
+		if err != nil {
+			return nil, err
+		}
+		dr.logger.Info("GOT DISPUTED SEQUENCERS", "RETURN", probationAddrs)
+		return probationAddrs, nil
+	case WatchTower:
+		probationAddrs, err := QueryDisputedWatchtowers(transition, gasLimit, minerAddress)
+		if err != nil {
+			return nil, err
+		}
+		dr.logger.Info("GOT DISPUTED WATCHTOWERS", "RETURN", probationAddrs)
+		return probationAddrs, nil
+	default:
+		return nil, fmt.Errorf("unsuported node type provided ':%s'", nodeType)
 	}
-
-	return probationAddrs, nil
 }
 
-func (dr *disputeResolution) Contains(addr types.Address) (bool, error) {
-	addrs, err := dr.Get()
+func (dr *disputeResolution) Contains(addr types.Address, nodeType NodeType) (bool, error) {
+	addrs, err := dr.Get(nodeType)
 	if err != nil {
 		return false, err
 	}
@@ -167,6 +180,7 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 
 	blk.SetCoinbaseAddress(address)
 	blk.SignWith(signKey)
+	blk.SetExtraDataField(block.KeyBeginDisputeResolutionOf, probationAddr.Bytes())
 
 	disputeResolutionTx, err := BeginDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
 	if err != nil {
@@ -181,6 +195,7 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 		return err
 	}
 
+	dr.logger.Info("Submitting begin dispute resolution block", "hash", fBlock.Header.Hash)
 	if err := dr.sender.Send(fBlock); err != nil {
 		return err
 	}
@@ -189,6 +204,7 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 		return err
 	}
 
+	dr.logger.Info("Submitted begin dispute resolution block", "hash", fBlock.Header.Hash)
 	return nil
 }
 
@@ -377,4 +393,32 @@ func QueryDisputedWatchtowerAddr(t *state.Transition, gasLimit uint64, from type
 
 	address, _ := results["0"].(ethgo.Address)
 	return types.Address(address), nil
+}
+
+func QueryDisputedWatchtowers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentDisputeWatchtowers"]
+	if !ok {
+		return nil, errors.New("GetCurrentDisputeWatchtowers method doesn't exist in Staking contract ABI")
+	}
+
+	selector := method.ID()
+	res, err := t.Apply(&types.Transaction{
+		From:     from,
+		To:       &AddrStakingContract,
+		Value:    big.NewInt(0),
+		Input:    selector,
+		GasPrice: big.NewInt(0),
+		Gas:      gasLimit,
+		Nonce:    t.GetNonce(from),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Failed() {
+		return nil, res.Err
+	}
+
+	return DecodeParticipants(method, res.ReturnValue)
 }

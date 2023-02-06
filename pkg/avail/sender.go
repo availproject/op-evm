@@ -124,7 +124,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(100),
-		AppID:              types.NewU32(0),
+		AppID:              s.appID,
 		TransactionVersion: rv.TransactionVersion,
 	}
 

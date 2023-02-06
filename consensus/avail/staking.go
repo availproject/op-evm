@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 
 	"github.com/maticnetwork/avail-settlement/pkg/block"
@@ -141,6 +142,61 @@ func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActivePartici
 		}
 		// Wait a bit before checking again.
 		time.Sleep(3 * time.Second)
+	}
+
+	return nil
+}
+
+func (d *Avail) slashNode(maliciousAddr types.Address, maliciousHeader *types.Header) error {
+	// First, build the staking block.
+	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
+	bb, err := blockBuilderFactory.FromBlockchainHead()
+	if err != nil {
+		return err
+	}
+
+	lastKnownCorrectHeader, ok := d.blockchain.GetBlockByHash(maliciousHeader.ParentHash, false)
+	if !ok {
+		return fmt.Errorf("failed to discover block by parent hash '%s'", maliciousHeader.ParentHash)
+	}
+
+	bb.SetParentStateRoot(lastKnownCorrectHeader.Header.StateRoot)
+	bb.SetCoinbaseAddress(d.minerAddr)
+	bb.SignWith(d.signKey)
+
+	tx, err := staking.SlashStakerTx(d.minerAddr, maliciousAddr, 1_000_000)
+	if err != nil {
+		d.logger.Error("failed to construct slash transaction", "err", err)
+		return err
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, d.signKey)
+	if err != nil {
+		d.logger.Error("failed to sign slashing transaction", "err", err)
+		return err
+	}
+
+	bb.AddTransactions(tx)
+	blk, err := bb.Build()
+	if err != nil {
+		d.logger.Error("failed to build slashing block: ", "err", err)
+		return err
+	}
+
+	d.logger.Info("sending block with slashing tx to Avail")
+	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	if err != nil {
+		d.logger.Error("error while submitting slashing block to avail", "err", err)
+		return err
+	}
+
+	d.logger.Info("writing block with slashing tx to local blockchain")
+
+	err = d.blockchain.WriteBlock(blk, "sequencer")
+	if err != nil {
+		d.logger.Error("bootstrap sequencer couldn't slash staker: ", "err", err)
+		return err
 	}
 
 	return nil

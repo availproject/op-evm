@@ -78,6 +78,8 @@ func (bs *BlockStream) watch() {
 					continue
 				}
 
+				bs.logger.Info("Received new avail block", "nbr", hdr.Number, "hash", blockHash.Hex())
+
 				blk, err := bs.api.RPC.Chain.GetBlock(blockHash)
 				if err != nil {
 					bs.logger.Error("couldn't fetch block", "block_number", hdr.Number, "block_hash", blockHash, "error", err)

@@ -3,6 +3,7 @@ package avail
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -14,8 +15,28 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
+func (sw *SequencerWorker) waitForStakedSequencer(activeParticipantsQuerier staking.ActiveSequencers, nodeAddr types.Address) bool {
+	for {
+		sequencerStaked, sequencerError := activeParticipantsQuerier.Contains(nodeAddr)
+		if sequencerError != nil {
+			sw.logger.Error("failed to check if my account is among active staked sequencers. Retrying in few seconds...", "err", sequencerError)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+
+		if !sequencerStaked {
+			sw.logger.Warn("my account is not among active staked sequencers. Retrying in few seconds...", "address", nodeAddr.String())
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+	return true
+}
+
+func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType
+
 	switch d.nodeType {
 	case BootstrapSequencer, Sequencer:
 		nodeType = staking.Sequencer
@@ -27,33 +48,53 @@ func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipant
 		return fmt.Errorf("unknown node type: %q", d.nodeType)
 	}
 
-	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
-	if err != nil {
-		return err
-	}
+	var returnErr error
 
-	if staked {
-		d.logger.Debug("already staked")
-		return nil
-	}
+	go func() {
+		for {
+			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
+			if err != nil {
+				d.logger.Error("Failed to check if participant exists... Rechecking in a second...", "err", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
 
-	switch MechanismType(d.nodeType) {
-	case BootstrapSequencer:
-		return d.stakeBootstrapSequencer()
-	case Sequencer:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	case WatchTower:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	default:
-		panic("invalid node type: " + d.nodeType)
-	}
+			if staked {
+				d.logger.Debug("Node is successfully staked... Checking in 2 seconds for state change...")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			switch MechanismType(d.nodeType) {
+			case BootstrapSequencer:
+				// We cannot pass machine type as it won't be staked.
+				// Bootstrap sequencer does not exist as category in the smart contract.
+				returnErr = d.stakeParticipant(false, "sequencer")
+			case Sequencer:
+				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+			case WatchTower:
+				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+			}
+		}
+	}()
+
+	return returnErr
 }
 
-// stakeBootstrapSequencer takes care of sequencer staking for the very first
-// bootstrap sequencer. This needs special handling, because there won't be any
-// other sequencer forging a block with staking transaction, therefore it must
-// be build by the bootstrap node itself.
-func (d *Avail) stakeBootstrapSequencer() error {
+func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
+	// Bootnode does not need to wait for any additional peers to be discovered prior pushing the
+	// block towards rest of the community, however, sequencers and watchtowers must!
+	if shouldWait {
+		for {
+			if d.network.GetBootnodeConnCount() > 0 {
+				break
+			}
+
+			time.Sleep(1 * time.Second)
+			continue
+		}
+	}
+
 	// First, build the staking block.
 	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
 	bb, err := blockBuilderFactory.FromBlockchainHead()
@@ -65,7 +106,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	bb.SignWith(d.signKey)
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
-	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, nodeType, 1_000_000)
 	if err != nil {
 		return err
 	}
@@ -86,23 +127,32 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		d.logger.Error("error while submitting data to avail", "error", err)
-		panic(err)
+		return err
 	}
 
-	d.logger.Debug("writing block with staking tx to local blockchain")
+	d.logger.Info(
+		"Successfully wrote staking block to the blockchain",
+		"hash", blk.Hash().String(),
+	)
 
-	err = d.blockchain.WriteBlock(blk, "sequencer")
+	err = d.blockchain.WriteBlock(blk, d.nodeType.String())
 	if err != nil {
-		panic("bootstrap sequencer couldn't stake: " + err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
-	// Sleep time is added because we need to stake the participant after the peer discovery is
-	// fully setup. If removed, transaction will never go through from watchtower to sequencer.
-	time.Sleep(5 * time.Second)
+func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) error {
+	// We need to have at least one node available to be able successfully push tx to the neighborhood peers
+	for {
+		if d.network.GetBootnodeConnCount() > 0 {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+		continue
+	}
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
@@ -142,61 +192,6 @@ func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActivePartici
 		}
 		// Wait a bit before checking again.
 		time.Sleep(3 * time.Second)
-	}
-
-	return nil
-}
-
-func (d *Avail) slashNode(maliciousAddr types.Address, maliciousHeader *types.Header) error {
-	// First, build the staking block.
-	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
-	bb, err := blockBuilderFactory.FromBlockchainHead()
-	if err != nil {
-		return err
-	}
-
-	lastKnownCorrectHeader, ok := d.blockchain.GetBlockByHash(maliciousHeader.ParentHash, false)
-	if !ok {
-		return fmt.Errorf("failed to discover block by parent hash '%s'", maliciousHeader.ParentHash)
-	}
-
-	bb.SetParentStateRoot(lastKnownCorrectHeader.Header.StateRoot)
-	bb.SetCoinbaseAddress(d.minerAddr)
-	bb.SignWith(d.signKey)
-
-	tx, err := staking.SlashStakerTx(d.minerAddr, maliciousAddr, 1_000_000)
-	if err != nil {
-		d.logger.Error("failed to construct slash transaction", "err", err)
-		return err
-	}
-
-	txSigner := &crypto.FrontierSigner{}
-	tx, err = txSigner.SignTx(tx, d.signKey)
-	if err != nil {
-		d.logger.Error("failed to sign slashing transaction", "err", err)
-		return err
-	}
-
-	bb.AddTransactions(tx)
-	blk, err := bb.Build()
-	if err != nil {
-		d.logger.Error("failed to build slashing block: ", "err", err)
-		return err
-	}
-
-	d.logger.Info("sending block with slashing tx to Avail")
-	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
-	if err != nil {
-		d.logger.Error("error while submitting slashing block to avail", "err", err)
-		return err
-	}
-
-	d.logger.Info("writing block with slashing tx to local blockchain")
-
-	err = d.blockchain.WriteBlock(blk, "sequencer")
-	if err != nil {
-		d.logger.Error("bootstrap sequencer couldn't slash staker: ", "err", err)
-		return err
 	}
 
 	return nil

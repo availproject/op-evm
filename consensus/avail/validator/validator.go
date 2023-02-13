@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -134,6 +135,8 @@ func (v *validator) verifyBlock(blk *types.Block) error {
 	return nil
 }
 
+// TODO - Check if miner address was the same (active sequencer at that point in the time)
+// through the avail block
 func (v *validator) verifyHeader(header *types.Header) error {
 	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
@@ -142,8 +145,7 @@ func (v *validator) verifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
-	if signer != v.sequencerAddress {
-		v.logger.Info("Passing, how is it possible? 222")
+	if !bytes.Equal(signer.Bytes(), header.Miner) {
 		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
 	}
 

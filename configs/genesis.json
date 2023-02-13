@@ -32,6 +32,9 @@
             },
             "0x91eBD9DB262d2D814c9983b5D4d3D3801AF3F007": {
                 "balance": "0x3635c9adc5dea00000"
+            },
+            "0x00D916EFbEeDb102A4D235a1EB525Fa147E5588e": {
+                "balance": "0x3635c9adc5dea00000"
             }
     },
         "number": "0x0",
@@ -63,6 +66,7 @@
     },
     "bootnodes": [
         "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa",
+        "/ip4/127.0.0.1/tcp/20001/p2p/16Uiu2HAkwyY1aXwC7o7nrUofsBXwUkxYwsj21LtE9jmhmTuei5mw",
         "/ip4/127.0.0.1/tcp/30001/p2p/16Uiu2HAmLgJKjdhLUjH9wtH6AL8wysr3rYMgYku8tTvhBZ5mctVq"
     ]
 }

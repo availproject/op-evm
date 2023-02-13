@@ -34,7 +34,7 @@ func (d *Avail) runValidator() {
 		case avail_blk = <-availBlockStream.Chan():
 		}
 
-		blks, err := block.FromAvail(avail_blk, d.availAppID, callIdx)
+		blks, err := block.FromAvail(avail_blk, d.availAppID, callIdx, d.logger)
 		if err != nil {
 			d.logger.Error("cannot extract Edge block from Avail block", "avail_block_number", avail_blk.Block.Header.Number, "error", err)
 			continue

@@ -109,7 +109,7 @@ func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType Node
 
 	for _, a := range addrs {
 		if a == addr {
-			asq.logger.Info(fmt.Sprintf("Stake discovered no need to stake the %s.", strings.ToLower(string(nodeType))))
+			asq.logger.Debug(fmt.Sprintf("Stake discovered no need to stake the %s.", strings.ToLower(string(nodeType))))
 			return true, nil
 		}
 	}

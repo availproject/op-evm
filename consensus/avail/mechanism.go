@@ -1,6 +1,9 @@
 package avail
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type MechanismType string
 
@@ -25,6 +28,11 @@ var mechanismTypes = map[string]MechanismType{
 // String is a helper method for casting a MechanismType to a string representation
 func (t MechanismType) String() string {
 	return string(t)
+}
+
+// String is a helper method for casting a MechanismType to a string representation
+func (t MechanismType) LogString() string {
+	return strings.Replace(string(t), "-", "_", -1)
 }
 
 // MechanismExists helper function designed to check mechanism existence

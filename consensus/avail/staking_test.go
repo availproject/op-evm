@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,5 +57,7 @@ func TestEnsureStakedBootstrapSequencer(t *testing.T) {
 	tAssert := assert.New(t)
 
 	tAvail, asq := NewTestAvail(t, BootstrapSequencer)
-	tAssert.NoError(tAvail.ensureStaked(asq))
+	var wg sync.WaitGroup
+	wg.Add(1)
+	tAssert.NoError(tAvail.ensureStaked(&wg, asq))
 }

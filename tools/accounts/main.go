@@ -38,7 +38,7 @@ func main() {
 	log.Printf("Created new avail account %+v", availAccount)
 	log.Printf("Depositing %d AVL to '%s'...", balance, availAccount.Address)
 
-	err = avail.DepositBalance(availClient, availAccount, balance*AVL)
+	err = avail.DepositBalance(availClient, availAccount, balance*AVL, 0)
 	if err != nil {
 		panic(err)
 	}

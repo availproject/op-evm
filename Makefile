@@ -81,13 +81,13 @@ tools-account:
 
 build: build-server build-client
 
+start-bootstrap-sequencer: build
+	rm -rf data/avail-bootnode-1/blockchain/
+	./server/server -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
+
 start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -bootstrap -config-file="./configs/bootnode.yaml"
-
-start-validator: build
-	rm -rf data/avail-node-1/blockchain/
-	./server/server -config-file="./configs/node-1.yaml"
+	./server/server -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
@@ -102,8 +102,11 @@ start-fraud: build-fraud
 start-staking: build-staking 
 	./tools/staking/staking
 
+create-bootstrap-sequencer-account: tools-account
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer
+	
 create-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 1000
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-sequencer
 
 create-watchtower-account: tools-account
 	./tools/accounts/accounts -balance 1000 -path ./configs/account-watchtower

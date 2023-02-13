@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Fraud(t *testing.T) {
-	//t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
+	//t.Skip("fraud e2e tests disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 
@@ -46,7 +46,7 @@ func Test_Fraud(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	waitForPeers(t, ethClient, 1)
+	waitForPeers(t, ethClient, 2)
 
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

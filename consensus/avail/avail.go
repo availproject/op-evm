@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
@@ -80,6 +81,8 @@ type Avail struct {
 	availClient  avail.Client
 	availSender  avail.Sender
 	stakingNode  staking.Node
+
+	validator validator.Validator
 }
 
 // Factory returns the consensus factory method
@@ -121,6 +124,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			),
 			signKey:   validatorKey,
 			minerAddr: validatorAddr,
+			validator: validator.New(params.Blockchain, params.Executor, validatorAddr),
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -194,11 +198,29 @@ func (d *Avail) Start() error {
 	// Start P2P syncing.
 	go d.startSyncing()
 
+	// Prior we continue with node bootstrap, we are first going to ensure that
+	// node is properly staked and keep checking if node is staked properly as a separated goroutine.
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+
+	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+
+	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+		return err
+	}
+
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
-		go d.runSequencer(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
-	case Validator:
-		go d.runValidator()
+		sequencerWorker, _ := NewSequencer(
+			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
+			d.validator, d.availClient, d.availAccount, d.availAppID,
+			d.signKey, d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
+			d.blockTime,
+		)
+		go func() {
+			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
+				panic(err)
+			}
+		}()
 	case WatchTower:
 		go d.runWatchTower(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
 	default:
@@ -206,6 +228,24 @@ func (d *Avail) Start() error {
 	}
 
 	return nil
+}
+
+func (d *Avail) startSyncing() {
+	// Start the syncer
+	err := d.syncer.Start()
+	if err != nil {
+		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
+	}
+
+	syncFunc := func(blk *types.Block) bool {
+		d.txpool.ResetWithHeaders(blk.Header)
+		return false
+	}
+
+	err = d.syncer.Sync(syncFunc)
+	if err != nil {
+		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
+	}
 }
 
 // REQUIRED BASE INTERFACE METHODS //

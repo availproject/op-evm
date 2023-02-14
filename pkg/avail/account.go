@@ -2,11 +2,14 @@ package avail
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/tyler-smith/go-bip39"
 )
+
+const AVL = 1_000_000_000_000_000_000 // 1 AVL == 10^18 Avail fractions
 
 func NewAccount() (signature.KeyringPair, error) {
 	entropy, err := bip39.NewEntropy(128)
@@ -27,7 +30,43 @@ func NewAccount() (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
-func DepositBalance(client Client, account signature.KeyringPair, amount uint64) error {
+func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
+	keyPair, err := signature.KeyringPairFromSecret(mnemonic, 42)
+	if err != nil {
+		return signature.KeyringPair{}, err
+	}
+
+	return keyPair, nil
+}
+
+func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
+	accountBytes, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("failure to read account file '%s'", err)
+	}
+
+	account, err := NewAccountFromMnemonic(string(accountBytes))
+	if err != nil {
+		return false, err
+	}
+
+	api := client.instance()
+
+	meta, err := api.RPC.State.GetMetadataLatest()
+	if err != nil {
+		return false, err
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Account", account.PublicKey, nil)
+	if err != nil {
+		return false, err
+	}
+
+	var accountInfo types.AccountInfo
+	return api.RPC.State.GetStorageLatest(key, &accountInfo)
+}
+
+func DepositBalance(client Client, account signature.KeyringPair, amount, nonceIncrement uint64) error {
 	api := client.instance()
 
 	meta, err := api.RPC.State.GetMetadataLatest()
@@ -64,7 +103,11 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64)
 		return err
 	}
 
-	nonce := uint32(accountInfo.Nonce)
+	nonce := uint64(accountInfo.Nonce)
+
+	if nonceIncrement > 0 {
+		nonce = nonce + nonceIncrement
+	}
 
 	o := types.SignatureOptions{
 		BlockHash:          genesisHash,

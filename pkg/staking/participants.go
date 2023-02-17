@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -28,10 +29,14 @@ func (dasq *DumbActiveParticipants) GetBalance(_ types.Address) (*big.Int, error
 func (dasq *DumbActiveParticipants) GetTotalStakedAmount() (*big.Int, error) {
 	return nil, nil
 }
+func (dasq *DumbActiveParticipants) InProbation(_ types.Address) (bool, error) {
+	return true, nil
+}
 
 type ActiveParticipants interface {
 	Get(nodeType NodeType) ([]types.Address, error)
 	Contains(addr types.Address, nodeType NodeType) (bool, error)
+	InProbation(address types.Address) (bool, error)
 	GetBalance(addr types.Address) (*big.Int, error)
 	GetTotalStakedAmount() (*big.Int, error)
 }
@@ -89,13 +94,6 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 			return nil, err
 		}
 		return addrs, nil
-	case Validator:
-		addrs, err := QueryValidators(transition, gasLimit, minerAddress)
-		if err != nil {
-			asq.logger.Error("failed to query validators", "err", err)
-			return nil, err
-		}
-		return addrs, nil
 	default:
 		return nil, fmt.Errorf("failure to query participants due to node type missmatch. '%s' is not node type", nodeType)
 	}
@@ -119,6 +117,46 @@ func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType Node
 
 	return false, nil
 
+}
+
+func (asq *activeParticipantsQuerier) InProbation(address types.Address) (bool, error) {
+	parent := asq.blockchain.Header()
+	minerAddress := types.BytesToAddress(parent.Miner)
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      minerAddress.Bytes(),
+		Nonce:      types.Nonce{},
+		GasLimit:   parent.GasLimit,
+		Timestamp:  uint64(time.Now().Unix()),
+	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := asq.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return false, err
+	}
+
+	transition, err := asq.executor.BeginTxn(parent.StateRoot, header, minerAddress)
+	if err != nil {
+		return false, err
+	}
+
+	probationAddrs, err := QuerySequencersInProbation(transition, gasLimit, minerAddress)
+	if err != nil {
+		return false, err
+	}
+
+	//asq.logger.Warn("GOT BACK PROBATION ADDRESSES", "SLICE", probationAddrs)
+
+	for _, probationAddr := range probationAddrs {
+		if bytes.Equal(probationAddr.Bytes(), address.Bytes()) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (asq *activeParticipantsQuerier) GetBalance(address types.Address) (*big.Int, error) {
@@ -322,34 +360,6 @@ func QueryWatchtower(t *state.Transition, gasLimit uint64, from types.Address) (
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentWatchtowers"]
 	if !ok {
 		return nil, errors.New("GetCurrentWatchtowers method doesn't exist in Staking contract ABI")
-	}
-
-	selector := method.ID()
-	res, err := t.Apply(&types.Transaction{
-		From:     from,
-		To:       &AddrStakingContract,
-		Value:    big.NewInt(0),
-		Input:    selector,
-		GasPrice: big.NewInt(0),
-		Gas:      gasLimit,
-		Nonce:    t.GetNonce(from),
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Failed() {
-		return nil, res.Err
-	}
-
-	return DecodeParticipants(method, res.ReturnValue)
-}
-
-func QueryValidators(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
-	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentValidators"]
-	if !ok {
-		return nil, errors.New("GetCurrentValidators method doesn't exist in Staking contract ABI")
 	}
 
 	selector := method.ID()

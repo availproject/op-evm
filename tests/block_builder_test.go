@@ -25,7 +25,7 @@ func Test_Builder_Construction_FromParentHash(t *testing.T) {
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
-	_, err := bbf.FromParentHash(h)
+	_, err := bbf.FromParentHash(h, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func Test_Builder_Add_Transaction(t *testing.T) {
 	// Construct block.Builder w/ the blockchain instance that contains
 	// balance for our test account.
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
-	bb, err := bbf.FromParentHash(bchain.Header().Hash)
+	bb, err := bbf.FromParentHash(bchain.Header().Hash, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func newBlockBuilder(t *testing.T) block.Builder {
 	h := bchain.Genesis()
 
 	bbf := block.NewBlockBuilderFactory(bchain, executor, hclog.Default())
-	bb, err := bbf.FromParentHash(h)
+	bb, err := bbf.FromParentHash(h, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

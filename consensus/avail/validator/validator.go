@@ -47,12 +47,12 @@ type validator struct {
 	sequencerAddress types.Address
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address) Validator {
+func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address, logger hclog.Logger) Validator {
 	return &validator{
 		blockchain: blockchain,
 		executor:   executor,
 
-		logger:           hclog.Default(),
+		logger:           logger.Named("validator"),
 		sequencerAddress: sequencer,
 	}
 }
@@ -145,11 +145,13 @@ func (v *validator) verifyHeader(header *types.Header) error {
 
 	v.logger.Info("Verify header", "signer", signer.String())
 
+	minerAddr := types.BytesToAddress(header.Miner)
+
 	if !bytes.Equal(signer.Bytes(), header.Miner) {
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
+		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, minerAddr)
 	}
 
-	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
+	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", minerAddr)
 
 	/*
 		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)

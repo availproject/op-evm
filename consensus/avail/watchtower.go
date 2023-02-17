@@ -1,6 +1,7 @@
 package avail
 
 import (
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -80,10 +81,33 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 		blksLoop:
 			for _, blk := range blks {
 				err = watchTower.Check(blk)
-				if err != nil || (blk != nil && blk.Number() == 4) {
+				if err != nil || blk.Number() == 4 {
 					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
+					// TODO: Fix this...
+					// Basically right now if fraud is discovered it will end in the endless loop of
+					// pushing the frauds and never completing the fraud...
+					if err != nil {
+						if strings.Contains(err.Error(), "does not belong to active sequencers") {
+							continue blksLoop
+						}
+					}
+
+					// Block should be applied regardless as new block will take it's place.
+					// Basically later on what happens block cannot be found resulting in various issues of hash not found.
+					// It must be applied prior to have correct nonce, numbers, etc...
+					_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
+					if exists {
+						continue
+					}
+
+					if err := watchTower.Apply(blk); err != nil {
+						logger.Error("cannot apply block to blockchain prior constructing fraud proof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+						continue blksLoop
+					}
+
 					fp, err := watchTower.ConstructFraudproof(blk)
+
 					if err != nil {
 						logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 						continue blksLoop
@@ -98,17 +122,15 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 					}
 
 					logger.Info("Submitted fraudproof", "block_number", fp.Header.Number, "block_hash", fp.Header.Hash, "txns", len(fp.Transactions))
-
-					err = watchTower.Apply(fp)
-					if err != nil {
-						logger.Error("cannot apply fraud block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-					}
 					continue blksLoop
 				}
 
-				err = watchTower.Apply(blk)
-				if err != nil {
-					logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+				_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
+				if !exists {
+					err = watchTower.Apply(blk)
+					if err != nil {
+						logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+					}
 				}
 			}
 		}

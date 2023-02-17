@@ -26,7 +26,7 @@ type Builder interface {
 	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
-
+	SetParentHash(parentHash types.Hash) Builder
 	AddTransactions(txs ...*types.Transaction) Builder
 
 	SignWith(signKey *ecdsa.PrivateKey) Builder
@@ -43,6 +43,7 @@ type blockBuilder struct {
 	coinbase   *types.Address
 	difficulty *uint64
 	parentRoot *types.Hash
+	parentHash *types.Hash
 	gasLimit   *uint64
 
 	header *types.Header
@@ -55,7 +56,7 @@ type blockBuilder struct {
 }
 
 type BlockBuilderFactory interface {
-	FromParentHash(hash types.Hash) (Builder, error)
+	FromParentHash(hash types.Hash, blockIncrement uint64) (Builder, error)
 	FromBlockchainHead() (Builder, error)
 }
 
@@ -75,19 +76,19 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 
 func (bbf *blockBuilderFactory) FromBlockchainHead() (Builder, error) {
 	hdr := bbf.blockchain.Header()
-	return bbf.FromParentHeader(hdr)
+	return bbf.FromParentHeader(hdr, 0)
 }
 
-func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, error) {
+func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash, blockIncrement uint64) (Builder, error) {
 	hdr, found := bbf.blockchain.GetHeaderByHash(parent)
 	if !found {
 		return nil, fmt.Errorf("%w: not found", ErrInvalidHash)
 	}
 
-	return bbf.FromParentHeader(hdr)
+	return bbf.FromParentHeader(hdr, blockIncrement)
 }
 
-func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder, error) {
+func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header, blockIncrement uint64) (Builder, error) {
 	bb := &blockBuilder{
 		blockchain: bbf.blockchain,
 		executor:   bbf.executor,
@@ -95,7 +96,7 @@ func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder,
 
 		header: &types.Header{
 			ParentHash: parent.Hash,
-			Number:     parent.Number + 1,
+			Number:     (parent.Number + 1) + blockIncrement,
 			GasLimit:   parent.GasLimit,
 		},
 		parent: parent,
@@ -133,6 +134,11 @@ func (bb *blockBuilder) SetGasLimit(limit uint64) Builder {
 
 func (bb *blockBuilder) SetParentStateRoot(parentRoot types.Hash) Builder {
 	bb.parentRoot = &parentRoot
+	return bb
+}
+
+func (bb *blockBuilder) SetParentHash(parentHash types.Hash) Builder {
+	bb.parentHash = &parentHash
 	return bb
 }
 
@@ -174,6 +180,11 @@ func (bb *blockBuilder) setDefaults() {
 	if bb.parentRoot == nil {
 		bb.parentRoot = new(types.Hash)
 		*bb.parentRoot = bb.parent.StateRoot
+	}
+
+	if bb.parentHash == nil {
+		bb.parentHash = new(types.Hash)
+		*bb.parentHash = bb.parent.ParentHash
 	}
 
 	if bb.gasLimit == nil {

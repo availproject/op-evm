@@ -89,27 +89,21 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 }
 
 func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.Block, error) {
-	builder, err := wt.blockBuilderFactory.FromParentHash(maliciousBlock.ParentHash())
+	builder, err := wt.blockBuilderFactory.FromParentHash(maliciousBlock.ParentHash(), 0)
 	if err != nil {
 		return nil, err
 	}
-
-	wt.logger.Info("Passing 1")
 
 	fraudProofTxs, err := constructFraudproofTxs(wt.account, maliciousBlock)
 	if err != nil {
 		return nil, err
 	}
 
-	wt.logger.Info("Passing 2")
-
 	hdr, _ := wt.blockchain.GetHeaderByHash(maliciousBlock.ParentHash())
 	transition, err := wt.executor.BeginTxn(hdr.StateRoot, hdr, wt.account)
 	if err != nil {
 		return nil, err
 	}
-
-	wt.logger.Info("Passing 3")
 
 	txSigner := &crypto.FrontierSigner{}
 	fpTx := fraudProofTxs[0]
@@ -119,22 +113,27 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 		return nil, err
 	}
 
-	wt.logger.Info("Passing 4")
-
 	if err := wt.txpool.AddTx(tx); err != nil {
 		wt.logger.Error("failed to add fraud proof txn to the pool", "err", err)
 		return nil, err
 	}
 
-	transition.Commit()
+	// Probably state should not be commited at this point in the time but rather later on
+	//transition.Commit()
 
-	wt.logger.Info("Passing 5")
+	wt.logger.Info(
+		"Applied dispute resolution transaction to the txpool",
+		"hash", tx.Hash,
+		"nonce", tx.Nonce,
+		"account_from", tx.From,
+	)
 
 	// Build the block that is going to be sent out to the Avail.
 	blk, err := builder.
 		SetCoinbaseAddress(wt.account).
 		SetGasLimit(maliciousBlock.Header.GasLimit).
 		SetExtraDataField(block.KeyFraudProofOf, maliciousBlock.Hash().Bytes()).
+		SetExtraDataField(block.KeyBeginDisputeResolutionOf, tx.Hash.Bytes()).
 		AddTransactions(fraudProofTxs...).
 		SignWith(wt.signKey).
 		Build()
@@ -142,8 +141,6 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 	if err != nil {
 		return nil, err
 	}
-
-	wt.logger.Info("Passing 6")
 
 	return blk, nil
 }

@@ -42,8 +42,6 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		nodeType = staking.Sequencer
 	case WatchTower:
 		nodeType = staking.WatchTower
-	case Validator:
-		nodeType = staking.Validator
 	default:
 		return fmt.Errorf("unknown node type: %q", d.nodeType)
 	}
@@ -52,16 +50,29 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 
 	go func() {
 		for {
+			inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
+			if err != nil {
+				d.logger.Error("Failed to check if participant is currently in probation... Rechecking in a second...", "err", err)
+				time.Sleep(3 * time.Second)
+				continue
+			}
+
+			if inProbation {
+				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking in few seconds...", "err", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
 			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
 			if err != nil {
 				d.logger.Error("Failed to check if participant exists... Rechecking in a second...", "err", err)
-				time.Sleep(1 * time.Second)
+				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			if staked {
 				d.logger.Debug("Node is successfully staked... Checking in 2 seconds for state change...")
-				time.Sleep(2 * time.Second)
+				time.Sleep(3 * time.Second)
 				continue
 			}
 
@@ -69,7 +80,7 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 			case BootstrapSequencer:
 				// We cannot pass machine type as it won't be staked.
 				// Bootstrap sequencer does not exist as category in the smart contract.
-				returnErr = d.stakeParticipant(false, "sequencer")
+				returnErr = d.stakeParticipant(false, Sequencer.String())
 			case Sequencer:
 				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
 			case WatchTower:
@@ -120,6 +131,7 @@ func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 	bb.AddTransactions(tx)
 	blk, err := bb.Build()
 	if err != nil {
+		d.logger.Error("failed to build staking block", "node_type", nodeType, "err", err)
 		return err
 	}
 

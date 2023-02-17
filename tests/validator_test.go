@@ -44,14 +44,14 @@ func TestValidatorBlockCheck(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor, coinbaseAddr, hclog.Default())
 			err = v.Check(tc.block(blockBuilder))
 			switch {
 			case err == nil && tc.errorMatcher == nil:
@@ -87,14 +87,14 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor, coinbaseAddr, hclog.Default())
 
 			err = v.Apply(tc.block(blockBuilder))
 			switch {
@@ -130,14 +130,14 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
-			v := validator.New(blockchain, executor, coinbaseAddr)
+			v := validator.New(blockchain, executor, coinbaseAddr, hclog.Default())
 
 			err = v.ProcessFraudproof(tc.block(blockBuilder))
 			switch {

@@ -13,7 +13,7 @@ type ValidatorSet []types.Address
 
 func (d *Avail) runValidator() {
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 1)
-	validator := validator.New(d.blockchain, d.executor, types.StringToAddress(SequencerAddress))
+	validator := validator.New(d.blockchain, d.executor, types.StringToAddress(SequencerAddress), d.logger)
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {

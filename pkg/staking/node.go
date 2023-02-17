@@ -14,7 +14,6 @@ type NodeType string
 
 const (
 	Sequencer  NodeType = "sequencer"
-	Validator  NodeType = "validator"
 	WatchTower NodeType = "watchtower"
 )
 

@@ -44,7 +44,7 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +114,7 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}

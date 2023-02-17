@@ -47,11 +47,15 @@ type SequencerWorker struct {
 	blockTime    time.Duration // Minimum block generation time in seconds
 }
 
+func (sw *SequencerWorker) IsNextSequencer(sequencer types.Address) bool {
+	return bytes.Equal(sequencer.Bytes(), sw.nodeAddr.Bytes())
+}
+
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
-	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr)
-	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, validator, sw.nodeAddr, sw.nodeSignKey, sw.availSender)
+	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
+	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, validator, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
 
 	accBalance, err := avail.GetBalance(sw.availClient, sw.availAccount)
 	if err != nil {
@@ -98,19 +102,44 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				}
 			}
 
-			for _, blockk := range edgeBlks {
-				sw.blockchain.WriteBlock(blockk, sw.nodeType.String())
-			}
+			// Write down blocks received from avail to make sure we're synced before processing with the
+			// fraud check or writing down new blocks...
+		processBlocks:
+			for _, edgeBlk := range edgeBlks {
 
-			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
-			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
+				// In case that dispute resolution is ended, please make sure to set fraud resolution block
+				// to nil so whole chain and corrupted node can continue making our day good!
+				// Block does not have to be written into the chain as it's already written with syncer...
+				if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
+					sw.logger.Warn(
+						"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
+						"edge_block_hash", edgeBlk.Hash(),
+						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
+					)
+					fraudResolver.SetBlock(nil)
+					continue processBlocks
+				}
 
-			// Will check the block for fraudlent behaviour and slash parties accordingly.
-			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
-			// We can change this in the future but with it, understand that series of issues are going to
-			// happen with syncing and publishing of the blocks that will need to be fixed.
-			if _, err := fraudResolver.CheckAndSlash(); err != nil {
-				continue
+				// We cannot write down disputed blocks to the blockchain as they would be rejected due to
+				// numerous reasons. From block number missalignment to block already exist to skewing the
+				// rest of the flow later on...
+				if !fraudResolver.IsDisputedBlock(edgeBlk) {
+					if err := validator.Check(edgeBlk); err == nil {
+						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
+							sw.logger.Warn(
+								"failed to write edge block received from avail",
+								"edge_block_hash", edgeBlk.Hash(),
+								"error", err,
+							)
+						}
+					} else {
+						sw.logger.Warn(
+							"failed to validate edge block received from avail",
+							"edge_block_hash", edgeBlk.Hash(),
+							"error", err,
+						)
+					}
+				}
 			}
 
 			// Periodically verify that we are staked, before proceeding with sequencer
@@ -139,8 +168,21 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				panic("no staked sequencers")
 			}
 
+			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
+			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
+
+			isItMyTurn := sw.IsNextSequencer(sequencers[0])
+
+			// Will check the block for fraudlent behaviour and slash parties accordingly.
+			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
+			// We can change this in the future but with it, understand that series of issues are going to
+			// happen with syncing and publishing of the blocks that will need to be fixed.
+			if _, err := fraudResolver.CheckAndSlash(isItMyTurn); err != nil {
+				continue
+			}
+
 			// Is it my turn to generate next block?
-			if bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes()) {
+			if isItMyTurn {
 				header := sw.blockchain.Header()
 				sw.logger.Info("it's my turn; producing a block", "t", blk.Block.Header.Number)
 				if err := sw.writeBlock(account, key, header); err != nil {
@@ -277,7 +319,6 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 		sw.logger.Debug("found transaction from txpool", "hash", tx.Hash.String())
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
-			sw.txpool.Drop(tx)
 			continue
 		}
 

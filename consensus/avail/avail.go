@@ -124,7 +124,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			),
 			signKey:   validatorKey,
 			minerAddr: validatorAddr,
-			validator: validator.New(params.Blockchain, params.Executor, validatorAddr),
+			validator: validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {

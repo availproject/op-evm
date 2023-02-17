@@ -41,7 +41,7 @@ bootstrap-staking-contract: build-staking-contract
 	--artifacts-path "$(STAKING_CONTRACT_PATH)/artifacts/contracts/Staking.sol/Staking.json" \
 	--constructor-args "1" \
 	--constructor-args "10"
-	sed -i 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
+	sed -i '' -e 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 

@@ -37,6 +37,10 @@ func (dasq *staticActiveSequencers) GetTotalStakedAmount() (*big.Int, error) {
 	return nil, nil
 }
 
+func (dasq *staticActiveSequencers) InProbation(_ types.Address) (bool, error) {
+	return false, nil
+}
+
 func Test_RandomizedSequencers(t *testing.T) {
 
 	testCases := []struct {

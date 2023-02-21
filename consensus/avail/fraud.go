@@ -99,12 +99,12 @@ func (f *Fraud) GetBeginDisputeResolutionTxHash() types.Hash {
 	return hash
 }
 
-func (f *Fraud) IsDisputedBlock(blk *types.Block) bool {
+func (f *Fraud) IsFraudProofBlock(blk *types.Block) bool {
 	_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
 	return exists
 }
 
-func (f *Fraud) CheckAndSlash(allowSlash bool) (bool, error) {
+func (f *Fraud) CheckAndSlash(isMaliciousNode bool) (bool, error) {
 
 	// There is no block attached from previous sequencer runs and therefore we assume
 	// no fraud should be checked in this moment...
@@ -113,7 +113,7 @@ func (f *Fraud) CheckAndSlash(allowSlash bool) (bool, error) {
 		return false, nil
 	}
 
-	if !allowSlash {
+	if isMaliciousNode {
 		f.logger.Info("it is not my turn to check the potentially fraudlent block and slash. Skipping...")
 		return false, errors.New("i am not allowed to check this particular fraudlent block")
 	}
@@ -194,6 +194,8 @@ func (f *Fraud) CheckAndSlash(allowSlash bool) (bool, error) {
 			"Fraud proof block check confirmed malicious block. Slashing sequencer...",
 			"watchtower_block_hash", f.fraudBlock.Hash(),
 			"potentially_malicious_block_hash", maliciousBlock.Hash(),
+			"potentially_malicious_block_parent_hash", maliciousBlock.ParentHash(),
+			"potentially_malicious_block_number", maliciousBlock.Number(),
 			"sequencer", sequencerAddr,
 			"watchtower_addr", watchtowerAddr,
 			"error", err,
@@ -247,14 +249,14 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 		return err
 	}
 
+	bb.SetCoinbaseAddress(f.nodeAddr)
+	bb.SignWith(f.nodeSignKey)
+
 	// We are going to fork the chain but only if the malicious participant is sequencer.
 	// Otherwise we are making sure we slash the watchtower and continue normal operation...
 	if nodeType == Sequencer {
 		bb.SetParentHash(maliciousHeader.ParentHash)
 	}
-
-	bb.SetCoinbaseAddress(f.nodeAddr)
-	bb.SignWith(f.nodeSignKey)
 
 	// Append begin disputed resolution txn
 	disputeTxHash := f.GetBeginDisputeResolutionTxHash()
@@ -295,6 +297,10 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 		return err
 	}
 
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	f.txpool.ResetWithHeaders(blk.Header)
+
 	f.logger.Info(
 		"Successfully sent and wrote begin dispute resolution block to the blockchain...",
 		"txn_count", len(blk.Transactions),
@@ -309,6 +315,12 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 	if err != nil {
 		return err
 	}
+
+	// We are going to fork the chain but only if the malicious participant is sequencer.
+	// Otherwise we are making sure we slash the watchtower and continue normal operation...
+	/* 	if nodeType == Sequencer {
+		slashBlk.SetParentHash(maliciousHeader.ParentHash)
+	} */
 
 	// If sequencer set parent hash
 	// bb.SetParentHash(maliciousHeader.ParentHash)
@@ -367,6 +379,10 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 		f.logger.Error("failed to write slashing block to the blockchain", "err", err)
 		return err
 	}
+
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	f.txpool.ResetWithHeaders(blk2.Header)
 
 	f.logger.Info(
 		"Successfully sent and wrote slashing block to the blockchain... Resuming with the chain activity...",

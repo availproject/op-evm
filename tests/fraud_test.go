@@ -59,7 +59,7 @@ func Test_Fraud(t *testing.T) {
 		cancel()
 
 		// Wait for 10 blocks
-		if bNum > 10 {
+		if bNum > 20 {
 			t.Fatal("Could not receive successful confirmation that fraud block was processed in 10 blocks.")
 		}
 

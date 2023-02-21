@@ -249,7 +249,6 @@ func (d *Avail) startSyncing() {
 }
 
 // REQUIRED BASE INTERFACE METHODS //
-// BeginDisputeResolution -
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 	return d.verifier.VerifyHeader(header)

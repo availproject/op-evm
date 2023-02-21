@@ -89,8 +89,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// So this is the situation...
 			// Here we are not looking for if current node should be producing or not producing the block.
 			// What we are interested, prior to fraud resolver, if block is containing fraud check request.
-			// That and only that we're looking at this stage...
-
 			edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
 			if len(edgeBlks) == 0 && err != nil {
 				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
@@ -104,9 +102,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 			// Write down blocks received from avail to make sure we're synced before processing with the
 			// fraud check or writing down new blocks...
-		processBlocks:
 			for _, edgeBlk := range edgeBlks {
-
 				// In case that dispute resolution is ended, please make sure to set fraud resolution block
 				// to nil so whole chain and corrupted node can continue making our day good!
 				// Block does not have to be written into the chain as it's already written with syncer...
@@ -117,13 +113,12 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
 					)
 					fraudResolver.SetBlock(nil)
-					continue processBlocks
 				}
 
 				// We cannot write down disputed blocks to the blockchain as they would be rejected due to
 				// numerous reasons. From block number missalignment to block already exist to skewing the
 				// rest of the flow later on...
-				if !fraudResolver.IsDisputedBlock(edgeBlk) {
+				if !fraudResolver.IsFraudProofBlock(edgeBlk) {
 					if err := validator.Check(edgeBlk); err == nil {
 						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
 							sw.logger.Warn(
@@ -131,6 +126,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 								"edge_block_hash", edgeBlk.Hash(),
 								"error", err,
 							)
+						} else {
+							sw.txpool.ResetWithHeaders(edgeBlk.Header)
 						}
 					} else {
 						sw.logger.Warn(
@@ -177,7 +174,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
 			// We can change this in the future but with it, understand that series of issues are going to
 			// happen with syncing and publishing of the blocks that will need to be fixed.
-			if _, err := fraudResolver.CheckAndSlash(isItMyTurn); err != nil {
+			if _, err := fraudResolver.CheckAndSlash(false); err != nil {
 				continue
 			}
 
@@ -201,6 +198,49 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			return nil
 		}
 	}
+}
+
+// processEdgeBlocks - Write down blocks received from avail to make sure we're synced before processing with the
+// fraud check or writing down new blocks...
+func (sw *SequencerWorker) processEdgeBlocks(fraudResolver *Fraud, validator validator.Validator, edgeBlks []*types.Block) error {
+	for _, edgeBlk := range edgeBlks {
+		// In case that dispute resolution is ended, please make sure to set fraud resolution block
+		// to nil so whole chain and corrupted node can continue making our day good!
+		// Block does not have to be written into the chain as it's already written with syncer...
+		if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
+			sw.logger.Warn(
+				"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
+				"edge_block_hash", edgeBlk.Hash(),
+				"fraud_block_hash", fraudResolver.GetBlock().Hash(),
+			)
+			fraudResolver.SetBlock(nil)
+		}
+
+		// We cannot write down disputed blocks to the blockchain as they would be rejected due to
+		// numerous reasons. From block number missalignment to block already exist to skewing the
+		// rest of the flow later on...
+		if !fraudResolver.IsFraudProofBlock(edgeBlk) {
+			if err := validator.Check(edgeBlk); err == nil {
+				if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
+					sw.logger.Warn(
+						"failed to write edge block received from avail",
+						"edge_block_hash", edgeBlk.Hash(),
+						"error", err,
+					)
+				} else {
+					sw.txpool.ResetWithHeaders(edgeBlk.Header)
+				}
+			} else {
+				sw.logger.Warn(
+					"failed to validate edge block received from avail",
+					"edge_block_hash", edgeBlk.Hash(),
+					"error", err,
+				)
+			}
+		}
+	}
+
+	return nil
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
@@ -246,6 +286,24 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	txns := sw.writeTransactions(gasLimit, transition)
 
+	/* 	TRIGGER SEQUENCER SLASHING
+		maliciousBlockWritten := false
+	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
+	   		if header.Number == 4 || header.Number == 5 {
+	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+	   			tx.Nonce = 1
+	   			txSigner := &crypto.FrontierSigner{}
+	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+	   			if err != nil {
+	   				sw.logger.Error("failed to sign fraud transaction", "err", err)
+	   				return err
+	   			}
+
+	   			txns = append(txns, dtx)
+	   			maliciousBlockWritten = true
+	   		}
+	   	} */
+
 	// Commit the changes
 	_, root := transition.Commit()
 
@@ -267,20 +325,19 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	//if header.Number == 5 {
-	//	header.ExtraData = []byte{1, 2, 3}
-	//}
-
-	// Corrupt miner -> fraud check.
-	//header.Miner = types.ZeroAddress.Bytes()
-
 	blk.Header = header
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
-	sw.logger.Info("sending block to avail")
+	sw.logger.Info(
+		"Sending new block to avail",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
 
 	err = sw.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
@@ -288,16 +345,26 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	sw.logger.Info("sent block to avail")
-	sw.logger.Info("writing block to blockchain")
+	sw.logger.Info(
+		"Block successfully sent to avail. Writing block to local chain...",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
 
 	// Write the block to the blockchain
 	if err := sw.blockchain.WriteBlock(blk, sw.nodeType.String()); err != nil {
 		return err
 	}
 
-	sw.logger.Info("Successfully wrote block to blockchain", "number", blk.Number(), "hash", blk.Hash(), "parent_hash", blk.ParentHash())
-
+	sw.logger.Info(
+		"Successfully wrote new sequencer block to the local chain",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
 	sw.txpool.ResetWithHeaders(blk.Header)

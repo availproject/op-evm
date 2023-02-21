@@ -81,9 +81,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 		blksLoop:
 			for _, blk := range blks {
 				err = watchTower.Check(blk)
-				if err != nil || blk.Number() == 4 {
-					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-
+				if err != nil || blk.Number() == 4 { //   - test the fraud
 					// TODO: Fix this...
 					// Basically right now if fraud is discovered it will end in the endless loop of
 					// pushing the frauds and never completing the fraud...
@@ -92,6 +90,8 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 							continue blksLoop
 						}
 					}
+
+					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
 					// Block should be applied regardless as new block will take it's place.
 					// Basically later on what happens block cannot be found resulting in various issues of hash not found.

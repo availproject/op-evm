@@ -62,6 +62,26 @@ func TestBeginDisputeResolution(t *testing.T) {
 	tAssert.Equal(byzantineSequencerAddr, contractSequencerAddr)
 }
 
+func TestIsBeginDisputeResolutionTx(t *testing.T) {
+	from, _ := test.NewAccount(t)
+	probationAddr, _ := test.NewAccount(t)
+	gasLimit := uint64(1_000_000)
+
+	tx, err := BeginDisputeResolutionTx(from, probationAddr, gasLimit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := IsBeginDisputeResolutionTx(tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !res {
+		t.Fatalf("IsBeginDisputeResolutionTx(): got %t, expected %t", res, true)
+	}
+}
+
 func TestEndDisputeResolution(t *testing.T) {
 	tAssert := assert.New(t)
 

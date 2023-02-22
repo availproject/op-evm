@@ -29,22 +29,23 @@ type transitionInterface interface {
 }
 
 type SequencerWorker struct {
-	logger       hclog.Logger
-	blockchain   *blockchain.Blockchain
-	executor     *state.Executor
-	validator    validator.Validator
-	txpool       *txpool.TxPool
-	apq          staking.ActiveParticipants
-	availAppID   avail_types.U32
-	availClient  avail.Client
-	availAccount signature.KeyringPair
-	nodeSignKey  *ecdsa.PrivateKey
-	nodeAddr     types.Address
-	nodeType     MechanismType
-	stakingNode  staking.Node
-	availSender  avail.Sender
-	closeCh      chan struct{}
-	blockTime    time.Duration // Minimum block generation time in seconds
+	logger                     hclog.Logger
+	blockchain                 *blockchain.Blockchain
+	executor                   *state.Executor
+	validator                  validator.Validator
+	txpool                     *txpool.TxPool
+	apq                        staking.ActiveParticipants
+	availAppID                 avail_types.U32
+	availClient                avail.Client
+	availAccount               signature.KeyringPair
+	nodeSignKey                *ecdsa.PrivateKey
+	nodeAddr                   types.Address
+	nodeType                   MechanismType
+	stakingNode                staking.Node
+	availSender                avail.Sender
+	closeCh                    chan struct{}
+	blockTime                  time.Duration // Minimum block generation time in seconds
+	blockProductionIntervalSec uint64
 }
 
 func (sw *SequencerWorker) IsNextSequencer(sequencer types.Address) bool {
@@ -71,6 +72,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	// Will wait until contract is updated and there's a staking transaction written
 	sw.waitForStakedSequencer(activeSequencersQuerier, sw.nodeAddr)
+
+	enableBlockProductionCh := make(chan bool)
+	go sw.runWriteBlocksLoop(enableBlockProductionCh, sw.apq, account, key)
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
@@ -175,19 +179,18 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// We can change this in the future but with it, understand that series of issues are going to
 			// happen with syncing and publishing of the blocks that will need to be fixed.
 			if _, err := fraudResolver.CheckAndSlash(false); err != nil {
+				enableBlockProductionCh <- false
 				continue
 			}
 
 			// Is it my turn to generate next block?
 			if isItMyTurn {
-				header := sw.blockchain.Header()
-				sw.logger.Info("it's my turn; producing a block", "t", blk.Block.Header.Number)
-				if err := sw.writeBlock(account, key, header); err != nil {
-					sw.logger.Error("failed to mine block", "err", err)
-				}
+				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+				enableBlockProductionCh <- true
 				continue
 			} else {
-				sw.logger.Info("it's not my turn; skippin' a round", "t", blk.Block.Header.Number)
+				sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+				enableBlockProductionCh <- false
 			}
 
 		case <-sw.closeCh:
@@ -200,52 +203,39 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	}
 }
 
-// processEdgeBlocks - Write down blocks received from avail to make sure we're synced before processing with the
-// fraud check or writing down new blocks...
-func (sw *SequencerWorker) processEdgeBlocks(fraudResolver *Fraud, validator validator.Validator, edgeBlks []*types.Block) error {
-	for _, edgeBlk := range edgeBlks {
-		// In case that dispute resolution is ended, please make sure to set fraud resolution block
-		// to nil so whole chain and corrupted node can continue making our day good!
-		// Block does not have to be written into the chain as it's already written with syncer...
-		if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
-			sw.logger.Warn(
-				"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
-				"edge_block_hash", edgeBlk.Hash(),
-				"fraud_block_hash", fraudResolver.GetBlock().Hash(),
-			)
-			fraudResolver.SetBlock(nil)
-		}
+// runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
+func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
+	t := time.NewTicker(time.Duration(sw.blockProductionIntervalSec) * time.Second)
+	defer t.Stop()
 
-		// We cannot write down disputed blocks to the blockchain as they would be rejected due to
-		// numerous reasons. From block number missalignment to block already exist to skewing the
-		// rest of the flow later on...
-		if !fraudResolver.IsFraudProofBlock(edgeBlk) {
-			if err := validator.Check(edgeBlk); err == nil {
-				if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
-					sw.logger.Warn(
-						"failed to write edge block received from avail",
-						"edge_block_hash", edgeBlk.Hash(),
-						"error", err,
-					)
-				} else {
-					sw.txpool.ResetWithHeaders(edgeBlk.Header)
-				}
-			} else {
-				sw.logger.Warn(
-					"failed to validate edge block received from avail",
-					"edge_block_hash", edgeBlk.Hash(),
-					"error", err,
-				)
+	shouldProduce := false
+	for {
+		select {
+		case <-t.C:
+			if !shouldProduce {
+				continue
 			}
+
+			sw.logger.Debug("writing a new block", "myAccount.Address", myAccount.Address)
+			if err := sw.writeBlock(enableBlockProductionCh, activeParticipantsQuerier, myAccount, signKey); err != nil {
+				sw.logger.Error("failed to mine block", "err", err)
+			}
+		case e := <-enableBlockProductionCh:
+			sw.logger.Debug("sequencer block producing status", "should_produce", e)
+			shouldProduce = e
+
+		case <-sw.closeCh:
+			sw.logger.Debug("received stop signal")
+			return
 		}
 	}
-
-	return nil
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key, parent *types.Header) error {
+func (sw *SequencerWorker) writeBlock(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) error {
+	parent := sw.blockchain.Header()
+
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -284,7 +274,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	txns := sw.writeTransactions(gasLimit, transition)
+	txns := sw.writeTransactions(enableBlockProductionCh, activeParticipantsQuerier, gasLimit, transition)
 
 	/* 	TRIGGER SEQUENCER SLASHING
 		maliciousBlockWritten := false
@@ -372,7 +362,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	return nil
 }
 
-func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (sw *SequencerWorker) writeTransactions(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
 	sw.txpool.Prepare()
@@ -383,7 +373,30 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 			break
 		}
 
-		sw.logger.Debug("found transaction from txpool", "hash", tx.Hash.String())
+		// We are not interested in errors at this moment. Only if watchtower is set to true or false
+		isWatchtower, _ := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
+
+		sw.logger.Info(
+			"New tx pool transaction discovered",
+			"hash", tx.Hash,
+			"value", tx.Value,
+			"originating_addr", tx.From.String(),
+			"recipient_addr", tx.To.String(),
+			"submitted_via_watchtower", isWatchtower,
+			"staking_contract_addr", staking.AddrStakingContract.String(),
+			"submitted_towards_contract", bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()),
+		)
+
+		// TODO: Figure out if the transaction is type of begin dispute resolution
+		if isWatchtower && bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()) {
+			sw.logger.Warn(
+				"Discovered begin dispute resolution tx while building block txns. Processing block txns until this tx and disabling node...",
+				"originating_watchtower_addr", tx.From,
+				"dispute_resolution_tx_hash", tx.Hash,
+			)
+			enableBlockProductionCh <- false
+			break
+		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			continue
@@ -417,22 +430,24 @@ func NewSequencer(
 	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, v validator.Validator, availClient avail.Client,
 	availAccount signature.KeyringPair, availAppID avail_types.U32,
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
-	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{}, blockTime time.Duration) (*SequencerWorker, error) {
+	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
+	blockTime time.Duration, blockProductionIntervalSec uint64) (*SequencerWorker, error) {
 	return &SequencerWorker{
-		logger:       logger,
-		blockchain:   b,
-		executor:     e,
-		validator:    v,
-		txpool:       txp,
-		apq:          apq,
-		availAppID:   availAppID,
-		availClient:  availClient,
-		availAccount: availAccount,
-		nodeSignKey:  nodeSignKey,
-		nodeAddr:     nodeAddr,
-		nodeType:     nodeType,
-		stakingNode:  stakingNode,
-		availSender:  availSender,
-		blockTime:    blockTime,
+		logger:                     logger,
+		blockchain:                 b,
+		executor:                   e,
+		validator:                  v,
+		txpool:                     txp,
+		apq:                        apq,
+		availAppID:                 availAppID,
+		availClient:                availClient,
+		availAccount:               availAccount,
+		nodeSignKey:                nodeSignKey,
+		nodeAddr:                   nodeAddr,
+		nodeType:                   nodeType,
+		stakingNode:                stakingNode,
+		availSender:                availSender,
+		blockTime:                  blockTime,
+		blockProductionIntervalSec: blockProductionIntervalSec,
 	}, nil
 }

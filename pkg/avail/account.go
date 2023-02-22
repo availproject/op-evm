@@ -150,7 +150,7 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64,
 			case status.IsFinalized:
 				return nil
 			case status.IsInBlock:
-				continue
+				return nil
 			default:
 				if status.IsDropped || status.IsInvalid {
 					return fmt.Errorf("unexpected extrinsic status from Avail: %#v", status)

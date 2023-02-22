@@ -19,6 +19,10 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+var (
+	ErrTxPoolHashNotFound = errors.New("hash not found in the txpool")
+)
+
 type Fraud struct {
 	logger      hclog.Logger
 	blockchain  *blockchain.Blockchain
@@ -49,7 +53,7 @@ func (f *Fraud) CheckAndSetFraudBlock(blocks []*types.Block) bool {
 	for _, blk := range blocks {
 		if fraudProofBlockHash, exists := block.GetExtraDataFraudProofTarget(blk.Header); exists {
 			f.logger.Info(
-				"Fraud proof parent hash discovered. Chain is entering into the dispute mode...",
+				"Fraud proof parent hash block discovered. Chain is entering into the dispute mode...",
 				"probation_block_hash", fraudProofBlockHash,
 			)
 			f.SetBlock(blk)
@@ -91,7 +95,7 @@ func (f *Fraud) DiscoverDisputeResolutionTx(hash types.Hash) (*types.Transaction
 		}
 	}
 
-	return nil, fmt.Errorf("failed to discover dispute resolution tx at txpool hash: %s", hash)
+	return nil, ErrTxPoolHashNotFound
 }
 
 func (f *Fraud) GetBeginDisputeResolutionTxHash() types.Hash {
@@ -260,12 +264,13 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 
 	// Append begin disputed resolution txn
 	disputeTxHash := f.GetBeginDisputeResolutionTxHash()
-	f.logger.Info("Dispute resolution tx hash from fraud block", "hash", disputeTxHash.String())
+	f.logger.Info("Looking for dispute resolution tx hash from fraud block", "hash", disputeTxHash)
 	disputeBeginTx, err := f.DiscoverDisputeResolutionTx(disputeTxHash)
 	if err != nil {
 		f.logger.Error(
 			"failed to discover begin dispute resoultion transaction for the block",
 			"correct_block_hash", maliciousHeader.ParentHash,
+			"dispute_resolution_tx_hash", disputeTxHash,
 			"err", err,
 		)
 		return err

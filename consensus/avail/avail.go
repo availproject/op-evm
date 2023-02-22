@@ -41,6 +41,9 @@ const (
 
 	// For now hand coded address of the watch tower
 	WatchTowerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
+
+	// StakingPollPeersIntervalMs interval to wait for when waiting for peer sto come up before staking
+	StakingPollPeersIntervalMs = 200
 )
 
 type Config struct {
@@ -82,7 +85,8 @@ type Avail struct {
 	availSender  avail.Sender
 	stakingNode  staking.Node
 
-	validator validator.Validator
+	blockProductionIntervalSec uint64
+	validator                  validator.Validator
 }
 
 // Factory returns the consensus factory method
@@ -122,9 +126,10 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 				params.Blockchain,
 				time.Duration(params.BlockTime)*3*time.Second,
 			),
-			signKey:   validatorKey,
-			minerAddr: validatorAddr,
-			validator: validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
+			signKey:                    validatorKey,
+			minerAddr:                  validatorAddr,
+			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
+			blockProductionIntervalSec: 1,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -154,6 +159,16 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
+		blockProductionIntervalSecRaw, ok := params.Config.Config["blockProductionIntervalSec"]
+		if ok {
+			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
+			if !ok {
+				return nil, fmt.Errorf("blockProductionIntervalSec expected int")
+			}
+
+			d.blockProductionIntervalSec = blockProductionIntervalSec
+		}
+
 		accountBytes, err := os.ReadFile(config.AccountFilePath)
 		if err != nil {
 			return nil, fmt.Errorf("failure to read account file '%s'", err)
@@ -164,15 +179,13 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			return nil, err
 		}
 
-		if d.availAppID, err = avail.QueryAppID(d.availClient, AvailApplicationKey); err != nil {
-			if err == avail.ErrAppIDNotFound {
-				d.logger.Debug("Application key not found. Creating new one...", "app_key", AvailApplicationKey)
-				d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-				if err != nil {
-					return nil, err
-				}
-			}
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+		if err != nil {
+			return nil, err
+		}
 
+		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+		if err != nil {
 			return nil, err
 		}
 
@@ -191,6 +204,11 @@ func (d *Avail) Initialize() error {
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
+	var (
+		activeParticipantsQuerier = staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+		account                   = accounts.Account{Address: common.Address(d.minerAddr)}
+		key                       = &keystore.Key{PrivateKey: d.signKey}
+	)
 
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
@@ -198,12 +216,7 @@ func (d *Avail) Start() error {
 	// Start P2P syncing.
 	go d.startSyncing()
 
-	// Prior we continue with node bootstrap, we are first going to ensure that
-	// node is properly staked and keep checking if node is staked properly as a separated goroutine.
-	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
-
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		return err
 	}
@@ -214,7 +227,7 @@ func (d *Avail) Start() error {
 			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
 			d.validator, d.availClient, d.availAccount, d.availAppID,
 			d.signKey, d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
-			d.blockTime,
+			d.blockTime, d.blockProductionIntervalSec,
 		)
 		go func() {
 			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
@@ -222,7 +235,7 @@ func (d *Avail) Start() error {
 			}
 		}()
 	case WatchTower:
-		go d.runWatchTower(d.stakingNode, accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey})
+		go d.runWatchTower(activeParticipantsQuerier, account, key)
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

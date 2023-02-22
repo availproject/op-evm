@@ -14,8 +14,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
-	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
@@ -51,7 +50,7 @@ func (d *Avail) runWatchTower(stakingNode staking.Node, myAccount accounts.Accou
 	for {
 		select {
 		case <-d.closeCh:
-			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
+			if err := d.stakingNode.UnStake(signKey.PrivateKey); err != nil {
 				d.logger.Error("failed to unstake the node", "error", err)
 			}
 			availBlockStream.Close()

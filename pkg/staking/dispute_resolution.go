@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -270,6 +271,42 @@ func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, g
 		GasPrice: big.NewInt(5000),
 		Gas:      gasLimit,
 	}, nil
+}
+
+func IsBeginDisputeResolutionTx(tx *types.Transaction) (bool, error) {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
+	if !ok {
+		panic("BeginDisputeResolution method doesn't exist in Staking contract ABI. Contract is broken.")
+	}
+
+	fnSelector := method.ID()
+
+	if len(fnSelector) >= len(tx.Input) {
+		return false, fmt.Errorf("invalid transaction input bytes: length too short")
+	}
+
+	splitIdx := len(fnSelector)
+	s := tx.Input[:splitIdx]
+	if !bytes.Equal(s, fnSelector) {
+		return false, fmt.Errorf("smart contract function selector doesn't match")
+	}
+
+	decodedInput, err := method.Inputs.Decode(tx.Input[splitIdx:])
+	if err != nil {
+		return false, err
+	}
+
+	m, ok := decodedInput.(map[string]interface{})
+	if !ok {
+		return false, fmt.Errorf("unrecognizable type decoded from dispute resolution tx: %T", decodedInput)
+	}
+
+	_, exists := m["sequencerAddr"]
+	if !exists {
+		return false, fmt.Errorf("invalid parameters for BeginDisputeResolution")
+	}
+
+	return true, nil
 }
 
 func EndDisputeResolutionTx(from types.Address, probationAddr types.Address, gasLimit uint64) (*types.Transaction, error) {

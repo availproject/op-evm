@@ -33,7 +33,7 @@ const (
 	AVL = 1_000_000_000_000_000_000
 
 	// DefaultBlockProductionIntervalS - In seconds, default block loop production attempt interval
-	DefaultBlockProductionIntervalS = 2
+	DefaultBlockProductionIntervalS = 1
 
 	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
 	// data in Avail.

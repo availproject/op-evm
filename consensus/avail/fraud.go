@@ -42,8 +42,9 @@ type Fraud struct {
 	availSender avail.Sender
 	nodeType    MechanismType
 
-	fraudBlock         *types.Block
-	chainProcessStatus DisputeProcessChainStatus
+	fraudBlock          *types.Block
+	lastFraudDisputedTx *types.Transaction
+	chainProcessStatus  DisputeProcessChainStatus
 }
 
 func (f *Fraud) SetBlock(b *types.Block) {
@@ -110,7 +111,7 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 		// We've already received begin dispute resolution transaction. Now it's time to wait for
 		// processing prior we check tx pool again...
 		if f.IsChainDisabled() {
-			time.Sleep(1 * time.Second)
+			time.Sleep(200 * time.Millisecond) // Just a bit of the delay...
 			continue
 		}
 
@@ -127,14 +128,12 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 			isWatchtower, err := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
 			if err != nil {
 				f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
-				time.Sleep(1 * time.Second)
 				continue
 			}
 
 			isBeginDisputeResolutionTx, err := staking.IsBeginDisputeResolutionTx(tx)
 			if err != nil {
 				f.logger.Debug("failure while checking if tx is type of begin dispute resolution", "error", err)
-				time.Sleep(1 * time.Second)
 				continue
 			}
 
@@ -151,6 +150,13 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 			)
 
 			if isWatchtower && bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()) && isBeginDisputeResolutionTx {
+				// It happens that in time to time, due to multiple push (one tx pool one next block) of the begin dispute resolution txs
+				// it can get node into the disputed mode even if dispute mode is already resolved for that specific transaction.
+				// This check makes sure we bypass that situation.
+				if f.lastFraudDisputedTx != nil && bytes.Equal(tx.Hash.Bytes(), f.lastFraudDisputedTx.Hash.Bytes()) {
+					continue
+				}
+
 				f.logger.Warn(
 					"Discovered valid begin dispute resolution transaction. Chain is entering fraud dispute mode...",
 					"originating_watchtower_addr", tx.From,
@@ -159,6 +165,7 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 
 				// We have proper transaction and therefore we are going to stop processing blocks in the chain
 				f.SetChainStatus(ChainProcessingDisabled)
+				f.lastFraudDisputedTx = tx
 				break innerLoop
 			}
 		}

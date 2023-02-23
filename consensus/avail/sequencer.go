@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -123,6 +122,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
 					)
 					fraudResolver.EndDisputeResolution()
+					//sw.txpool.ResetWithHeaders(edgeBlk.Header)
 				}
 
 				// We cannot write down disputed blocks to the blockchain as they would be rejected due to
@@ -136,9 +136,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 								"edge_block_hash", edgeBlk.Hash(),
 								"error", err,
 							)
-						} else {
-							sw.txpool.ResetWithHeaders(edgeBlk.Header)
-						}
+						} // else {
+						//	sw.txpool.ResetWithHeaders(edgeBlk.Header)
+						//}
 					} else {
 						sw.logger.Warn(
 							"failed to validate edge block received from avail",
@@ -163,7 +163,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			}
 
 			if !sequencerStaked {
-				sw.logger.Error("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
+				sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
 				continue
 			}
 
@@ -294,23 +294,23 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	txns := sw.writeTransactions(gasLimit, transition)
 
-	// TRIGGER SEQUENCER SLASHING
-	maliciousBlockWritten := false
-	if sw.nodeType != Sequencer && !maliciousBlockWritten {
-		if header.Number == 4 || header.Number == 5 {
-			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
-			tx.Nonce = 1
-			txSigner := &crypto.FrontierSigner{}
-			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
-			if err != nil {
-				sw.logger.Error("failed to sign fraud transaction", "err", err)
-				return err
-			}
+	/* 	// TRIGGER SEQUENCER SLASHING
+	   	maliciousBlockWritten := false
+	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
+	   		if header.Number == 4 || header.Number == 5 {
+	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+	   			tx.Nonce = 1
+	   			txSigner := &crypto.FrontierSigner{}
+	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+	   			if err != nil {
+	   				sw.logger.Error("failed to sign fraud transaction", "err", err)
+	   				return err
+	   			}
 
-			txns = append(txns, dtx)
-			maliciousBlockWritten = true
-		}
-	}
+	   			txns = append(txns, dtx)
+	   			maliciousBlockWritten = true
+	   		}
+	   	} */
 
 	// Commit the changes
 	_, root := transition.Commit()

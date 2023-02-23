@@ -143,15 +143,26 @@ func (v *validator) verifyHeader(header *types.Header) error {
 		return err
 	}
 
-	v.logger.Info("Verify header", "signer", signer.String())
+	v.logger.Info("About to process block header verification",
+		"block_hash", header.Hash,
+		"signer", signer.String(),
+	)
 
 	minerAddr := types.BytesToAddress(header.Miner)
 
 	if !bytes.Equal(signer.Bytes(), header.Miner) {
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, minerAddr)
+		return fmt.Errorf(
+			"signer address '%s' does not match sequencer address '%s' for block hash '%s'",
+			signer, minerAddr, header.Hash,
+		)
 	}
 
-	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", minerAddr)
+	v.logger.Info(
+		"Seal signer address successfully verified!",
+		"block_hash", header.Hash,
+		"signer", signer,
+		"sequencer", minerAddr,
+	)
 
 	/*
 		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)

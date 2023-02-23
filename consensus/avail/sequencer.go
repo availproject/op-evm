@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -48,22 +49,24 @@ type SequencerWorker struct {
 	blockProductionIntervalSec uint64
 }
 
-func (sw *SequencerWorker) IsNextSequencer(sequencer types.Address) bool {
-	return bytes.Equal(sequencer.Bytes(), sw.nodeAddr.Bytes())
-}
-
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
 	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
-	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, validator, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
+
+	enableBlockProductionCh := make(chan bool)
+	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, validator, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
 
 	accBalance, err := avail.GetBalance(sw.availClient, sw.availAccount)
 	if err != nil {
 		return fmt.Errorf("failed to discover account balance: %s", err)
 	}
 
-	sw.logger.Info("Current avail account", "balance", accBalance.Int64())
+	sw.logger.Info(
+		"Avail account information",
+		"address", sw.availAccount.Address,
+		"balance", accBalance.Int64(),
+	)
 
 	callIdx, err := avail.FindCallIndex(sw.availClient)
 	if err != nil {
@@ -73,8 +76,11 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	// Will wait until contract is updated and there's a staking transaction written
 	sw.waitForStakedSequencer(activeSequencersQuerier, sw.nodeAddr)
 
-	enableBlockProductionCh := make(chan bool)
-	go sw.runWriteBlocksLoop(enableBlockProductionCh, sw.apq, account, key)
+	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
+	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
+
+	// Write blocks to the local blockchain and avail in intervals uless block production is stopped.
+	go sw.runWriteBlocksLoop(enableBlockProductionCh, activeSequencersQuerier, fraudResolver, account, key)
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
@@ -116,7 +122,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						"edge_block_hash", edgeBlk.Hash(),
 						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
 					)
-					fraudResolver.SetBlock(nil)
+					fraudResolver.EndDisputeResolution()
 				}
 
 				// We cannot write down disputed blocks to the blockchain as they would be rejected due to
@@ -143,6 +149,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				}
 			}
 
+			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
+			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
+
 			// Periodically verify that we are staked, before proceeding with sequencer
 			// logic. In the unexpected case of being slashed and dropping below the
 			// required sequencer staking threshold, we must stop processing, because
@@ -158,33 +167,16 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				continue
 			}
 
-			sequencers, err := activeSequencersQuerier.Get()
-			if err != nil {
-				sw.logger.Error("querying staked sequencers failed; quitting", "error", err)
-				continue
-			}
-
-			if len(sequencers) == 0 {
-				// This is something that should **never** happen.
-				panic("no staked sequencers")
-			}
-
-			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
-			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
-
-			isItMyTurn := sw.IsNextSequencer(sequencers[0])
-
 			// Will check the block for fraudlent behaviour and slash parties accordingly.
 			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
 			// We can change this in the future but with it, understand that series of issues are going to
 			// happen with syncing and publishing of the blocks that will need to be fixed.
-			if _, err := fraudResolver.CheckAndSlash(false); err != nil {
-				enableBlockProductionCh <- false
+			if _, err := fraudResolver.CheckAndSlash(); err != nil {
 				continue
 			}
 
 			// Is it my turn to generate next block?
-			if isItMyTurn {
+			if sw.IsNextSequencer(activeSequencersQuerier) {
 				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
 				enableBlockProductionCh <- true
 				continue
@@ -203,12 +195,23 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	}
 }
 
+func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.ActiveSequencers) bool {
+	sequencers, err := activeSequencersQuerier.Get()
+	if err != nil {
+		sw.logger.Error("querying staked sequencers failed; quitting", "error", err)
+		return false
+	}
+
+	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
+}
+
 // runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
-func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
+func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool, activeSequencersQuerier staking.ActiveSequencers, fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) {
 	t := time.NewTicker(time.Duration(sw.blockProductionIntervalSec) * time.Second)
 	defer t.Stop()
 
 	shouldProduce := false
+
 	for {
 		select {
 		case <-t.C:
@@ -216,8 +219,23 @@ func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool,
 				continue
 			}
 
-			sw.logger.Debug("writing a new block", "myAccount.Address", myAccount.Address)
-			if err := sw.writeBlock(enableBlockProductionCh, activeParticipantsQuerier, myAccount, signKey); err != nil {
+			// Means we are processing the disputed (fraud) block verification and should not create new
+			// blocks anywhere...
+			if fraudResolver.IsChainDisabled() {
+				continue
+			}
+
+			if !sw.IsNextSequencer(activeSequencersQuerier) {
+				sw.logger.Warn(
+					"it is not my turn to produce the block",
+					"sequencer_addr", myAccount.Address,
+				)
+				continue
+			}
+
+			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)
+
+			if err := sw.writeBlock(myAccount, signKey); err != nil {
 				sw.logger.Error("failed to mine block", "err", err)
 			}
 		case e := <-enableBlockProductionCh:
@@ -233,7 +251,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool,
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (sw *SequencerWorker) writeBlock(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) error {
+func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key) error {
 	parent := sw.blockchain.Header()
 
 	header := &types.Header{
@@ -274,25 +292,25 @@ func (sw *SequencerWorker) writeBlock(enableBlockProductionCh chan bool, activeP
 		return err
 	}
 
-	txns := sw.writeTransactions(enableBlockProductionCh, activeParticipantsQuerier, gasLimit, transition)
+	txns := sw.writeTransactions(gasLimit, transition)
 
-	/* 	TRIGGER SEQUENCER SLASHING
-		maliciousBlockWritten := false
-	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
-	   		if header.Number == 4 || header.Number == 5 {
-	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
-	   			tx.Nonce = 1
-	   			txSigner := &crypto.FrontierSigner{}
-	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
-	   			if err != nil {
-	   				sw.logger.Error("failed to sign fraud transaction", "err", err)
-	   				return err
-	   			}
+	// TRIGGER SEQUENCER SLASHING
+	maliciousBlockWritten := false
+	if sw.nodeType != Sequencer && !maliciousBlockWritten {
+		if header.Number == 4 || header.Number == 5 {
+			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+			tx.Nonce = 1
+			txSigner := &crypto.FrontierSigner{}
+			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+			if err != nil {
+				sw.logger.Error("failed to sign fraud transaction", "err", err)
+				return err
+			}
 
-	   			txns = append(txns, dtx)
-	   			maliciousBlockWritten = true
-	   		}
-	   	} */
+			txns = append(txns, dtx)
+			maliciousBlockWritten = true
+		}
+	}
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -362,7 +380,7 @@ func (sw *SequencerWorker) writeBlock(enableBlockProductionCh chan bool, activeP
 	return nil
 }
 
-func (sw *SequencerWorker) writeTransactions(enableBlockProductionCh chan bool, activeParticipantsQuerier staking.ActiveParticipants, gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
 	sw.txpool.Prepare()
@@ -370,31 +388,6 @@ func (sw *SequencerWorker) writeTransactions(enableBlockProductionCh chan bool, 
 	for {
 		tx := sw.txpool.Peek()
 		if tx == nil {
-			break
-		}
-
-		// We are not interested in errors at this moment. Only if watchtower is set to true or false
-		isWatchtower, _ := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
-
-		sw.logger.Info(
-			"New tx pool transaction discovered",
-			"hash", tx.Hash,
-			"value", tx.Value,
-			"originating_addr", tx.From.String(),
-			"recipient_addr", tx.To.String(),
-			"submitted_via_watchtower", isWatchtower,
-			"staking_contract_addr", staking.AddrStakingContract.String(),
-			"submitted_towards_contract", bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()),
-		)
-
-		// TODO: Figure out if the transaction is type of begin dispute resolution
-		if isWatchtower && bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()) {
-			sw.logger.Warn(
-				"Discovered begin dispute resolution tx while building block txns. Processing block txns until this tx and disabling node...",
-				"originating_watchtower_addr", tx.From,
-				"dispute_resolution_tx_hash", tx.Hash,
-			)
-			enableBlockProductionCh <- false
 			break
 		}
 

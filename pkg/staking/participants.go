@@ -112,8 +112,8 @@ func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType Node
 		}
 	}
 
-	asq.logger.Info("Staking contract address discovery information", strings.ToLower(string(nodeType)), addrs)
-	asq.logger.Warn(fmt.Sprintf("Stake not discovered for '%s'. Need to stake the %s.", addr, strings.ToLower(string(nodeType))))
+	asq.logger.Debug("Staking contract address discovery information", strings.ToLower(string(nodeType)), addrs)
+	asq.logger.Debug(fmt.Sprintf("Stake not discovered for '%s'. Need to stake the %s.", addr, strings.ToLower(string(nodeType))))
 
 	return false, nil
 

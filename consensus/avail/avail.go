@@ -32,6 +32,9 @@ const (
 	// 1 AVL == 10^18 Avail fractions.
 	AVL = 1_000_000_000_000_000_000
 
+	// DefaultBlockProductionIntervalS - In seconds, default block loop production attempt interval
+	DefaultBlockProductionIntervalS = 2
+
 	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
 	// data in Avail.
 	AvailApplicationKey = "avail-settlement"
@@ -129,7 +132,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			signKey:                    validatorKey,
 			minerAddr:                  validatorAddr,
 			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
-			blockProductionIntervalSec: 1,
+			blockProductionIntervalSec: DefaultBlockProductionIntervalS,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {

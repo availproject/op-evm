@@ -19,7 +19,7 @@ import (
 const walletsDir = "../data/wallets"
 
 func Benchmark_SendingTransactions(b *testing.B) {
-	//b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
+	b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 

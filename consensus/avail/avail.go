@@ -176,19 +176,20 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 		if err != nil {
 			return nil, fmt.Errorf("failure to read account file '%s'", err)
 		}
-
 		d.availAccount, err = avail.NewAccountFromMnemonic(string(accountBytes))
 		if err != nil {
 			return nil, err
 		}
 
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-		if err != nil {
-			return nil, err
-		}
+		if d.availAppID, err = avail.QueryAppID(d.availClient, AvailApplicationKey); err != nil {
+			if err == avail.ErrAppIDNotFound {
+				d.logger.Debug("Application key not found. Creating new one...", "app_key", AvailApplicationKey)
+				d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+				if err != nil {
+					return nil, err
+				}
+			}
 
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-		if err != nil {
 			return nil, err
 		}
 

@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -27,8 +28,9 @@ import (
 )
 
 const (
-	// 1 AVL == 10^18 Avail fractions.
-	AVL = 1_000_000_000_000_000_000
+	availConsensus server.ConsensusType = "avail"
+
+	testAccountPath = "../data/test-accounts"
 )
 
 type Context struct {
@@ -48,50 +50,15 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	t.Helper()
 
 	ctx := &Context{}
+	if err := createAvailAccounts(t, availAddr, nodeTypes); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
-	nodeNameHelper := map[avail.MechanismType]int{
-		avail.BootstrapSequencer: 0,
-		avail.Sequencer:          0,
-		avail.WatchTower:         0,
-	}
-
-	var accountWg sync.WaitGroup
-
-	availClient, err := avail_client.NewClient(availAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	var nonceIncrement uint64
+	nnh := newNodeNameHelper()
 	for _, nt := range nodeTypes {
-		nodeNameHelper[nt] = nodeNameHelper[nt] + 1
-		nodeName := fmt.Sprintf("%s-%d", nt, nodeNameHelper[nt])
-		accountWg.Add(1)
-
-		go func(nodeName string, nonceIncrement uint64) {
-			defer accountWg.Done()
-			// Initiate creation of the avail account if not present
-			_, err := createAvailAccount(t, availClient, availAddr, nt.String(), nodeName, nonceIncrement)
-			if err != nil {
-				t.Fatalf("failed to create new avail account: %s", err)
-				return
-			}
-		}(nodeName, nonceIncrement)
-
-		nonceIncrement++
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	t.Log("Waiting for Avail accounts to be created...")
-	accountWg.Wait()
-	t.Log("Avail accounts created")
-
-	for _, nt := range nodeTypes {
-		nodeName := fmt.Sprintf("%s-%d", nt, nodeNameHelper[nt])
-
 		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
 		if err != nil {
 			_ = pa.Release()
@@ -101,10 +68,10 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 		si := instance{
 			nodeType:    nt,
 			config:      cfg,
-			accountPath: nodeName,
+			accountPath: nnh.nextAccountPath(nt),
 		}
 
-		u, err := url.Parse("http://" + cfg.JSONRPC.JSONRPCAddr.String() + "/")
+		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.JSONRPC.JSONRPCAddr.String()))
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +81,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	}
 
 	// Release allocated [TCP] ports to be used in Edge nodes.
-	err = pa.Release()
+	err := pa.Release()
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +127,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		accountPath := fmt.Sprintf("../data/test-accounts/%s", si.accountPath)
-		srv, err := startNode(si.config, availAddr, accountPath, si.nodeType)
+		srv, err := startNode(si.config, availAddr, si.accountPath, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -174,54 +140,6 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	t.Logf("all %d nodes started", len(ctx.servers))
 
 	return ctx, nil
-}
-
-func createAvailAccount(t testing.TB, availClient avail_client.Client, availAddr, nodeType, nodeName string, nonceIncrement uint64) (string, error) {
-	var accountPath string
-
-	path := fmt.Sprintf("../data/test-accounts/%s", nodeName)
-
-	// If file exists, make sure that we return the file and not go through account creation process.
-	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
-	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		// In case that account path exists but is not visible in Avail (restart)
-		// make sure to go through the process of the account creation.
-		if ok, err := avail_client.AccountExistsFromMnemonic(availClient, path); err == nil && ok {
-			return path, nil
-		}
-	}
-
-	availAccount, err := avail_client.NewAccount()
-	if err != nil {
-		return accountPath, err
-	}
-
-	err = avail_client.DepositBalance(availClient, availAccount, 15*AVL, nonceIncrement)
-	if err != nil {
-		return accountPath, err
-	}
-
-	if _, err := avail_client.QueryAppID(availClient, avail.AvailApplicationKey); err != nil {
-		if err == avail_client.ErrAppIDNotFound {
-			_, err = avail_client.EnsureApplicationKeyExists(availClient, avail.AvailApplicationKey, availAccount)
-			if err != nil {
-				return accountPath, err
-			}
-		}
-
-		return accountPath, err
-	}
-
-	log.Printf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
-
-	if err := os.WriteFile(path, []byte(availAccount.URI), 0644); err != nil {
-		return accountPath, err
-	}
-
-	log.Printf("Successfuly written mnemonic into '%s'", path)
-
-	return accountPath, nil
 }
 
 func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
@@ -338,7 +256,7 @@ func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail
 	}
 
 	// Attach the concensus to the Edge
-	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
+	err := server.RegisterConsensus(availConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
 	if err != nil {
 		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}
@@ -349,7 +267,7 @@ func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail
 	}
 
 	// Remove consensus from Edge to clean up our factory configuration.
-	err = server.UnRegisterConsensus(server.ConsensusType("avail"))
+	err = server.UnRegisterConsensus(availConsensus)
 	if err != nil {
 		return nil, err
 	}
@@ -424,4 +342,99 @@ func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.UR
 	}
 
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
+}
+
+func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []avail.MechanismType) error {
+	t.Helper()
+
+	nnh := newNodeNameHelper()
+
+	var accountWg sync.WaitGroup
+
+	availClient, err := avail_client.NewClient(availAddr)
+	if err != nil {
+		return err
+	}
+
+	var nonceIncrement uint64
+	for _, nt := range nodeTypes {
+		accountWg.Add(1)
+
+		go func(accountPath string, nonceIncrement uint64) {
+			defer accountWg.Done()
+			// Initiate creation of the avail account if not present
+			err := createAvailAccount(t, availClient, accountPath, nonceIncrement)
+			if err != nil {
+				t.Fatalf("failed to create new avail account: %s", err)
+				return
+			}
+		}(nnh.nextAccountPath(nt), nonceIncrement)
+
+		nonceIncrement++
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	t.Log("Waiting for Avail accounts to be created...")
+	accountWg.Wait()
+	t.Log("Avail accounts created")
+	return err
+}
+
+func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPath string, nonceIncrement uint64) error {
+	t.Helper()
+
+	// If file exists, make sure that we return the file and not go through account creation process.
+	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
+	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
+	if _, err := os.Stat(accountPath); !errors.Is(err, os.ErrNotExist) {
+		// In case that account path exists but is not visible in Avail (restart)
+		// make sure to go through the process of the account creation.
+		if ok, err := avail_client.AccountExistsFromMnemonic(availClient, accountPath); err == nil && ok {
+			return nil
+		}
+	}
+
+	availAccount, err := avail_client.NewAccount()
+	if err != nil {
+		return err
+	}
+
+	err = avail_client.DepositBalance(availClient, availAccount, 15*avail_client.AVL, nonceIncrement)
+	if err != nil {
+		return err
+	}
+
+	if _, err := avail_client.QueryAppID(availClient, avail.AvailApplicationKey); err != nil {
+		if err == avail_client.ErrAppIDNotFound {
+			_, err = avail_client.EnsureApplicationKeyExists(availClient, avail.AvailApplicationKey, availAccount)
+			if err != nil {
+				return err
+			}
+		}
+
+		return err
+	}
+
+	t.Logf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
+
+	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0644); err != nil {
+		return err
+	}
+
+	t.Logf("Successfully written mnemonic into '%s'", accountPath)
+
+	return nil
+}
+
+type nodeNameHelper map[avail.MechanismType]int
+
+func newNodeNameHelper() nodeNameHelper { return make(nodeNameHelper) }
+
+func (h nodeNameHelper) next(nodeType avail.MechanismType) string {
+	h[nodeType]++
+	return fmt.Sprintf("%s-%d", nodeType, h[nodeType])
+}
+
+func (h nodeNameHelper) nextAccountPath(nodeType avail.MechanismType) string {
+	return path.Join(testAccountPath, h.next(nodeType))
 }

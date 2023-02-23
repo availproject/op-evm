@@ -70,7 +70,7 @@ func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
 	return api.RPC.State.GetStorageLatest(key, &accountInfo)
 }
 
-func DepositBalance(client Client, account signature.KeyringPair, amount uint64, nonceIncrement uint64) error {
+func DepositBalance(client Client, account signature.KeyringPair, amount, nonceIncrement uint64) error {
 	api := client.instance()
 
 	meta, err := api.RPC.State.GetMetadataLatest()

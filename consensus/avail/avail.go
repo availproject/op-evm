@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
+	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -45,8 +47,9 @@ const (
 )
 
 type Config struct {
-	AvailAddr string
-	Bootnode  bool
+	AvailAddr       string
+	Bootnode        bool
+	AccountFilePath string
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -83,6 +86,8 @@ type Avail struct {
 	stakingNode  staking.Node
 
 	blockProductionIntervalSec uint64
+
+	validator validator.Validator
 }
 
 // Factory returns the consensus factory method
@@ -124,8 +129,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			),
 			signKey:   validatorKey,
 			minerAddr: validatorAddr,
-
-			blockProductionIntervalSec: 1,
+			validator: validator.New(params.Blockchain, params.Executor, validatorAddr),
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -155,29 +159,25 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
-		blockProductionIntervalSecRaw, ok := params.Config.Config["blockProductionIntervalSec"]
-		if ok {
-			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
-			if !ok {
-				return nil, fmt.Errorf("blockProductionIntervalSec expected int")
+		accountBytes, err := os.ReadFile(config.AccountFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failure to read account file '%s'", err)
+		}
+
+		d.availAccount, err = avail.NewAccountFromMnemonic(string(accountBytes))
+		if err != nil {
+			return nil, err
+		}
+
+		if d.availAppID, err = avail.QueryAppID(d.availClient, AvailApplicationKey); err != nil {
+			if err == avail.ErrAppIDNotFound {
+				d.logger.Debug("Application key not found. Creating new one...", "app_key", AvailApplicationKey)
+				d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
+				if err != nil {
+					return nil, err
+				}
 			}
 
-			d.blockProductionIntervalSec = blockProductionIntervalSec
-		}
-
-		d.availAccount, err = avail.NewAccount()
-		if err != nil {
-			return nil, err
-		}
-
-		// 5 AVLs
-		err = avail.DepositBalance(d.availClient, d.availAccount, 5*AVL)
-		if err != nil {
-			return nil, err
-		}
-
-		d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-		if err != nil {
 			return nil, err
 		}
 

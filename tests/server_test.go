@@ -1,13 +1,18 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"net/netip"
 	"net/url"
+	"os"
+	"path"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
@@ -18,7 +23,14 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	avail_client "github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
+)
+
+const (
+	availConsensus server.ConsensusType = "avail"
+
+	testAccountPath = "../data/test-accounts"
 )
 
 type Context struct {
@@ -27,9 +39,10 @@ type Context struct {
 }
 
 type instance struct {
-	nodeType avail.MechanismType
-	config   *server.Config
-	server   *server.Server
+	nodeType    avail.MechanismType
+	accountPath string
+	config      *server.Config
+	server      *server.Server
 }
 
 // StartServers starts configured nodes
@@ -37,10 +50,14 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	t.Helper()
 
 	ctx := &Context{}
+	if err := createAvailAccounts(t, availAddr, nodeTypes); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
+	nnh := newNodeNameHelper()
 	for _, nt := range nodeTypes {
 		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
 		if err != nil {
@@ -49,11 +66,12 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		}
 
 		si := instance{
-			nodeType: nt,
-			config:   cfg,
+			nodeType:    nt,
+			config:      cfg,
+			accountPath: nnh.nextAccountPath(nt),
 		}
 
-		u, err := url.Parse("http://" + cfg.JSONRPC.JSONRPCAddr.String() + "/")
+		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.JSONRPC.JSONRPCAddr.String()))
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +127,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(si.config, availAddr, si.nodeType)
+		srv, err := startNode(si.config, availAddr, si.accountPath, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +249,7 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 	return cfg, nil
 }
 
-func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismType) (*server.Server, error) {
+func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail.MechanismType) (*server.Server, error) {
 
 	bootnode := false
 	if nodeType == avail.BootstrapSequencer {
@@ -239,7 +257,7 @@ func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismTyp
 	}
 
 	// Attach the concensus to the Edge
-	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
+	err := server.RegisterConsensus(availConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
 	if err != nil {
 		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}
@@ -250,7 +268,7 @@ func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismTyp
 	}
 
 	// Remove consensus from Edge to clean up our factory configuration.
-	err = server.UnRegisterConsensus(server.ConsensusType("avail"))
+	err = server.UnRegisterConsensus(availConsensus)
 	if err != nil {
 		return nil, err
 	}
@@ -325,4 +343,99 @@ func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.UR
 	}
 
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
+}
+
+func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []avail.MechanismType) error {
+	t.Helper()
+
+	nnh := newNodeNameHelper()
+
+	var accountWg sync.WaitGroup
+
+	availClient, err := avail_client.NewClient(availAddr)
+	if err != nil {
+		return err
+	}
+
+	var nonceIncrement uint64
+	for _, nt := range nodeTypes {
+		accountWg.Add(1)
+
+		go func(accountPath string, nonceIncrement uint64) {
+			defer accountWg.Done()
+			// Initiate creation of the avail account if not present
+			err := createAvailAccount(t, availClient, accountPath, nonceIncrement)
+			if err != nil {
+				t.Fatalf("failed to create new avail account: %s", err)
+				return
+			}
+		}(nnh.nextAccountPath(nt), nonceIncrement)
+
+		nonceIncrement++
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	t.Log("Waiting for Avail accounts to be created...")
+	accountWg.Wait()
+	t.Log("Avail accounts created")
+	return err
+}
+
+func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPath string, nonceIncrement uint64) error {
+	t.Helper()
+
+	// If file exists, make sure that we return the file and not go through account creation process.
+	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
+	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
+	if _, err := os.Stat(accountPath); !errors.Is(err, os.ErrNotExist) {
+		// In case that account path exists but is not visible in Avail (restart)
+		// make sure to go through the process of the account creation.
+		if ok, err := avail_client.AccountExistsFromMnemonic(availClient, accountPath); err == nil && ok {
+			return nil
+		}
+	}
+
+	availAccount, err := avail_client.NewAccount()
+	if err != nil {
+		return err
+	}
+
+	err = avail_client.DepositBalance(availClient, availAccount, 15*avail_client.AVL, nonceIncrement)
+	if err != nil {
+		return err
+	}
+
+	if _, err := avail_client.QueryAppID(availClient, avail.AvailApplicationKey); err != nil {
+		if err == avail_client.ErrAppIDNotFound {
+			_, err = avail_client.EnsureApplicationKeyExists(availClient, avail.AvailApplicationKey, availAccount)
+			if err != nil {
+				return err
+			}
+		}
+
+		return err
+	}
+
+	t.Logf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
+
+	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0644); err != nil {
+		return err
+	}
+
+	t.Logf("Successfully written mnemonic into '%s'", accountPath)
+
+	return nil
+}
+
+type nodeNameHelper map[avail.MechanismType]int
+
+func newNodeNameHelper() nodeNameHelper { return make(nodeNameHelper) }
+
+func (h nodeNameHelper) next(nodeType avail.MechanismType) string {
+	h[nodeType]++
+	return fmt.Sprintf("%s-%d", nodeType, h[nodeType])
+}
+
+func (h nodeNameHelper) nextAccountPath(nodeType avail.MechanismType) string {
+	return path.Join(testAccountPath, h.next(nodeType))
 }

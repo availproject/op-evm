@@ -231,6 +231,11 @@ func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool,
 					"sequencer_addr", myAccount.Address,
 				)
 				continue
+			} else {
+				sw.logger.Warn(
+					"it is my turn to produce the block",
+					"sequencer_addr", myAccount.Address,
+				)
 			}
 
 			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)

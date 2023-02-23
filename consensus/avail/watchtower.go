@@ -80,7 +80,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 		blksLoop:
 			for _, blk := range blks {
 				err = watchTower.Check(blk)
-				if err != nil || blk.Number() == 4 { //    - test the fraud
+				if err != nil { // || blk.Number() == 4   - test the fraud
 					// TODO: Fix this...
 					// Basically right now if fraud is discovered it will end in the endless loop of
 					// pushing the frauds and never completing the fraud...

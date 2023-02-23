@@ -113,8 +113,6 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64,
 		nonce = nonce + nonceIncrement
 	}
 
-	fmt.Printf("Nonce increment: %d \n", nonce)
-
 	o := types.SignatureOptions{
 		BlockHash:          genesisHash,
 		Era:                types.ExtrinsicEra{IsMortalEra: false},
@@ -137,8 +135,6 @@ func DepositBalance(client Client, account signature.KeyringPair, amount uint64,
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("Extrinsic submitted: %d \n", nonce)
 
 	defer sub.Unsubscribe()
 
@@ -181,8 +177,6 @@ func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) 
 	if err != nil || !ok {
 		return nil, err
 	}
-
-	//fmt.Printf("BALANCES: %d - %d - %d - %d \n", accountInfo.Data.Free.Uint64(), AVL, accountInfo.Data.Free.Uint64()/AVL, new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)))
 
 	return new(big.Int).Div(new(big.Int).SetUint64(accountInfo.Data.Free.Uint64()), big.NewInt(AVL)), nil
 }

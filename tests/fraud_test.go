@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Fraud(t *testing.T) {
-	//t.Skip("fraud e2e tests disabled in CI/CD due to lack of Avail")
+	t.Skip("fraud e2e tests disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 

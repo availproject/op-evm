@@ -115,9 +115,8 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			tAssert.NoError(err)
+			tAssert.NotNil(blockBuilder)
 
 			blk := tc.block(blockBuilder)
 			if err := wt.Check(blk); err != nil {

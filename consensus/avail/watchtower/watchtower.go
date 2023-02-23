@@ -117,9 +117,11 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 		return nil, err
 	}
 
-	if err := wt.txpool.AddTx(tx); err != nil {
-		wt.logger.Error("failed to add fraud proof txn to the pool", "err", err)
-		return nil, err
+	if wt.txpool != nil { // Tests sometimes do not have txpool so we need to do this check.
+		if err := wt.txpool.AddTx(tx); err != nil {
+			wt.logger.Error("failed to add fraud proof txn to the pool", "err", err)
+			return nil, err
+		}
 	}
 
 	// Probably state should not be commited at this point in the time but rather later on

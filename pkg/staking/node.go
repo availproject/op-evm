@@ -39,7 +39,7 @@ func (n *node) ShouldStake(pkey *ecdsa.PrivateKey) bool {
 
 	staked, err := participantsQuerier.Contains(address, n.nodeType)
 	if err != nil {
-		n.logger.Error("failed to check if sequencer is staked", "err", err)
+		n.logger.Error("failed to check if sequencer is staked", "error", err)
 		return false
 	}
 

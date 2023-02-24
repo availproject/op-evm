@@ -83,14 +83,14 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 	case Sequencer:
 		addrs, err := QueryActiveSequencers(asq.blockchain, asq.executor, transition, gasLimit, minerAddress)
 		if err != nil {
-			asq.logger.Error("failed to query sequencers", "err", err)
+			asq.logger.Error("failed to query sequencers", "error", err)
 			return nil, err
 		}
 		return addrs, nil
 	case WatchTower:
 		addrs, err := QueryWatchtower(transition, gasLimit, minerAddress)
 		if err != nil {
-			asq.logger.Error("failed to query watchtowers", "err", err)
+			asq.logger.Error("failed to query watchtowers", "error", err)
 			return nil, err
 		}
 		return addrs, nil

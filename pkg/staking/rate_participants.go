@@ -52,7 +52,7 @@ func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey
 
 	setThresholdTx, setThresholdTxErr := SetMinimumParticipantsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new minimum participants count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new minimum participants count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -81,7 +81,7 @@ func (st *participantRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey
 
 	setThresholdTx, setThresholdTxErr := SetMaximumParticipantsTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new maximum participants count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new maximum participants count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -115,7 +115,7 @@ func (st *participantRate) CurrentMinimum() (*big.Int, error) {
 
 	threshold, err := GetMinimumParticipantsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current minimum participants allowed", "err", err)
+		st.logger.Error("failed to query current minimum participants allowed", "error", err)
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func (st *participantRate) CurrentMaximum() (*big.Int, error) {
 
 	threshold, err := GetMaximumParticipantsTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current maximum participants allowed", "err", err)
+		st.logger.Error("failed to query current maximum participants allowed", "error", err)
 		return nil, err
 	}
 

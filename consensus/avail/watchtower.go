@@ -29,13 +29,13 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 	for {
 		watchtowerStaked, sequencerError := activeParticipantsQuerier.Contains(d.minerAddr, staking.WatchTower)
 		if sequencerError != nil {
-			d.logger.Error("failed to check if my account is among active staked watchtowers. Retrying in a second...", "err", sequencerError)
+			d.logger.Error("failed to check if my account is among active staked watchtowers. Retrying in few seconds...", "error", sequencerError)
 			time.Sleep(3 * time.Second)
 			continue
 		}
 
 		if !watchtowerStaked {
-			d.logger.Warn("my account is not among active staked watchtower. Retrying in a second...", "address", d.minerAddr.String())
+			d.logger.Warn("my account is not among active staked watchtower. Retrying in few seconds...", "address", d.minerAddr.String())
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -62,7 +62,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 			// otherwise we just get slashed more.
 			watchtowerStaked, sequencerError := activeParticipantsQuerier.Contains(d.minerAddr, staking.WatchTower)
 			if sequencerError != nil {
-				d.logger.Error("failed to check if my account is among active staked watchtowers; cannot continue", "err", sequencerError)
+				d.logger.Error("failed to check if my account is among active staked watchtowers; cannot continue", "error", sequencerError)
 				continue
 			}
 
@@ -81,9 +81,8 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 			for _, blk := range blks {
 				err = watchTower.Check(blk)
 				if err != nil { // || blk.Number() == 4   - test the fraud
-					// TODO: Fix this...
-					// Basically right now if fraud is discovered it will end in the endless loop of
-					// pushing the frauds and never completing the fraud...
+					// TODO: We should implement something like SafeCheck() to not return errors that should not
+					// result in creating fraud proofs for blocks/transactions that should not be checked.
 					if err != nil {
 						if strings.Contains(err.Error(), "does not belong to active sequencers") {
 							continue blksLoop

@@ -185,7 +185,7 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 
 	disputeResolutionTx, err := BeginDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
 	if err != nil {
-		dr.logger.Error("failed to begin new fraud dispute resolution", "err", err)
+		dr.logger.Error("failed to begin new fraud dispute resolution", "error", err)
 		return err
 	}
 
@@ -224,7 +224,7 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 
 	disputeResolutionTx, err := EndDisputeResolutionTx(address, probationAddr, dr.blockchain.Header().GasLimit)
 	if err != nil {
-		dr.logger.Error("failed to end new fraud dispute resolution", "err", err)
+		dr.logger.Error("failed to end new fraud dispute resolution", "error", err)
 		return err
 	}
 

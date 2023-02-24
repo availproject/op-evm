@@ -19,7 +19,7 @@ func (sw *SequencerWorker) waitForStakedSequencer(activeParticipantsQuerier stak
 	for {
 		sequencerStaked, sequencerError := activeParticipantsQuerier.Contains(nodeAddr)
 		if sequencerError != nil {
-			sw.logger.Error("failed to check if my account is among active staked sequencers. Retrying in few seconds...", "err", sequencerError)
+			sw.logger.Error("failed to check if my account is among active staked sequencers. Retrying in few seconds...", "error", sequencerError)
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -52,34 +52,33 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		for {
 			inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
 			if err != nil {
-				d.logger.Error("Failed to check if participant is currently in probation... Rechecking in a second...", "err", err)
+				d.logger.Error("Failed to check if participant is currently in probation... Rechecking again in few seconds...", "error", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			if inProbation {
-				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking in few seconds...", "err", err)
+				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking again in few seconds...", "error", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
 
 			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
 			if err != nil {
-				d.logger.Error("Failed to check if participant exists... Rechecking in a second...", "err", err)
+				d.logger.Error("Failed to check if participant exists... Rechecking again in few seconds...", "error", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			if staked {
-				d.logger.Debug("Node is successfully staked... Checking in 2 seconds for state change...")
+				d.logger.Debug("Node is successfully staked... Rechecking in few seconds for potential changes...")
 				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			switch MechanismType(d.nodeType) {
 			case BootstrapSequencer:
-				// We cannot pass machine type as it won't be staked.
-				// Bootstrap sequencer does not exist as category in the smart contract.
+				// Staking smart contract does not support `BootstrapSequencer` MachineType.
 				returnErr = d.stakeParticipant(false, Sequencer.String())
 			case Sequencer:
 				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
@@ -131,7 +130,7 @@ func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 	bb.AddTransactions(tx)
 	blk, err := bb.Build()
 	if err != nil {
-		d.logger.Error("failed to build staking block", "node_type", nodeType, "err", err)
+		d.logger.Error("failed to build staking block", "node_type", nodeType, "error", err)
 		return err
 	}
 

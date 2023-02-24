@@ -44,7 +44,7 @@ func TestValidatorBlockCheck(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -87,7 +87,7 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,7 +130,7 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
-			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash(), 0)
+			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
 			if err != nil {
 				t.Fatal(err)
 			}

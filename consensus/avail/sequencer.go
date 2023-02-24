@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
@@ -52,9 +53,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
 	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
+	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
 	enableBlockProductionCh := make(chan bool)
-	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, validator, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
+	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
 
 	accBalance, err := avail.GetBalance(sw.availClient, sw.availAccount)
 	if err != nil {
@@ -158,7 +160,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// otherwise we just get slashed more.
 			sequencerStaked, sequencerError := activeSequencersQuerier.Contains(sw.nodeAddr)
 			if sequencerError != nil {
-				sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "err", sequencerError)
+				sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "error", sequencerError)
 				continue
 			}
 
@@ -241,7 +243,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool,
 			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)
 
 			if err := sw.writeBlock(myAccount, signKey); err != nil {
-				sw.logger.Error("failed to mine block", "err", err)
+				sw.logger.Error("failed to mine block", "error", err)
 			}
 		case e := <-enableBlockProductionCh:
 			sw.logger.Debug("sequencer block producing status", "should_produce", e)
@@ -308,7 +310,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	   			txSigner := &crypto.FrontierSigner{}
 	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
 	   			if err != nil {
-	   				sw.logger.Error("failed to sign fraud transaction", "err", err)
+	   				sw.logger.Error("failed to sign fraud transaction", "error", err)
 	   				return err
 	   			}
 
@@ -378,8 +380,8 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		"block_hash", blk.Hash(),
 		"block_parent_hash", blk.ParentHash(),
 	)
-	// after the block has been written we reset the txpool so that
-	// the old transactions are removed
+
+	// After the block has been written we reset the txpool to remove stale transactions.
 	sw.txpool.ResetWithHeaders(blk.Header)
 
 	return nil

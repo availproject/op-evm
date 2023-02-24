@@ -56,7 +56,7 @@ type blockBuilder struct {
 }
 
 type BlockBuilderFactory interface {
-	FromParentHash(hash types.Hash, blockIncrement uint64) (Builder, error)
+	FromParentHash(hash types.Hash) (Builder, error)
 	FromBlockchainHead() (Builder, error)
 }
 
@@ -76,19 +76,19 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 
 func (bbf *blockBuilderFactory) FromBlockchainHead() (Builder, error) {
 	hdr := bbf.blockchain.Header()
-	return bbf.FromParentHeader(hdr, 0)
+	return bbf.FromParentHeader(hdr)
 }
 
-func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash, blockIncrement uint64) (Builder, error) {
+func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, error) {
 	hdr, found := bbf.blockchain.GetHeaderByHash(parent)
 	if !found {
 		return nil, fmt.Errorf("%w: not found", ErrInvalidHash)
 	}
 
-	return bbf.FromParentHeader(hdr, blockIncrement)
+	return bbf.FromParentHeader(hdr)
 }
 
-func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header, blockIncrement uint64) (Builder, error) {
+func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder, error) {
 	bb := &blockBuilder{
 		blockchain: bbf.blockchain,
 		executor:   bbf.executor,
@@ -96,7 +96,7 @@ func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header, blockIncr
 
 		header: &types.Header{
 			ParentHash: parent.Hash,
-			Number:     (parent.Number + 1) + blockIncrement,
+			Number:     parent.Number + 1,
 			GasLimit:   parent.GasLimit,
 		},
 		parent: parent,

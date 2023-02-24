@@ -15,7 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
@@ -33,7 +33,7 @@ type Fraud struct {
 	blockchain              *blockchain.Blockchain
 	executor                *state.Executor
 	txpool                  *txpool.TxPool
-	validator               validator.Validator
+	watchtower              watchtower.WatchTower
 	enableBlockProductionCh chan bool
 
 	nodeAddr    types.Address
@@ -280,7 +280,7 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 	// Discover who needs to be slashed.
 	// If watchtower produced block that proves sequencer to be corrupted, sequencer needs to be slashed.
 	// If watchtower produced block that proves sequencer to be correct, watchtower needs to be slashed.
-	if err := f.validator.Check(maliciousBlock); err != nil {
+	if err := f.watchtower.Check(maliciousBlock); err != nil {
 		f.logger.Warn(
 			"Fraud proof block check confirmed malicious block. Slashing sequencer...",
 			"watchtower_block_hash", f.fraudBlock.Hash(),
@@ -371,7 +371,7 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 		f.logger.Error(
 			"failed to discover begin dispute resoultion transaction for the block",
 			"correct_block_hash", maliciousHeader.ParentHash,
-			"err", err,
+			"error", err,
 		)
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 
 	blk, err := bb.Build()
 	if err != nil {
-		f.logger.Error("failed to build begin dispute resolution block", "err", err)
+		f.logger.Error("failed to build begin dispute resolution block", "error", err)
 		return nil, err
 	}
 
@@ -392,18 +392,17 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 
 	err = f.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
-		f.logger.Error("error while submitting begin dispute resolution block to avail", "err", err)
+		f.logger.Error("error while submitting begin dispute resolution block to avail", "error", err)
 		return nil, err
 	}
 
 	err = f.blockchain.WriteBlock(blk, f.nodeType.String())
 	if err != nil {
-		f.logger.Error("failed to write begin dispute resolution block to the blockchain", "err", err)
+		f.logger.Error("failed to write begin dispute resolution block to the blockchain", "error", err)
 		return nil, err
 	}
 
-	// after the block has been written we reset the txpool so that
-	// the old transactions are removed
+	// After the block has been written we reset the txpool to remove stale transactions.
 	f.txpool.ResetWithHeaders(blk.Header)
 
 	f.logger.Info(
@@ -429,14 +428,14 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 
 	disputeResolutionTx, err := staking.SlashStakerTx(f.nodeAddr, maliciousAddr, 1_000_000)
 	if err != nil {
-		f.logger.Error("failed to end new fraud dispute resolution", "err", err)
+		f.logger.Error("failed to end new fraud dispute resolution", "error", err)
 		return nil, err
 	}
 
 	hdr, _ := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
 	transition, err := f.executor.BeginTxn(hdr.StateRoot, hdr, f.nodeAddr)
 	if err != nil {
-		f.logger.Error("failed to begin the transition for the end dispute resolution", "err", err)
+		f.logger.Error("failed to begin the transition for the end dispute resolution", "error", err)
 		return nil, err
 	}
 	disputeResolutionTx.Nonce = transition.GetNonce(disputeResolutionTx.From)
@@ -444,19 +443,18 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 	txSigner := &crypto.FrontierSigner{}
 	dtx, err := txSigner.SignTx(disputeResolutionTx, f.nodeSignKey)
 	if err != nil {
-		f.logger.Error("failed to sign slashing transaction", "err", err)
+		f.logger.Error("failed to sign slashing transaction", "error", err)
 		return nil, err
 	}
 
 	slashBlk.AddTransactions(dtx)
 
 	// Used to ensure we can end fraud dispute for a specific fraud block on all of the nodes!
-	// Work, please work...
 	slashBlk.SetExtraDataField(block.KeyEndDisputeResolutionOf, f.fraudBlock.Hash().Bytes())
 
 	blk, err := slashBlk.Build()
 	if err != nil {
-		f.logger.Error("failed to build slashing block", "err", err)
+		f.logger.Error("failed to build slashing block", "error", err)
 		return nil, err
 	}
 
@@ -469,18 +467,17 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 
 	err = f.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
-		f.logger.Error("error while submitting slashing block to avail", "err", err)
+		f.logger.Error("error while submitting slashing block to avail", "error", err)
 		return nil, err
 	}
 
 	err = f.blockchain.WriteBlock(blk, f.nodeType.String())
 	if err != nil {
-		f.logger.Error("failed to write slashing block to the blockchain", "err", err)
+		f.logger.Error("failed to write slashing block to the blockchain", "error", err)
 		return nil, err
 	}
 
-	// after the block has been written we reset the txpool so that
-	// the old transactions are removed
+	// After the block has been written we reset the txpool to remove stale transactions.
 	f.txpool.ResetWithHeaders(blk.Header)
 
 	f.logger.Info(
@@ -495,13 +492,13 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 	return blk, nil
 }
 
-func NewFraudResolver(logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, v validator.Validator, enableBlockProductionCh chan bool, nodeAddr types.Address, nodeSignKey *ecdsa.PrivateKey, availSender avail.Sender, nodeType MechanismType) *Fraud {
+func NewFraudResolver(logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, w watchtower.WatchTower, enableBlockProductionCh chan bool, nodeAddr types.Address, nodeSignKey *ecdsa.PrivateKey, availSender avail.Sender, nodeType MechanismType) *Fraud {
 	return &Fraud{
 		logger:                  logger,
 		blockchain:              b,
 		executor:                e,
 		txpool:                  txp,
-		validator:               v,
+		watchtower:              w,
 		nodeAddr:                nodeAddr,
 		nodeType:                nodeType,
 		nodeSignKey:             nodeSignKey,

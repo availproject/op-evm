@@ -91,14 +91,16 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
-					// Block should be applied regardless as new block will take it's place.
-					// Basically later on what happens block cannot be found resulting in various issues of hash not found.
-					// It must be applied prior to have correct nonce, numbers, etc...
+					// Skip processing of fraudproof block. It's not written to blockchain on sequencers
+					// either.
 					_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
 					if exists {
 						continue
 					}
 
+
+					// Apply block into local blockchain, even if the block was "invalid/malicious", because
+					// otherwise the local blockchain wouldn't be consistent with the one on sequencers.
 					if err := watchTower.Apply(blk); err != nil {
 						logger.Error("cannot apply block to blockchain prior constructing fraud proof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 						continue blksLoop

@@ -107,7 +107,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 					}
 
 					fp, err := watchTower.ConstructFraudproof(blk)
-
 					if err != nil {
 						logger.Error("failed to construct fraudproof for block", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 						continue blksLoop

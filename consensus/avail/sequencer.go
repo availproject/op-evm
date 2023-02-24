@@ -106,7 +106,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				// It is expected that not all Avail blocks contain a SL block. On any other error,
 				// log the error and wait for a next one.
 				if err != block.ErrNoExtrinsicFound {
-					d.logger.Warning("unexpected error while extracting SL blocks from Avail block", "error", err)
+					sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
 					continue
 				}
 			}

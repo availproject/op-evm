@@ -349,19 +349,26 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 }
 
 func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.BlockBuilderFactory, maliciousAddr types.Address, maliciousHeader *types.Header, nodeType MechanismType) (*types.Block, error) {
-	bb, err := blockBuilderFactory.FromBlockchainHead()
+	var bb block.Builder
+	var err error
+
+	// We are going to fork the chain but only if the malicious participant is sequencer.
+	// Otherwise we are making sure we slash the watchtower and continue normal operation...
+	switch nodeType {
+	case Sequencer:
+		bb, err = blockBuilderFactory.FromParentHash(maliciousHeader.ParentHash)
+	case WatchTower:
+		bb, err = blockBuilderFactory.FromBlockchainHead()
+	default:
+		panic("unsupported node type: " + nodeType)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	bb.SetCoinbaseAddress(f.nodeAddr)
 	bb.SignWith(f.nodeSignKey)
-
-	// We are going to fork the chain but only if the malicious participant is sequencer.
-	// Otherwise we are making sure we slash the watchtower and continue normal operation...
-	if nodeType == Sequencer {
-		bb.SetParentHash(maliciousHeader.ParentHash)
-	}
 
 	// Append begin disputed resolution txn
 	disputeTxHash := f.GetBeginDisputeResolutionTxHash()

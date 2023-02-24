@@ -26,7 +26,6 @@ type Builder interface {
 	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
-	SetParentHash(parentHash types.Hash) Builder
 	AddTransactions(txs ...*types.Transaction) Builder
 
 	SignWith(signKey *ecdsa.PrivateKey) Builder
@@ -134,11 +133,6 @@ func (bb *blockBuilder) SetGasLimit(limit uint64) Builder {
 
 func (bb *blockBuilder) SetParentStateRoot(parentRoot types.Hash) Builder {
 	bb.parentRoot = &parentRoot
-	return bb
-}
-
-func (bb *blockBuilder) SetParentHash(parentHash types.Hash) Builder {
-	bb.parentHash = &parentHash
 	return bb
 }
 

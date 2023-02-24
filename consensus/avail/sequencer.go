@@ -124,12 +124,13 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
 					)
 					fraudResolver.EndDisputeResolution()
-					//sw.txpool.ResetWithHeaders(edgeBlk.Header)
 				}
 
-				// We cannot write down disputed blocks to the blockchain as they would be rejected due to
-				// numerous reasons. From block number missalignment to block already exist to skewing the
-				// rest of the flow later on...
+				// We cannot write the fraud proof block to the blockchain at all due to following reasons:
+				// - Block number already exists and block won't be written.
+				// - Watchtower has syncer disabled and when writing block, next block can come in rejecting this block.
+				// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
+				//   trigger failures when writing down block due to already existing tx in the store.
 				if !fraudResolver.IsFraudProofBlock(edgeBlk) {
 					if err := validator.Check(edgeBlk); err == nil {
 						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
@@ -138,9 +139,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 								"edge_block_hash", edgeBlk.Hash(),
 								"error", err,
 							)
-						} // else {
-						//	sw.txpool.ResetWithHeaders(edgeBlk.Header)
-						//}
+						}
 					} else {
 						sw.logger.Warn(
 							"failed to validate edge block received from avail",
@@ -171,8 +170,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 			// Will check the block for fraudlent behaviour and slash parties accordingly.
 			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
-			// We can change this in the future but with it, understand that series of issues are going to
-			// happen with syncing and publishing of the blocks that will need to be fixed.
+			// If we do not stop the network from processing, blocks will continue to be built from other sequencers
+			// resulting in block number missmatches and fraud will potentially be corrupted.
 			if _, err := fraudResolver.CheckAndSlash(); err != nil {
 				continue
 			}

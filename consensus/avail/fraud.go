@@ -338,6 +338,13 @@ func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.He
 		return err
 	}
 
+	// TODO: Fix this function and remove this warning.
+	{
+		_, file, ln, ok := runtime.Caller(0)
+		if ok {
+			f.logger.Warning(fmt.Sprintf("%s:%d: TODO: Make {begin, end} dispute resolution process transactions atomic.", file, ln))
+		}
+	}
 	_, err = f.produceSlashBlock(blockBuilderFactory, disputeBlk, maliciousAddr, maliciousHeader, nodeType)
 	if err != nil {
 		return err

@@ -5,11 +5,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
-	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
-	"github.com/umbracle/ethgo/abi"
 )
 
 func TestBeginDisputeResolution(t *testing.T) {
@@ -191,42 +189,4 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	isProbationSequencer, isProbationSequencerErr = dr.Contains(byzantineSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
-}
-
-func TestBeginDisputeResolutionTxDiscovery(t *testing.T) {
-	tAssert := assert.New(t)
-
-	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
-	tAssert.NotNil(executor)
-	tAssert.NotNil(blockchain)
-
-	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
-	watchtowerAddr, watchtowerSignKey := test.NewAccount(t)
-	test.DepositBalance(t, watchtowerAddr, balance, blockchain, executor)
-
-	byzantineSequencerAddr, _ := test.NewAccount(t)
-	test.DepositBalance(t, byzantineSequencerAddr, balance, blockchain, executor)
-
-	// In order to begin the dispute resolution, onlyWatchtower modifier needs to be met.
-	// In other words, we first need to stake watchtower as .Begin() can be called only by the staked watchtower.
-	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
-	sender := NewTestAvailSender()
-	coinbaseStakeErr := Stake(blockchain, executor, sender, hclog.Default(), string(WatchTower), watchtowerAddr, watchtowerSignKey, stakeAmount, 1_000_000, "test")
-	tAssert.NoError(coinbaseStakeErr)
-
-	disputeResolutionTx, err := BeginDisputeResolutionTx(watchtowerAddr, byzantineSequencerAddr, blockchain.Header().GasLimit)
-	tAssert.NoError(err)
-
-	disputeResolutionTx = disputeResolutionTx.ComputeHash()
-
-	nameByte := []byte(disputeResolutionTx.Hash.String())
-	//disputeResolutionTxBytes := disputeResolutionTx.MarshalRLP()
-
-	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
-	tAssert.True(ok)
-
-	selector := method.ID()
-
-	t.Logf("Got tx: %v selector: %v", nameByte[:4], selector)
 }

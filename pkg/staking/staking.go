@@ -93,7 +93,7 @@ func UnStake(bh *blockchain.Blockchain, exec *state.Executor, sender Sender, log
 
 }
 
-func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, activeSequencerAddr types.Address, activeSequencerSignKey *ecdsa.PrivateKey, maliciousStakerAddr types.Address, gasLimit uint64, nodeType string, additionalTxns []*types.Transaction) error {
+func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger, activeSequencerAddr types.Address, activeSequencerSignKey *ecdsa.PrivateKey, maliciousStakerAddr types.Address, gasLimit uint64, nodeType string) error {
 	builder := block.NewBlockBuilderFactory(bh, exec, logger)
 	blk, err := builder.FromBlockchainHead()
 	if err != nil {
@@ -102,10 +102,6 @@ func Slash(bh *blockchain.Blockchain, exec *state.Executor, logger hclog.Logger,
 
 	blk.SetCoinbaseAddress(activeSequencerAddr)
 	blk.SignWith(activeSequencerSignKey)
-
-	for _, txn := range additionalTxns {
-		blk.AddTransactions(txn)
-	}
 
 	tx, err := SlashStakerTx(activeSequencerAddr, maliciousStakerAddr, gasLimit)
 	if err != nil {

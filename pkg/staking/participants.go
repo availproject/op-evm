@@ -148,8 +148,6 @@ func (asq *activeParticipantsQuerier) InProbation(address types.Address) (bool, 
 		return false, err
 	}
 
-	//asq.logger.Warn("GOT BACK PROBATION ADDRESSES", "SLICE", probationAddrs)
-
 	for _, probationAddr := range probationAddrs {
 		if bytes.Equal(probationAddr.Bytes(), address.Bytes()) {
 			return true, nil

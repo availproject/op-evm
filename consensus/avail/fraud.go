@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -20,13 +21,11 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-type DisputeProcessChainStatus uint16
-
 var (
 	ErrTxPoolHashNotFound = errors.New("hash not found in the txpool")
 
-	ChainProcessingDisabled DisputeProcessChainStatus = 0
-	ChainProcessingEnabled  DisputeProcessChainStatus = 1
+	ChainProcessingDisabled uint32 = 0
+	ChainProcessingEnabled  uint32 = 1
 )
 
 type Fraud struct {
@@ -44,7 +43,7 @@ type Fraud struct {
 
 	fraudBlock          *types.Block
 	lastFraudDisputedTx *types.Transaction
-	chainProcessStatus  DisputeProcessChainStatus
+	chainProcessStatus  uint32
 }
 
 func (f *Fraud) SetBlock(b *types.Block) {
@@ -55,8 +54,8 @@ func (f *Fraud) GetBlock() *types.Block {
 	return f.fraudBlock
 }
 
-func (f *Fraud) SetChainStatus(status DisputeProcessChainStatus) {
-	f.chainProcessStatus = status
+func (f *Fraud) SetChainStatus(status uint32) {
+	atomic.StoreUint32(&f.chainProcessStatus, status)
 
 	if status == ChainProcessingEnabled {
 		f.enableBlockProductionCh <- true
@@ -222,24 +221,16 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 
 	fraudBlockTargetHash, exists := block.GetExtraDataFraudProofTarget(f.fraudBlock.Header)
 	if !exists {
-		// It seems that fraud block is set but the proof target cannot be calculated
-		// therefore we are going to log this problem and unset the fraud block as it seems
-		// that there is corruption.
-		// TODO: Figure out what to do with dispute resolution as if it's set, sequencer is
-		// blocked. This should never happen and if it does, via malicious watchtower we should
-		// be resolve this problem.
-		f.logger.Error(
-			"failed to extract proof target from the fraud block",
-			"block_hash", f.fraudBlock.Hash(),
-		)
-
 		// Disregard entirely this specific fraud block
-		f.SetBlock(nil)
+		f.EndDisputeResolution()
 
-		return false, fmt.Errorf(
-			"failed to extract fraud proof targed from the fraud block hash %s",
+		// It seems that fraud block is set but the proof target cannot be calculated
+		// therefore we are going to log this problem and panic as this should *NEVER EVER HAPPEN*
+		// Block should not be set if it's not fraud block via `CheckAndSetFraudBlock` in the first place.
+		panic(fmt.Sprintf(
+			"failed to extract fraud proof targed from the fraud block hash `%s`",
 			f.fraudBlock.Hash(),
-		)
+		))
 	}
 
 	f.logger.Info(
@@ -248,8 +239,6 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 		"watchtower_block_hash", f.fraudBlock.Hash(),
 	)
 
-	// Extract the potentially malicious block from the database but fetch only headers
-	// as rest is not really needed.
 	maliciousBlock, mbExists := f.blockchain.GetBlockByHash(fraudBlockTargetHash, false)
 	if !mbExists {
 		f.logger.Info(

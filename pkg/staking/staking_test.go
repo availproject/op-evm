@@ -217,7 +217,7 @@ func TestSlashStaker(t *testing.T) {
 
 	// Must be executed with a correct sequencer (valid one), should fail if it's not.
 	// Slashing implements onSequencer modifier (decorator).
-	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), sequencerAddr, sequencerSignKey, maliciousSequencerAddr, 1_000_000, "test", []*types.Transaction{})
+	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), sequencerAddr, sequencerSignKey, maliciousSequencerAddr, 1_000_000, "test")
 	tAssert.NoError(coinbaseSlashErr)
 
 	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousSequencerAddr, Sequencer)

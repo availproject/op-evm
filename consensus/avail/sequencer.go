@@ -103,10 +103,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
 			if len(edgeBlks) == 0 && err != nil {
 				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
-				// It is expected that each edge block should contain avail block, however,
-				// this can block the entire production of the blocks later on.
-				// Continue if the decompiling block resulted in any error other than not found.
+				// It is expected that not all Avail blocks contain a SL block. On any other error,
+				// log the error and wait for a next one.
 				if err != block.ErrNoExtrinsicFound {
+					d.logger.Warning("unexpected error while extracting SL blocks from Avail block", "error", err)
 					continue
 				}
 			}

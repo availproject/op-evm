@@ -274,7 +274,7 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 		)
 
 		return false, errors.New(
-			"potentially malicious node cannot process (slash) block it produced",
+			"potentially malicious node cannot process with slashing itself",
 		)
 	}
 

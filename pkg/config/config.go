@@ -80,11 +80,12 @@ func NewServerConfig(path string) (*server.Config, error) {
 			MaxOutboundPeers: rawConfig.Network.MaxOutboundPeers,
 			Chain:            chain,
 		},
-		DataDir:        rawConfig.DataDir,
-		Seal:           rawConfig.ShouldSeal,
-		PriceLimit:     rawConfig.TxPool.PriceLimit,
-		MaxSlots:       rawConfig.TxPool.MaxSlots,
-		SecretsManager: secretsConfig,
+		DataDir:            rawConfig.DataDir,
+		Seal:               rawConfig.ShouldSeal,
+		PriceLimit:         rawConfig.TxPool.PriceLimit,
+		MaxSlots:           rawConfig.TxPool.MaxSlots,
+		MaxAccountEnqueued: rawConfig.TxPool.MaxAccountEnqueued,
+		SecretsManager:     secretsConfig,
 		RestoreFile: func(cfg *config.Config) *string {
 			if cfg.RestoreFile != "" {
 				return &cfg.RestoreFile

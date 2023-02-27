@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -46,12 +47,12 @@ type validator struct {
 	sequencerAddress types.Address
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address) Validator {
+func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address, logger hclog.Logger) Validator {
 	return &validator{
 		blockchain: blockchain,
 		executor:   executor,
 
-		logger:           hclog.Default(),
+		logger:           logger.Named("validator"),
 		sequencerAddress: sequencer,
 	}
 }
@@ -134,20 +135,34 @@ func (v *validator) verifyBlock(blk *types.Block) error {
 	return nil
 }
 
+// TODO - Check if miner address was the same (active sequencer at that point in the time)
+// through the avail block
 func (v *validator) verifyHeader(header *types.Header) error {
 	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
 		return err
 	}
 
-	v.logger.Info("Verify header", "signer", signer.String())
+	v.logger.Info("About to process block header verification",
+		"block_hash", header.Hash,
+		"signer", signer.String(),
+	)
 
-	if signer != v.sequencerAddress {
-		v.logger.Info("Passing, how is it possible? 222")
-		return fmt.Errorf("signer address '%s' does not match sequencer address '%s'", signer, SequencerAddress)
+	minerAddr := types.BytesToAddress(header.Miner)
+
+	if !bytes.Equal(signer.Bytes(), header.Miner) {
+		return fmt.Errorf(
+			"signer address '%s' does not match sequencer address '%s' for block hash '%s'",
+			signer, minerAddr, header.Hash,
+		)
 	}
 
-	v.logger.Info("Seal signer address successfully verified!", "signer", signer, "sequencer", SequencerAddress)
+	v.logger.Info(
+		"Seal signer address successfully verified!",
+		"block_hash", header.Hash,
+		"signer", signer,
+		"sequencer", minerAddr,
+	)
 
 	/*
 		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)

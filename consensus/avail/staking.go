@@ -3,9 +3,11 @@ package avail
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 
 	"github.com/maticnetwork/avail-settlement/pkg/block"
@@ -13,46 +15,96 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
+func (sw *SequencerWorker) waitForStakedSequencer(activeParticipantsQuerier staking.ActiveSequencers, nodeAddr types.Address) bool {
+	for {
+		sequencerStaked, sequencerError := activeParticipantsQuerier.Contains(nodeAddr)
+		if sequencerError != nil {
+			sw.logger.Error("failed to check if my account is among active staked sequencers. Retrying in few seconds...", "error", sequencerError)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+
+		if !sequencerStaked {
+			sw.logger.Warn("my account is not among active staked sequencers. Retrying in few seconds...", "address", nodeAddr.String())
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+	return true
+}
+
+func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType
+
 	switch d.nodeType {
 	case BootstrapSequencer, Sequencer:
 		nodeType = staking.Sequencer
 	case WatchTower:
 		nodeType = staking.WatchTower
-	case Validator:
-		nodeType = staking.Validator
 	default:
 		return fmt.Errorf("unknown node type: %q", d.nodeType)
 	}
 
-	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
-	if err != nil {
-		return err
-	}
+	var returnErr error
 
-	if staked {
-		d.logger.Debug("already staked")
-		return nil
-	}
+	go func() {
+		for {
+			inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
+			if err != nil {
+				d.logger.Error("Failed to check if participant is currently in probation... Rechecking again in few seconds...", "error", err)
+				time.Sleep(3 * time.Second)
+				continue
+			}
 
-	switch d.nodeType {
-	case BootstrapSequencer:
-		return d.stakeBootstrapSequencer()
-	case Sequencer:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	case WatchTower:
-		return d.stakeParticipant(activeParticipantsQuerier)
-	default:
-		panic("invalid node type: " + d.nodeType)
-	}
+			if inProbation {
+				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking again in few seconds...", "error", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
+			if err != nil {
+				d.logger.Error("Failed to check if participant exists... Rechecking again in few seconds...", "error", err)
+				time.Sleep(3 * time.Second)
+				continue
+			}
+
+			if staked {
+				d.logger.Debug("Node is successfully staked... Rechecking in few seconds for potential changes...")
+				time.Sleep(3 * time.Second)
+				continue
+			}
+
+			switch MechanismType(d.nodeType) {
+			case BootstrapSequencer:
+				// Staking smart contract does not support `BootstrapSequencer` MachineType.
+				returnErr = d.stakeParticipant(false, Sequencer.String())
+			case Sequencer:
+				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+			case WatchTower:
+				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+			}
+		}
+	}()
+
+	return returnErr
 }
 
-// stakeBootstrapSequencer takes care of sequencer staking for the very first
-// bootstrap sequencer. This needs special handling, because there won't be any
-// other sequencer forging a block with staking transaction, therefore it must
-// be build by the bootstrap node itself.
-func (d *Avail) stakeBootstrapSequencer() error {
+func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
+	// Bootnode does not need to wait for any additional peers to be discovered prior pushing the
+	// block towards rest of the community, however, sequencers and watchtowers must!
+	if shouldWait {
+		for {
+			if d.network.GetBootnodeConnCount() > 0 {
+				break
+			}
+
+			time.Sleep(1 * time.Second)
+			continue
+		}
+	}
+
 	// First, build the staking block.
 	blockBuilderFactory := block.NewBlockBuilderFactory(d.blockchain, d.executor, d.logger)
 	bb, err := blockBuilderFactory.FromBlockchainHead()
@@ -64,7 +116,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	bb.SignWith(d.signKey)
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
-	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, "sequencer", 1_000_000)
+	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, nodeType, 1_000_000)
 	if err != nil {
 		return err
 	}
@@ -78,6 +130,7 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	bb.AddTransactions(tx)
 	blk, err := bb.Build()
 	if err != nil {
+		d.logger.Error("failed to build staking block", "node_type", nodeType, "error", err)
 		return err
 	}
 
@@ -85,31 +138,31 @@ func (d *Avail) stakeBootstrapSequencer() error {
 	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		d.logger.Error("error while submitting data to avail", "error", err)
-		panic(err)
+		return err
 	}
 
-	d.logger.Debug("writing block with staking tx to local blockchain")
+	d.logger.Info(
+		"Successfully wrote staking block to the blockchain",
+		"hash", blk.Hash().String(),
+	)
 
-	err = d.blockchain.WriteBlock(blk, "sequencer")
+	err = d.blockchain.WriteBlock(blk, d.nodeType.String())
 	if err != nil {
-		panic("bootstrap sequencer couldn't stake: " + err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (d *Avail) stakeParticipant(activeParticipantsQuerier staking.ActiveParticipants) error {
+func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) error {
+	// We need to have at least one node available to be able successfully push tx to the neighborhood peers
 	for {
-		addrs, err := activeParticipantsQuerier.Get(staking.NodeType(d.nodeType))
-		if err != nil {
-			return err
-		}
-		if len(addrs) > 1 {
+		if d.network.GetBootnodeConnCount() > 0 {
 			break
 		}
 
-		d.logger.Info("Waiting for at least 1 peer to come up before starting")
-		time.Sleep(StakingPollPeersIntervalMs * time.Millisecond)
+		time.Sleep(1 * time.Second)
+		continue
 	}
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)

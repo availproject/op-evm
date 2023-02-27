@@ -52,7 +52,7 @@ func (st *sequencerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) 
 
 	setThresholdTx, setThresholdTxErr := SetMinimumSequencersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new minimum sequencers count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new minimum sequencers count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -81,7 +81,7 @@ func (st *sequencerRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) 
 
 	setThresholdTx, setThresholdTxErr := SetMaximumSequencersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new maximum sequencers count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new maximum sequencers count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -115,7 +115,7 @@ func (st *sequencerRate) CurrentMinimum() (*big.Int, error) {
 
 	threshold, err := GetMinimumSequencersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current minimum sequencers allowed", "err", err)
+		st.logger.Error("failed to query current minimum sequencers allowed", "error", err)
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func (st *sequencerRate) CurrentMaximum() (*big.Int, error) {
 
 	threshold, err := GetMaximumSequencersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current maximum sequencers allowed", "err", err)
+		st.logger.Error("failed to query current maximum sequencers allowed", "error", err)
 		return nil, err
 	}
 

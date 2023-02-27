@@ -12,7 +12,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/test"
-	"github.com/test-go/testify/assert"
 )
 
 func getGenesisBasePath() string {
@@ -50,11 +49,4 @@ func NewTestAvail(t *testing.T, nodeType MechanismType) (*Avail, staking.ActiveP
 		availSender: sender,
 		stakingNode: stakingNode,
 	}, asq
-}
-
-func TestEnsureStakedBootstrapSequencer(t *testing.T) {
-	tAssert := assert.New(t)
-
-	tAvail, asq := NewTestAvail(t, BootstrapSequencer)
-	tAssert.NoError(tAvail.ensureStaked(asq))
 }

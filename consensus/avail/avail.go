@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"os"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
@@ -31,6 +31,9 @@ import (
 const (
 	// 1 AVL == 10^18 Avail fractions.
 	AVL = 1_000_000_000_000_000_000
+
+	// DefaultBlockProductionIntervalS - In seconds, default block loop production attempt interval
+	DefaultBlockProductionIntervalS = 1
 
 	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
 	// data in Avail.
@@ -86,8 +89,7 @@ type Avail struct {
 	stakingNode  staking.Node
 
 	blockProductionIntervalSec uint64
-
-	validator validator.Validator
+	validator                  validator.Validator
 }
 
 // Factory returns the consensus factory method
@@ -127,9 +129,10 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 				params.Blockchain,
 				time.Duration(params.BlockTime)*3*time.Second,
 			),
-			signKey:   validatorKey,
-			minerAddr: validatorAddr,
-			validator: validator.New(params.Blockchain, params.Executor, validatorAddr),
+			signKey:                    validatorKey,
+			minerAddr:                  validatorAddr,
+			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
+			blockProductionIntervalSec: DefaultBlockProductionIntervalS,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -159,11 +162,20 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.interval = interval
 		}
 
+		blockProductionIntervalSecRaw, ok := params.Config.Config["blockProductionIntervalSec"]
+		if ok {
+			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
+			if !ok {
+				return nil, fmt.Errorf("blockProductionIntervalSec expected int")
+			}
+
+			d.blockProductionIntervalSec = blockProductionIntervalSec
+		}
+
 		accountBytes, err := os.ReadFile(config.AccountFilePath)
 		if err != nil {
 			return nil, fmt.Errorf("failure to read account file '%s'", err)
 		}
-
 		d.availAccount, err = avail.NewAccountFromMnemonic(string(accountBytes))
 		if err != nil {
 			return nil, err
@@ -208,11 +220,24 @@ func (d *Avail) Start() error {
 	// Start P2P syncing.
 	go d.startSyncing()
 
+	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+		return err
+	}
+
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
-		go d.runSequencer(activeParticipantsQuerier, account, key)
-	case Validator:
-		go d.runValidator()
+		sequencerWorker, _ := NewSequencer(
+			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
+			d.validator, d.availClient, d.availAccount, d.availAppID,
+			d.signKey, d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
+			d.blockTime, d.blockProductionIntervalSec,
+		)
+		go func() {
+			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
+				panic(err)
+			}
+		}()
 	case WatchTower:
 		go d.runWatchTower(activeParticipantsQuerier, account, key)
 	default:
@@ -222,8 +247,25 @@ func (d *Avail) Start() error {
 	return nil
 }
 
+func (d *Avail) startSyncing() {
+	// Start the syncer
+	err := d.syncer.Start()
+	if err != nil {
+		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
+	}
+
+	syncFunc := func(blk *types.Block) bool {
+		d.txpool.ResetWithHeaders(blk.Header)
+		return false
+	}
+
+	err = d.syncer.Sync(syncFunc)
+	if err != nil {
+		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
+	}
+}
+
 // REQUIRED BASE INTERFACE METHODS //
-// BeginDisputeResolution -
 
 func (d *Avail) VerifyHeader(header *types.Header) error {
 	return d.verifier.VerifyHeader(header)

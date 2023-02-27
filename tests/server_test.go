@@ -46,7 +46,7 @@ type instance struct {
 }
 
 // StartServers starts configured nodes
-func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
+func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...avail.MechanismType) (*Context, error) {
 	t.Helper()
 
 	ctx := &Context{}
@@ -242,7 +242,7 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 		RestoreFile:        nil,
 		BlockTime:          rawConfig.BlockTime,
 		NodeType:           nodeType.String(),
-		LogLevel:           hclog.Error,
+		LogLevel:           hclog.Info,
 		LogFilePath:        rawConfig.LogFilePath,
 	}
 
@@ -250,7 +250,6 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 }
 
 func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail.MechanismType) (*server.Server, error) {
-
 	bootnode := false
 	if nodeType == avail.BootstrapSequencer {
 		bootnode = true

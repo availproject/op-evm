@@ -16,7 +16,7 @@ import (
 
 func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
 	logger := d.logger.Named("watchtower")
-	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
+	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, nil, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
 	// Start watching HEAD from Avail.
 	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
@@ -79,7 +79,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 		blksLoop:
 			for _, blk := range blks {
-				err = watchTower.Check(blk)
+				err = watchTower.SafeCheck(blk)
 				if err != nil { //  || blk.Number() == 4  - test the fraud
 					// TODO: We should implement something like SafeCheck() to not return errors that should not
 					// result in creating fraud proofs for blocks/transactions that should not be checked.

@@ -53,7 +53,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
 	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
-	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
+	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, validator, sw.logger, types.Address(account.Address), key.PrivateKey)
 
 	enableBlockProductionCh := make(chan bool)
 	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)

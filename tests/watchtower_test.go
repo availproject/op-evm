@@ -51,9 +51,9 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			wt := watchtower.New(blockchain, executor, nil, nil, hclog.Default(), coinbaseAddr, signKey)
+			wt := watchtower.New(blockchain, executor, nil, watchtower.NoBlockValidation, hclog.Default(), coinbaseAddr, signKey)
 
-			err = wt.Check(tc.block(blockBuilder))
+			err = wt.CheckBlockFully(tc.block(blockBuilder))
 			switch {
 			case err == nil && tc.errorMatcher == nil:
 				// correct; carry on
@@ -82,7 +82,7 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 	verifier = staking.NewVerifier(asq, hclog.Default())
 	blockchain.SetConsensus(verifier)
 
-	wt := watchtower.New(blockchain, executor, nil, nil, hclog.Default(), coinbaseAddr, signKey)
+	wt := watchtower.New(blockchain, executor, nil, watchtower.NoBlockValidation, hclog.Default(), coinbaseAddr, signKey)
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(20), common.ETH)
 	sender := staking.NewTestAvailSender()
@@ -121,7 +121,7 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 			tAssert.NotNil(blockBuilder)
 
 			blk := tc.block(blockBuilder)
-			if err := wt.Check(blk); err != nil {
+			if err := wt.CheckBlockFully(blk); err != nil {
 				fpBlk, err := wt.ConstructFraudproof(blk)
 				tAssert.NoError(err)
 
@@ -134,7 +134,7 @@ func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 	}
 }
 
-func TestWatchTowerBlockSafeCheckConstructFraudProof(t *testing.T) {
+func TestWatchTowerBlockFullCheck(t *testing.T) {
 	tAssert := assert.New(t)
 	verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
 	executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
@@ -150,7 +150,7 @@ func TestWatchTowerBlockSafeCheckConstructFraudProof(t *testing.T) {
 
 	validator := validator.New(blockchain, executor, coinbaseAddr, hclog.Default())
 
-	wt := watchtower.New(blockchain, executor, nil, validator, hclog.Default(), coinbaseAddr, signKey)
+	wt := watchtower.New(blockchain, executor, nil, validator.CheckBlockFully, hclog.Default(), coinbaseAddr, signKey)
 
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(20), common.ETH)
 	sender := staking.NewTestAvailSender()
@@ -223,7 +223,7 @@ func TestWatchTowerBlockSafeCheckConstructFraudProof(t *testing.T) {
 			tAssert.NotNil(blockBuilder)
 
 			blk := tc.block(blockBuilder)
-			err = wt.SafeCheck(blk)
+			err = wt.CheckBlockFully(blk)
 			if tc.shouldError {
 				tAssert.Error(err)
 			} else {

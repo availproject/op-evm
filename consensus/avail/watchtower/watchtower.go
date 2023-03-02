@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
@@ -25,21 +24,21 @@ var (
 	// contain block for the referenced parent hash.
 	ErrParentBlockNotFound = errors.New("parent block not found")
 
-	// ErrValidatorNotSet is returned when SafeCheck func is triggered and passed validator
-	// to the constructor is not set.
-	ErrValidatorNotSet = errors.New("validator not set")
-
 	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
 	// malicious block hash in `ExtraData` of the fraudproof block header.
 	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
+
+	// NoBlockValidation is here to help us if we do not need to pass extra block validation
+	NoBlockValidation = func(_ *types.Block) (error, bool) { return nil, false }
 )
 
 type WatchTower interface {
 	Apply(blk *types.Block) error
-	Check(blk *types.Block) error
-	SafeCheck(blk *types.Block) error
+	CheckBlockFully(blk *types.Block) error
 	ConstructFraudproof(blk *types.Block) (*types.Block, error)
 }
+
+type BlockValidationFn = func(blk *types.Block) (error, bool)
 
 type watchTower struct {
 	blockchain          *blockchain.Blockchain
@@ -47,18 +46,18 @@ type watchTower struct {
 	txpool              *txpool.TxPool
 	blockBuilderFactory block.BlockBuilderFactory
 	logger              hclog.Logger
-	validator           validator.Validator
+	validationFn        BlockValidationFn
 
 	account types.Address
 	signKey *ecdsa.PrivateKey
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, txp *txpool.TxPool, validator validator.Validator, logger hclog.Logger, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
+func New(blockchain *blockchain.Blockchain, executor *state.Executor, txp *txpool.TxPool, fn BlockValidationFn, logger hclog.Logger, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
 	return &watchTower{
 		blockchain:          blockchain,
 		executor:            executor,
 		txpool:              txp,
-		validator:           validator,
+		validationFn:        fn,
 		logger:              logger,
 		blockBuilderFactory: block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()),
 
@@ -67,28 +66,7 @@ func New(blockchain *blockchain.Blockchain, executor *state.Executor, txp *txpoo
 	}
 }
 
-func (wt *watchTower) Check(blk *types.Block) error {
-	if blk == nil {
-		return fmt.Errorf("%w: block == nil", ErrInvalidBlock)
-	}
-
-	if blk.Header == nil {
-		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock)
-	}
-
-	if err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
-		wt.logger.Info("block cannot be verified", "block_number", blk.Number(), "block_hash", blk.Hash(), "parent_block_hash", blk.ParentHash(), "error", err)
-		return err
-	}
-
-	return nil
-}
-
-func (wt *watchTower) SafeCheck(blk *types.Block) error {
-	if wt.validator == nil {
-		return fmt.Errorf("%w: self.validator == nil", ErrValidatorNotSet)
-	}
-
+func (wt *watchTower) CheckBlockFully(blk *types.Block) error {
 	if blk == nil {
 		return fmt.Errorf("%w: block == nil", ErrInvalidBlock)
 	}
@@ -99,7 +77,7 @@ func (wt *watchTower) SafeCheck(blk *types.Block) error {
 
 	// No matter error, we should return that it's safe as in case of any errors, we're wont write
 	// block into sequencers and watchtower should not be doing a fraud check on those.
-	if err := wt.validator.Check(blk); err != nil {
+	if err, _ := wt.validationFn(blk); err != nil {
 		wt.logger.Warn(
 			"block cannot be verified and it's not necessary to build fraud proof",
 			"block_number", blk.Number(),
@@ -108,20 +86,6 @@ func (wt *watchTower) SafeCheck(blk *types.Block) error {
 			"error", err,
 		)
 		return nil
-	}
-
-	// Not that some of the checks that are done above will be checked again, however, as they are checked
-	// above, these will not return error if they occur. In case of any other error we should attempt the fraud proof
-	// process. Other errors will come from transactions itself and if they occur, should be raised.
-	if err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
-		wt.logger.Info(
-			"Invalid block discovered. Should build the fraud proof.",
-			"block_number", blk.Number(),
-			"block_hash", blk.Hash(),
-			"parent_block_hash", blk.ParentHash(),
-			"error", err,
-		)
-		return err
 	}
 
 	return nil

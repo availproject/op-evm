@@ -53,7 +53,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
 	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
-	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, validator, sw.logger, types.Address(account.Address), key.PrivateKey)
+	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, watchtower.NoBlockValidation, sw.logger, types.Address(account.Address), key.PrivateKey)
 
 	enableBlockProductionCh := make(chan bool)
 	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
@@ -132,7 +132,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
 				//   trigger failures when writing down block due to already existing tx in the store.
 				if !fraudResolver.IsFraudProofBlock(edgeBlk) {
-					if err := validator.Check(edgeBlk); err == nil {
+					if err := validator.CheckBlockStructure(edgeBlk); err == nil {
 						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
 							sw.logger.Warn(
 								"failed to write edge block received from avail",

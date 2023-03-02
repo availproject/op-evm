@@ -13,11 +13,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
-/****************************************************************************/
-
-// For now hand coded address of the sequencer
-const SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-
 var (
 	// ErrInvalidBlock is general error used when block structure is invalid
 	// or its field values are inconsistent.
@@ -33,7 +28,8 @@ var (
 
 type Validator interface {
 	Apply(block *types.Block) error
-	Check(block *types.Block) error
+	CheckBlockStructure(block *types.Block) error
+	CheckBlockFully(blk *types.Block) (error, bool)
 	ProcessFraudproof(block *types.Block) error
 }
 
@@ -68,7 +64,7 @@ func (v *validator) Apply(blk *types.Block) error {
 	return nil
 }
 
-func (v *validator) Check(blk *types.Block) error {
+func (v *validator) CheckBlockStructure(blk *types.Block) error {
 	if blk.Header == nil {
 		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock)
 	}
@@ -77,6 +73,17 @@ func (v *validator) Check(blk *types.Block) error {
 		return fmt.Errorf("unable to verify block, %w", err)
 	}
 	return nil
+}
+
+func (v *validator) CheckBlockFully(blk *types.Block) (error, bool) {
+	if blk.Header == nil {
+		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock), false
+	}
+
+	if err := v.verifyFinalizedBlock(blk); err != nil {
+		return fmt.Errorf("unable to verify block, %w", err), false
+	}
+	return nil, false
 }
 
 func (v *validator) ProcessFraudproof(blk *types.Block) error {
@@ -280,8 +287,6 @@ func (v *validator) verifyGasLimit(header *types.Header, parentHeader *types.Hea
 
 // verifyBlockBody verifies that the block body is valid. This means checking:
 // - The trie roots match up (state, transactions, receipts, uncles)
-// - The receipts match up
-// - The execution result matches up
 func (v *validator) verifyBlockBody(blk *types.Block) error {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(blk.Uncles); hash != blk.Header.Sha3Uncles {
@@ -304,9 +309,6 @@ func (v *validator) verifyBlockBody(blk *types.Block) error {
 
 		return ErrInvalidTxRoot
 	}
-
-	// Transaction execution skipped, contrary to
-	// `blockchain.Blockchain.verifyBlockBody()` implementation.
 
 	return nil
 }

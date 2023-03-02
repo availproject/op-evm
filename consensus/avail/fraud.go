@@ -281,7 +281,7 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 	// Discover who needs to be slashed.
 	// If watchtower produced block that proves sequencer to be corrupted, sequencer needs to be slashed.
 	// If watchtower produced block that proves sequencer to be correct, watchtower needs to be slashed.
-	if err := f.watchtower.Check(maliciousBlock); err != nil {
+	if err := f.watchtower.CheckBlockFully(maliciousBlock); err != nil {
 		f.logger.Warn(
 			"Fraud proof block check confirmed malicious block. Slashing sequencer...",
 			"watchtower_block_hash", f.fraudBlock.Hash(),

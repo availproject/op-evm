@@ -52,7 +52,7 @@ func TestValidatorBlockCheck(t *testing.T) {
 			blockBuilder.SetCoinbaseAddress(coinbaseAddr).SignWith(signKey)
 
 			v := validator.New(blockchain, executor, coinbaseAddr, hclog.Default())
-			err = v.Check(tc.block(blockBuilder))
+			err = v.CheckBlockStructure(tc.block(blockBuilder))
 			switch {
 			case err == nil && tc.errorMatcher == nil:
 				// correct; carry on

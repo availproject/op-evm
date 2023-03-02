@@ -79,7 +79,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 		blksLoop:
 			for _, blk := range blks {
-				err = watchTower.SafeCheck(blk)
+				err = watchTower.CheckBlockFully(blk)
 				if err != nil { //  || blk.Number() == 4  - test the fraud
 					// TODO: We should implement something like SafeCheck() to not return errors that should not
 					// result in creating fraud proofs for blocks/transactions that should not be checked.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -35,10 +34,6 @@ const (
 	// DefaultBlockProductionIntervalS - In seconds, default block loop production attempt interval
 	DefaultBlockProductionIntervalS = 1
 
-	// AvailApplicationKey is the App Key that distincts Avail Settlement Layer
-	// data in Avail.
-	AvailApplicationKey = "avail-settlement"
-
 	// For now hand coded address of the sequencer
 	SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
 
@@ -50,7 +45,9 @@ const (
 )
 
 type Config struct {
-	AvailAddr       string
+	AvailAccount    signature.KeyringPair
+	AvailClient     avail.Client
+	AvailSender     avail.Sender
 	Bootnode        bool
 	AccountFilePath string
 }
@@ -133,6 +130,10 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			minerAddr:                  validatorAddr,
 			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
 			blockProductionIntervalSec: DefaultBlockProductionIntervalS,
+
+			availAccount: config.AvailAccount,
+			availClient:  config.AvailClient,
+			availSender:  config.AvailSender,
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -145,11 +146,6 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 
 		if d.nodeType == Sequencer && config.Bootnode {
 			d.nodeType = BootstrapSequencer
-		}
-
-		d.availClient, err = avail.NewClient(config.AvailAddr)
-		if err != nil {
-			return nil, err
 		}
 
 		rawInterval, ok := params.Config.Config["interval"]
@@ -172,28 +168,6 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			d.blockProductionIntervalSec = blockProductionIntervalSec
 		}
 
-		accountBytes, err := os.ReadFile(config.AccountFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("failure to read account file '%s'", err)
-		}
-		d.availAccount, err = avail.NewAccountFromMnemonic(string(accountBytes))
-		if err != nil {
-			return nil, err
-		}
-
-		if d.availAppID, err = avail.QueryAppID(d.availClient, AvailApplicationKey); err != nil {
-			if err == avail.ErrAppIDNotFound {
-				d.logger.Debug("Application key not found. Creating new one...", "app_key", AvailApplicationKey)
-				d.availAppID, err = avail.EnsureApplicationKeyExists(d.availClient, AvailApplicationKey, d.availAccount)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			return nil, err
-		}
-
-		d.availSender = avail.NewSender(d.availClient, d.availAppID, d.availAccount)
 		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
 
 		return d, nil

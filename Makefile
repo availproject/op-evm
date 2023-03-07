@@ -102,6 +102,7 @@ start-fraud: build-fraud
 start-staking: build-staking 
 	./tools/staking/staking
 
+
 create-bootstrap-sequencer-account: tools-account
 	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer
 	

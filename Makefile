@@ -51,7 +51,7 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	cd server && go build -o server
+	cd entrypoint && go build -o server
 
 build-client:
 	cd client && go build -o client
@@ -83,15 +83,15 @@ build: build-server build-client
 
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
+	./entrypoint/server -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
 
 start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
+	./entrypoint/server -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
-	./server/server -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
+	./entrypoint/server -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
 
 start-e2e: build-e2e
 	./tools/e2e/e2e

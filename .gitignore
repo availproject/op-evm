@@ -77,3 +77,4 @@ tools/accounts/accounts
 node_modules
 contracts/stake/node_modules
 data/test-accounts/*
+entrypoint/server

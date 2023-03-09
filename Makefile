@@ -2,6 +2,8 @@ POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/polygon-edge
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
 STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
+GOOS="darwin"
+GOARCH="arm64"
 
 ifndef $(GOPATH)
     GOPATH=$(shell go env GOPATH)
@@ -41,7 +43,7 @@ bootstrap-staking-contract: build-staking-contract
 	--artifacts-path "$(STAKING_CONTRACT_PATH)/artifacts/contracts/Staking.sol/Staking.json" \
 	--constructor-args "1" \
 	--constructor-args "10"
-	sed -i '' -e 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
+	sed -i 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
@@ -51,13 +53,13 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	cd server && go build -o server
+	cd server && GOOS=${GOOS} GOARCH=${GOARCH} go build -o server
 
 build-client:
-	cd client && go build -o client
+	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
 
 build-e2e:
-	cd tools/e2e && go build -o e2e
+	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
 
 build-fraud: build-fraud-contract
 	cd tools/fraud && go build -o fraud
@@ -76,22 +78,23 @@ build-edge:
 tools-wallet:
 	cd tools/wallet && go build
 
-tools-account:
-	cd tools/accounts && go build
-
 build: build-server build-client
-
-start-bootstrap-sequencer: build
-	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
 
 start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
+	./server/server -bootstrap -config-file="./configs/bootnode.yaml"
+
+start-node: build
+	rm -rf data/avail-node-1/blockchain/
+	./server/server -config-file="./configs/node-1.yaml"
+
+start-node-2: build
+	rm -rf data/avail-node-1/blockchain/
+	./server/server -config-file="./configs/node-2.yaml"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
-	./server/server -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
+	./server/server -config-file="./configs/watchtower-1.yaml"
 
 start-e2e: build-e2e
 	./tools/e2e/e2e
@@ -101,15 +104,6 @@ start-fraud: build-fraud
 
 start-staking: build-staking 
 	./tools/staking/staking
-
-create-bootstrap-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer
-	
-create-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-sequencer
-
-create-watchtower-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

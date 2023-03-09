@@ -1,0 +1,10 @@
+[Unit]
+Description=
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/data-avail-linux-aarch64 --dev
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,4 @@
-# TODO add load balancers (or not?)
+# TODO add load balancers and make ec2 instances private
 resource "aws_lb" "avail_settlement_nodes" {
   name               = "avail-settlement-lb-${var.deployment_name}"
   load_balancer_type = "network"

@@ -41,14 +41,4 @@ data "aws_caller_identity" "provisioner" {}
 
 locals {
   all_instances = concat([aws_instance.avail], aws_instance.node, aws_instance.bootnode, aws_instance.watchtower)
-  all_nodes     = concat(aws_instance.node, aws_instance.bootnode, aws_instance.watchtower)
-  ref_bootnode  = {
-    for i, node in local.all_nodes : node.id => [for j, bootnode in aws_instance.bootnode : bootnode if node.id != bootnode.id]
-  }
-  ref_node  = {
-    for i, node in local.all_nodes : node.id => [for j, node2 in aws_instance.node : node2 if node.id != node2.id]
-  }
-  ref = { //TODO rename
-    for i, node in local.all_nodes : node.id => length(local.ref_bootnode[node.id]) > 0 ? local.ref_bootnode[node.id][0]: local.ref_node[node.id][0]
-  }
 }

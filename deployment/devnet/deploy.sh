@@ -15,6 +15,7 @@ function generate_config {
     jsonrpc_port=$2
     p2p_port=$3
     node_type=$4
+    nat_addr=$5
 
     cat <<EOF
 chain_config: /home/ubuntu/genesis.json
@@ -27,8 +28,8 @@ telemetry:
     prometheus_addr: ""
 network:
     no_discover: false
-    libp2p_addr: :${p2p_port}
-    nat_addr: ""
+    libp2p_addr: 0.0.0.0:${p2p_port}
+    nat_addr: ${nat_addr}
     dns_addr: ""
     max_peers: 40
     max_outbound_peers: 8
@@ -76,89 +77,62 @@ chmod 400 ./configs/id_rsa
 all_instances=$(terraform output --json all_instances)
 
 avail_addr=
-
+bootnodes=()
+nodes_addr=()
 while read -r i; do
-    function node {
-      echo "$i" | jq -r "$1"
-    }
-    if [ "$(node .tags_all.NodeType)" = "avail" ]; then
-      avail_addr=$(node .public_dns)
+    node_type=$(echo "$i" | jq -r .tags.NodeType)
+    public_ip=$(echo "$i" | jq -r .public_ip)
+    node_addr=$(echo "$i" | jq -r .public_dns)
+    p2p_port=$(echo "$i" | jq -r .tags_all.P2PPort)
+    grpc_port=$(echo "$i" | jq -r .tags_all.GRPCPort)
+    jsonrpc_port=$(echo "$i" | jq -r .tags_all.JsonRPCPort)
+
+    if [ "$node_type" = "avail" ]; then
+      avail_addr=$node_addr
       continue
+    else
+      nodes_addr+=("$node_addr")
     fi
-    id=$(node .id)
-    mkdir -p "configs/${id}"
-    ../../third_party/polygon-edge/polygon-edge secrets init \
-      --data-dir "./configs/${id}/data" \
-      --json > "./configs/${id}/secrets.json"
+
+    mkdir -p "configs/${node_addr}"
+    node_id=$(../../third_party/polygon-edge/polygon-edge secrets init --data-dir "./configs/${node_addr}/data" --json | jq -r .[0].node_id)
+
+    if [ "$node_type" = "bootstrap-sequencer"  ] || [ "$node_type" = "sequencer"  ]; then
+      bootnodes+=("/ip4/$public_ip/tcp/$p2p_port/p2p/$node_id")
+    fi
+    echo "generating config for node: $node_type"
+    generate_config "$grpc_port" "$jsonrpc_port" "$p2p_port" "$node_type" "$public_ip" > "./configs/$node_addr/config.yaml"
+    generate_service "$avail_addr" > "./configs/$node_addr/node.service"
 
 done < <(echo "$all_instances" | jq -c '.[]')
 
-while read -r i; do
-    function node {
-      echo "$i" | jq -r "$1"
-    }
+../../third_party/polygon-edge/polygon-edge genesis \
+  --dir "./configs/genesis.json" \
+  --name "polygon-avail-settlement" \
+  --premine "0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000" \
+  "${bootnodes[@]/#/--bootnode=}" \
+  --consensus "ibft" \
+  --ibft-validator "0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864" \
+  --ibft-validator-type "ecdsa"
 
-    if [ "$(node .tags_all.NodeType)" = "avail" ]; then
-      # connect to the avail node and startup the avail service in dev mode
-      scp -oStrictHostKeyChecking=no -i ./configs/id_rsa "./avail.service" "ubuntu@$(node .public_dns):/home/ubuntu/"
-      ssh -n -i ./configs/id_rsa "ubuntu@$(node .public_dns)" 'wget https://github.com/maticnetwork/avail/releases/download/v1.4.0-rc3/data-avail-linux-aarch64.tar.gz && tar -xzvf data-avail-linux-aarch64.tar.gz && sudo mv avail.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl start avail.service && sudo systemctl enable avail.service'
-      continue
-    fi
+../../third_party/polygon-edge/polygon-edge genesis predeploy \
+  --chain "./configs/genesis.json" \
+  --predeploy-address "0x0110000000000000000000000000000000000001" \
+  --artifacts-path "../../third_party/avail-settlement-contracts/staking/artifacts/contracts/Staking.sol/Staking.json" \
+  --constructor-args "1" \
+  --constructor-args "10"
 
-    id=$(node .id)
-    bootnode_json=""
-    while read -r j; do
-      function node2 {
-        echo "$j" | jq -r "$1"
-      }
+# cannot use -i flag because macos version of sed doesn't allow this flag
+sed 's/\"balance\": \"0x0\"/\"balance\": \"0x3635c9adc5dea00000\"/g' < "./configs/genesis.json" > "./configs/genesis2.json"
+mv "./configs/genesis2.json" "./configs/genesis.json"
 
-      if [ "$id" = "$(node2 .id)" ]; then
-        continue
-      fi
+scp -oStrictHostKeyChecking=no -i ./configs/id_rsa "./avail.service" "ubuntu@$avail_addr:/home/ubuntu/"
+ssh -n -i ./configs/id_rsa "ubuntu@$avail_addr" 'wget https://github.com/maticnetwork/avail/releases/download/v1.4.0-rc3/data-avail-linux-aarch64.tar.gz && tar -xzvf data-avail-linux-aarch64.tar.gz && sudo mv avail.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl start avail.service && sudo systemctl enable avail.service'
 
-      if [ "$(node2 .tags.NodeType)" = "bootstrap-sequencer"  ] || [ "$(node2 .tags.NodeType)" = "sequencer"  ]; then
-        bootnode_json=$j
-        break
-      fi
-    done < <(echo "$all_instances" | jq -c '.[]')
-
-    if [ -z "$bootnode_json" ]; then
-      echo "Boot node not found for instance '$id'; exiting!"
-      exit 1
-      continue
-    fi
-    function bootnode() {
-        echo "$bootnode_json" | jq -r "$1"
-    }
-
-    ../../third_party/polygon-edge/polygon-edge genesis \
-      --dir "./configs/$id/genesis.json" \
-      --name "polygon-avail-settlement" \
-      --premine "0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000" \
-      --consensus "ibft" \
-      --bootnode "/ip4/$(bootnode .public_ip)/tcp/$(bootnode .tags_all.P2PPort)/p2p/$(cat "./configs/$(bootnode .id)/secrets.json" | jq -r .[0].node_id)" \
-      --ibft-validator "0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864" \
-      --ibft-validator-type "ecdsa"
-
-    ../../third_party/polygon-edge/polygon-edge genesis predeploy \
-      --chain "./configs/$id/genesis.json" \
-      --predeploy-address "0x0110000000000000000000000000000000000001" \
-      --artifacts-path "../../third_party/avail-settlement-contracts/staking/artifacts/contracts/Staking.sol/Staking.json" \
-      --constructor-args "1" \
-      --constructor-args "10"
-
-    # cannot use -i flag because of macos machines
-    sed 's/\"balance\": \"0x0\"/\"balance\": \"0x3635c9adc5dea00000\"/g' < "./configs/$id/genesis.json" > "./configs/$id/genesis2.json"
-    mv "./configs/$id/genesis2.json" "./configs/$id/genesis.json"
-
-    generate_config "$(node .tags_all.GRPCPort)" "$(node .tags_all.JsonRPCPort)" "$(node .tags_all.P2PPort)" "$(node .tags_all.NodeType)" > "./configs/$id/config.yaml"
-    generate_service "$avail_addr" > "./configs/$id/node.service"
-
-    scp -oStrictHostKeyChecking=no -i ./configs/id_rsa -r "./configs/$id/." "ubuntu@$(node .public_dns):/home/ubuntu/"
-    scp -oStrictHostKeyChecking=no -i ./configs/id_rsa "../../server/server" "ubuntu@$(node .public_dns):/home/ubuntu/"
-
-    ssh -n -i ./configs/id_rsa "ubuntu@$(node .public_dns)" 'sudo mv node.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl start node.service && sudo systemctl enable node.service'
-
-done < <(echo "$all_instances" | jq -c '.[]')
-
-# copy and startup avail
+for node_addr in "${nodes_addr[@]}"
+do
+  scp -oStrictHostKeyChecking=no -i ./configs/id_rsa -r "./configs/$node_addr/." "ubuntu@$node_addr:/home/ubuntu/"
+  scp -oStrictHostKeyChecking=no -i ./configs/id_rsa -r "./configs/genesis.json" "ubuntu@$node_addr:/home/ubuntu/"
+  scp -oStrictHostKeyChecking=no -i ./configs/id_rsa "../../server/server" "ubuntu@$node_addr:/home/ubuntu/"
+  ssh -n -i ./configs/id_rsa "ubuntu@$node_addr" 'sudo mv node.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl start node.service && sudo systemctl enable node.service'
+done

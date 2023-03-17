@@ -9,7 +9,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-type BlockStream struct {
+type BlockStream interface {
+	Chan() <-chan *types.SignedBlock
+	Close()
+}
+
+type blockStream struct {
 	closed  *atomic.Bool
 	closeCh chan struct{}
 
@@ -21,12 +26,17 @@ type BlockStream struct {
 	offset uint64
 }
 
-func NewBlockStream(client Client, logger hclog.Logger, offset uint64) *BlockStream {
-	bs := &BlockStream{
+func newBlockStream(client Client, logger hclog.Logger, offset uint64) BlockStream {
+	api, err := instance(client)
+	if err != nil {
+		panic("unsupported client in newBlockStream()")
+	}
+
+	bs := &blockStream{
 		closed:  new(atomic.Bool),
 		closeCh: make(chan struct{}),
 		dataCh:  make(chan *types.SignedBlock),
-		api:     client.instance(),
+		api:     api,
 		logger:  logger.Named("blockstream"),
 		offset:  offset,
 	}
@@ -36,17 +46,17 @@ func NewBlockStream(client Client, logger hclog.Logger, offset uint64) *BlockStr
 	return bs
 }
 
-func (bs *BlockStream) Close() {
+func (bs *blockStream) Close() {
 	if bs.closed.CompareAndSwap(false, true) {
 		close(bs.closeCh)
 	}
 }
 
-func (bs *BlockStream) Chan() <-chan *types.SignedBlock {
+func (bs *blockStream) Chan() <-chan *types.SignedBlock {
 	return bs.dataCh
 }
 
-func (bs *BlockStream) watch() {
+func (bs *blockStream) watch() {
 	hdr, err := bs.api.RPC.Chain.GetHeaderLatest()
 	if err != nil {
 		bs.logger.Error("couldn't fetch latest block hash", "error", err)
@@ -130,7 +140,7 @@ func (bs *BlockStream) watch() {
 	}
 }
 
-func (bs *BlockStream) catchUp(fromOffset, toOffset uint64) (err error) {
+func (bs *blockStream) catchUp(fromOffset, toOffset uint64) (err error) {
 	// Have we reached the HEAD?
 	for i := fromOffset; i <= toOffset; i++ {
 		blockHash, err := bs.api.RPC.Chain.GetBlockHash(i)

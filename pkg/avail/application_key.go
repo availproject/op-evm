@@ -37,7 +37,10 @@ func EnsureApplicationKeyExists(client Client, applicationKey string, signingKey
 }
 
 func QueryAppID(client Client, applicationKey string) (types.U32, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return 0, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
@@ -73,7 +76,10 @@ func QueryAppID(client Client, applicationKey string) (types.U32, error) {
 }
 
 func CreateApplicationKey(client Client, applicationKey string, signingKeyPair signature.KeyringPair) (types.U32, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return 0, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

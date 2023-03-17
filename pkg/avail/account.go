@@ -63,7 +63,10 @@ func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
 		return false, err
 	}
 
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return false, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
@@ -80,7 +83,10 @@ func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
 }
 
 func DepositBalance(client Client, account signature.KeyringPair, amount, nonceIncrement uint64) error {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
@@ -169,7 +175,10 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 }
 
 func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return nil, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

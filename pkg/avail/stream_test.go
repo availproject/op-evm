@@ -18,7 +18,7 @@ func TestStreamBlocksCorrectSequence(t *testing.T) {
 	}
 	logger := hclog.New(&hclog.LoggerOptions{Name: "polygon", Level: hclog.Off})
 
-	bc := NewBlockStream(availClient, logger, uint64(offset))
+	bc := newBlockStream(availClient, logger, uint64(offset))
 
 	timeout := time.After(20 * time.Second)
 	var blockSeq []uint64

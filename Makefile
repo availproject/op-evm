@@ -51,7 +51,7 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	go build -o avail-settlement ./cmd/...
+	go build -o avail-settlement ./cmd/server/...
 
 build-client:
 	cd client && go build -o client

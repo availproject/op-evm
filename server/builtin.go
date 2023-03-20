@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
@@ -14,13 +13,7 @@ import (
 
 type ConsensusType string
 
-const (
-	DummyConsensus ConsensusType = "dummy"
-)
-
-var consensusBackends = map[ConsensusType]consensus.Factory{
-	DummyConsensus: consensusDummy.Factory,
-}
+var consensusBackends = map[ConsensusType]consensus.Factory{}
 
 // secretsManagerBackends defines the SecretManager factories for different
 // secret management solutions

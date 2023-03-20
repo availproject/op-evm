@@ -22,6 +22,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
+	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
+	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -35,6 +39,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
+
+// secretsManagerBackends defines the SecretManager factories for different
+// secret management solutions
+var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
+	secrets.Local:          local.SecretsManagerFactory,
+	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
+	secrets.AWSSSM:         awsssm.SecretsManagerFactory,
+	secrets.GCPSSM:         gcpssm.SecretsManagerFactory,
+}
 
 // Server is the central manager of the blockchain client
 type Server struct {
@@ -120,7 +133,7 @@ func newLoggerFromConfig(config *server.Config) (hclog.Logger, error) {
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
-func NewServer(config *server.Config) (*Server, error) {
+func NewServer(config *server.Config, consensusFn func(params *consensus.Params) (consensus.Consensus, error)) (*Server, error) {
 	logger, err := newLoggerFromConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup new logger instance, %w", err)
@@ -236,7 +249,7 @@ func NewServer(config *server.Config) (*Server, error) {
 
 	{
 		// Setup consensus
-		if err := m.setupConsensus(); err != nil {
+		if err := m.setupConsensus(consensusFn); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
@@ -388,13 +401,8 @@ func (s *Server) setupSecretsManager() error {
 }
 
 // setupConsensus sets up the consensus mechanism
-func (s *Server) setupConsensus() error {
+func (s *Server) setupConsensus(consensusFn func(params *consensus.Params) (consensus.Consensus, error)) error {
 	engineName := s.config.Chain.Params.GetEngine()
-	engine, ok := consensusBackends[ConsensusType(engineName)]
-
-	if !ok {
-		return fmt.Errorf("consensus engine '%s' not found", engineName)
-	}
 
 	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
 	if !ok {
@@ -407,7 +415,7 @@ func (s *Server) setupConsensus() error {
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
 
-	consensus, err := engine(
+	consensus, err := consensusFn(
 		&consensus.Params{
 			Context:        context.Background(),
 			Config:         config,

@@ -15,10 +15,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
-const (
-	AvailConsensus server.ConsensusType = "avail"
-)
-
 func main() {
 	var bootnode bool
 	var availAddr, path, accountPath string
@@ -67,12 +63,7 @@ func main() {
 		Bootnode:     bootnode,
 	}
 
-	err = server.RegisterConsensus(AvailConsensus, consensus.Factory(cfg))
-	if err != nil {
-		log.Fatalf("failure to register consensus: %s", err)
-	}
-
-	serverInstance, err := server.NewServer(config)
+	serverInstance, err := server.NewServer(config, consensus.Factory(cfg))
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)
 	}

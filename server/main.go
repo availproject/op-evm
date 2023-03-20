@@ -9,7 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	golog "github.com/ipfs/go-log/v2"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
 )
 
@@ -40,8 +41,32 @@ func main() {
 
 	log.Printf("Server config: %+v", config)
 
+	availAccount, err := avail.AccountFromFile(accountPath)
+	if err != nil {
+		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
+	}
+
+	availClient, err := avail.NewClient(availAddr)
+	if err != nil {
+		log.Fatalf("failed to create Avail client: %s\n", err)
+	}
+
+	appID, err := avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+	if err != nil {
+		log.Fatalf("failed to get AppID from Avail: %s\n", err)
+	}
+
+	availSender := avail.NewSender(availClient, appID, availAccount)
+
 	// Attach the concensus to the server
-	err = server.RegisterConsensus(AvailConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
+	cfg := consensus.Config{
+		AvailAccount: availAccount,
+		AvailClient:  availClient,
+		AvailSender:  availSender,
+		Bootnode:     bootnode,
+	}
+
+	err = server.RegisterConsensus(AvailConsensus, consensus.Factory(cfg))
 	if err != nil {
 		log.Fatalf("failure to register consensus: %s", err)
 	}

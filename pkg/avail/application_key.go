@@ -12,13 +12,15 @@ const (
 	// DefaultAppID is the Avail application ID.
 	DefaultAppID = types.U32(0)
 
+	// ApplicationKey is the App Key that distincts Avail Settlement Layer
+	// data in Avail.
+	ApplicationKey = "avail-settlement"
+
 	// CallCreateApplicationKey is the RPC API call for creating new AppID on Avail.
 	CallCreateApplicationKey = "DataAvailability.create_application_key"
 )
 
-var (
-	ErrAppIDNotFound = errors.New("AppID not found")
-)
+var ErrAppIDNotFound = errors.New("AppID not found")
 
 func EnsureApplicationKeyExists(client Client, applicationKey string, signingKeyPair signature.KeyringPair) (types.U32, error) {
 	appID, err := QueryAppID(client, applicationKey)

@@ -43,13 +43,22 @@ func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
-func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
-	accountBytes, err := os.ReadFile(path)
+func AccountFromFile(filePath string) (signature.KeyringPair, error) {
+	accountBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return false, fmt.Errorf("failure to read account file '%s'", err)
+		return signature.KeyringPair{}, fmt.Errorf("failure to read account file '%s'", err)
 	}
 
-	account, err := NewAccountFromMnemonic(string(accountBytes))
+	availAccount, err := NewAccountFromMnemonic(string(accountBytes))
+	if err != nil {
+		return signature.KeyringPair{}, err
+	}
+
+	return availAccount, nil
+}
+
+func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
+	account, err := AccountFromFile(filePath)
 	if err != nil {
 		return false, err
 	}

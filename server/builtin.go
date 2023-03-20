@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
 	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
-	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
@@ -17,14 +15,10 @@ import (
 type ConsensusType string
 
 const (
-	DevConsensus   ConsensusType = "dev"
-	IBFTConsensus  ConsensusType = "ibft"
 	DummyConsensus ConsensusType = "dummy"
 )
 
 var consensusBackends = map[ConsensusType]consensus.Factory{
-	DevConsensus:   consensusDev.Factory,
-	IBFTConsensus:  consensusIBFT.Factory,
 	DummyConsensus: consensusDummy.Factory,
 }
 

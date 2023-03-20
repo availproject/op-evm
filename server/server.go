@@ -87,7 +87,7 @@ func newFileLogger(config *server.Config) (hclog.Logger, error) {
 	}
 
 	return hclog.New(&hclog.LoggerOptions{
-		Name:       config.NodeType + "-" + config.NodeIdx, // nolint:typecheck
+		Name:       config.NodeType, // nolint:typecheck
 		Level:      config.LogLevel,
 		Output:     logFileWriter,
 		JSONFormat: config.JSONLogFormat,
@@ -97,7 +97,7 @@ func newFileLogger(config *server.Config) (hclog.Logger, error) {
 // newCLILogger returns minimal logger instance that sends all logs to standard output
 func newCLILogger(config *server.Config) hclog.Logger {
 	return hclog.New(&hclog.LoggerOptions{
-		Name:       config.NodeType + "-" + config.NodeIdx, // nolint:typecheck
+		Name:       config.NodeType, // nolint:typecheck
 		Level:      config.LogLevel,
 		JSONFormat: config.JSONLogFormat,
 	})

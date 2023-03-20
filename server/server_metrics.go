@@ -22,7 +22,7 @@ func (s *Server) setupTelemetry() error {
 
 	metricsConf := metrics.DefaultConfig("edge")
 	metricsConf.EnableHostname = false
-	metrics.NewGlobal(metricsConf, metrics.FanoutSink{
+	_, _ = metrics.NewGlobal(metricsConf, metrics.FanoutSink{
 		inm, promSink,
 	})
 

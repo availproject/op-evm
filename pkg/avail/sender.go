@@ -6,6 +6,7 @@ import (
 	edgetypes "github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 const (
@@ -22,29 +23,30 @@ type Sender interface {
 // Result contains the final result of block data submission.
 type Result struct{}
 
-type testSender struct{}
+type blackholeSender struct{}
 
-func (t *testSender) Send(blk *edgetypes.Block) error {
+func (t *blackholeSender) Send(blk *edgetypes.Block) error {
 	return nil
 }
 
-func (t *testSender) SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error {
+func (t *blackholeSender) SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error {
 	return nil
 }
 
-// NewSender constructs an Avail block data sender.
-func NewTestSender() Sender {
-	return &testSender{}
+// NewBlackholeSender constructs an Avail block data sender that ignores sent
+// blocks - i.e. blackholes them.
+func NewBlackholeSender() Sender {
+	return &blackholeSender{}
 }
 
 type sender struct {
-	appID          types.U32
+	appID          types.UCompact
 	client         Client
 	signingKeyPair signature.KeyringPair
 }
 
 // NewSender constructs an Avail block data sender.
-func NewSender(client Client, appID types.U32, signingKeyPair signature.KeyringPair) Sender {
+func NewSender(client Client, appID types.UCompact, signingKeyPair signature.KeyringPair) Sender {
 	return &sender{
 		appID:          appID,
 		client:         client,
@@ -88,7 +90,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		// `Blob` implements `scale.Encodeable` interface, but it it's passed
 		// directly to `types.NewCall()`, the server will return an error. This
 		// requires further investigation to fix.
-		encodedBytes, err := types.EncodeToBytes(blob)
+		encodedBytes, err := codec.Encode(blob)
 		if err != nil {
 			return err
 		}

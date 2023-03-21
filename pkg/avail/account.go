@@ -87,7 +87,12 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 		return err
 	}
 
-	c, err := types.NewCall(meta, "Balances.transfer", types.NewMultiAddressFromAccountID(account.PublicKey), types.NewUCompactFromUInt(amount))
+	addr, err := types.NewMultiAddressFromAccountID(account.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	c, err := types.NewCall(meta, "Balances.transfer", addr, types.NewUCompactFromUInt(amount))
 	if err != nil {
 		return err
 	}
@@ -129,7 +134,7 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(0),
-		AppID:              types.NewU32(0),
+		AppID:              types.NewUCompactFromUInt(0),
 		TransactionVersion: rv.TransactionVersion,
 	}
 

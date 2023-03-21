@@ -6,6 +6,7 @@ import (
 	edgetypes "github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 const (
@@ -39,13 +40,13 @@ func NewBlackholeSender() Sender {
 }
 
 type sender struct {
-	appID          types.U32
+	appID          types.UCompact
 	client         Client
 	signingKeyPair signature.KeyringPair
 }
 
 // NewSender constructs an Avail block data sender.
-func NewSender(client Client, appID types.U32, signingKeyPair signature.KeyringPair) Sender {
+func NewSender(client Client, appID types.UCompact, signingKeyPair signature.KeyringPair) Sender {
 	return &sender{
 		appID:          appID,
 		client:         client,
@@ -86,7 +87,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		// `Blob` implements `scale.Encodeable` interface, but it it's passed
 		// directly to `types.NewCall()`, the server will return an error. This
 		// requires further investigation to fix.
-		encodedBytes, err := types.EncodeToBytes(blob)
+		encodedBytes, err := codec.Encode(blob)
 		if err != nil {
 			return err
 		}

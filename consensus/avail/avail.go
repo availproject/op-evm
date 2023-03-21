@@ -63,7 +63,7 @@ type Avail struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	availAppID avail_types.U32
+	availAppID avail_types.UCompact
 	signKey    *ecdsa.PrivateKey
 	minerAddr  types.Address
 

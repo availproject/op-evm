@@ -31,7 +31,7 @@ func NewTestAvail(t *testing.T, nodeType MechanismType) (*Avail, staking.ActiveP
 	verifier := staking.NewVerifier(asq, hclog.Default())
 	blockchain.SetConsensus(verifier)
 
-	sender := avail.NewTestSender()
+	sender := avail.NewBlackholeSender()
 	stakingNode := staking.NewNode(blockchain, executor, sender, hclog.Default(), staking.NodeType(nodeType))
 
 	return &Avail{

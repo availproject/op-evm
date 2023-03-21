@@ -23,6 +23,9 @@ var bindInterface = flag.String("bind-addr", "127.0.0.1", "IP address of the int
 // nolint:unused
 var genesisCfgPath = flag.String("genesis-config", "../configs/genesis.json", "Path to genesis.json config")
 
+// nolint:unused
+var accountPath = flag.String("account-config-file", "../configs/account", "Path to the account mnemonic file")
+
 func Test_MultipleSequencers(t *testing.T) {
 	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
 
@@ -42,7 +45,7 @@ func Test_MultipleSequencers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +92,8 @@ func waitForPeers(t testing.TB, ethClient *ethclient.Client, minNodes int) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		t.Logf("Got peer count: %d", peerCount)
 
 		// Cleanup timeout context.
 		cancel()

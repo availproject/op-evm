@@ -2,16 +2,24 @@ package avail
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"fmt"
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
+	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
@@ -21,145 +29,237 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Avail) runSequencer(stakingNode staking.Node, myAccount accounts.Account, signKey *keystore.Key) {
-	t := new(atomic.Int64)
-	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, activeParticipantsQuerier)
+type SequencerWorker struct {
+	logger                     hclog.Logger
+	blockchain                 *blockchain.Blockchain
+	executor                   *state.Executor
+	validator                  validator.Validator
+	txpool                     *txpool.TxPool
+	apq                        staking.ActiveParticipants
+	availAppID                 avail_types.UCompact
+	availClient                avail.Client
+	availAccount               signature.KeyringPair
+	nodeSignKey                *ecdsa.PrivateKey
+	nodeAddr                   types.Address
+	nodeType                   MechanismType
+	stakingNode                staking.Node
+	availSender                avail.Sender
+	closeCh                    chan struct{}
+	blockTime                  time.Duration // Minimum block generation time in seconds
+	blockProductionIntervalSec uint64
+}
 
-	d.logger.Debug("ensuring sequencer staked")
-	err := d.ensureStaked(activeParticipantsQuerier)
+func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
+	t := new(atomic.Int64)
+	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
+	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
+	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
+
+	enableBlockProductionCh := make(chan bool)
+	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
+
+	accBalance, err := avail.GetBalance(sw.availClient, sw.availAccount)
 	if err != nil {
-		d.logger.Error("error while ensuring sequencer staked", "error", err)
-		return
+		return fmt.Errorf("failed to discover account balance: %s", err)
 	}
 
-	d.logger.Debug("ensured sequencer staked")
+	sw.logger.Info(
+		"Avail account information",
+		"address", sw.availAccount.Address,
+		"balance", accBalance.Int64(),
+	)
+
+	callIdx, err := avail.FindCallIndex(sw.availClient)
+	if err != nil {
+		return fmt.Errorf("failed to discover avail call index: %s", err)
+	}
+
+	// Will wait until contract is updated and there's a staking transaction written
+	sw.waitForStakedSequencer(activeSequencersQuerier, sw.nodeAddr)
+
+	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
+	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
+
+	// Write blocks to the local blockchain and avail in intervals uless block production is stopped.
+	go sw.runWriteBlocksLoop(enableBlockProductionCh, activeSequencersQuerier, fraudResolver, account, key)
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
-	availBlockStream := avail.NewBlockStream(d.availClient, d.logger, 0)
+	availBlockStream := avail.NewBlockStream(sw.availClient, sw.logger, 0)
 	defer availBlockStream.Close()
 
-	d.logger.Debug("sequencer started")
+	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
 
-	for blk := range availBlockStream.Chan() {
-		// Check if we need to stop.
+	for {
 		select {
-		case <-d.closeCh:
-			if err := stakingNode.UnStake(signKey.PrivateKey); err != nil {
-				d.logger.Error("failed to unstake the node", "error", err)
-			}
-			return
-		default:
-		}
+		case blk := <-availBlockStream.Chan():
+			// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
+			// time sensitive logic in sequencer, such as block generation timeouts.
+			t.Store(int64(blk.Block.Header.Number))
 
-		// Periodically verify that we are staked, before proceeding with sequencer
-		// logic. In the unexpected case of being slashed and dropping below the
-		// required sequencer staking threshold, we must stop processing, because
-		// otherwise we just get slashed more.
-		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(types.Address(myAccount.Address))
-		if sequencerError != nil {
-			d.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "err", sequencerError)
-			return
-		}
-
-		if !sequencerStaked {
-			d.logger.Error("my account is not among active staked sequencers; cannot continue", "myAccount.Address", myAccount.Address)
-			return
-		}
-
-		// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
-		// time sensitive logic in sequencer, such as block generation timeouts.
-		t.Store(int64(blk.Block.Header.Number))
-
-		sequencers, err := activeSequencersQuerier.Get()
-		if err != nil {
-			d.logger.Error("querying staked sequencers failed; quitting", "error", err)
-			return
-		}
-
-		if len(sequencers) == 0 {
-			// This is something that should **never** happen.
-			panic("no staked sequencers")
-		}
-
-		// Is it my turn to generate next block?
-		if bytes.Equal(sequencers[0].Bytes(), myAccount.Address.Bytes()) {
-			header := d.blockchain.Header()
-			d.logger.Debug("it's my turn; producing a block", "t", blk.Block.Header.Number)
-			if err := d.writeNewBlock(myAccount, signKey, header); err != nil {
-				d.logger.Error("failed to mine block", "err", err)
+			// So this is the situation...
+			// Here we are not looking for if current node should be producing or not producing the block.
+			// What we are interested, prior to fraud resolver, if block is containing fraud check request.
+			edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
+			if len(edgeBlks) == 0 && err != nil {
+				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
+				// It is expected that not all Avail blocks contain a SL block. On any other error,
+				// log the error and wait for a next one.
+				if err != block.ErrNoExtrinsicFound {
+					sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
+					continue
+				}
 			}
 
-			continue
-		} else {
-			d.logger.Debug("it's not my turn; skippin' a round", "t", blk.Block.Header.Number)
+			// Write down blocks received from avail to make sure we're synced before processing with the
+			// fraud check or writing down new blocks...
+			for _, edgeBlk := range edgeBlks {
+				// In case that dispute resolution is ended, please make sure to set fraud resolution block
+				// to nil so whole chain and corrupted node can continue making our day good!
+				// Block does not have to be written into the chain as it's already written with syncer...
+				if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
+					sw.logger.Warn(
+						"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
+						"edge_block_hash", edgeBlk.Hash(),
+						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
+					)
+					fraudResolver.EndDisputeResolution()
+				}
+
+				// We cannot write the fraud proof block to the blockchain at all due to following reasons:
+				// - Block number already exists and block won't be written.
+				// - Watchtower has syncer disabled and when writing block, next block can come in rejecting this block.
+				// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
+				//   trigger failures when writing down block due to already existing tx in the store.
+				if !fraudResolver.IsFraudProofBlock(edgeBlk) {
+					if err := validator.Check(edgeBlk); err == nil {
+						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
+							sw.logger.Warn(
+								"failed to write edge block received from avail",
+								"edge_block_hash", edgeBlk.Hash(),
+								"error", err,
+							)
+						}
+					} else {
+						sw.logger.Warn(
+							"failed to validate edge block received from avail",
+							"edge_block_hash", edgeBlk.Hash(),
+							"error", err,
+						)
+					}
+				}
+			}
+
+			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
+			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
+
+			// Periodically verify that we are staked, before proceeding with sequencer
+			// logic. In the unexpected case of being slashed and dropping below the
+			// required sequencer staking threshold, we must stop processing, because
+			// otherwise we just get slashed more.
+			sequencerStaked, sequencerError := activeSequencersQuerier.Contains(sw.nodeAddr)
+			if sequencerError != nil {
+				sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "error", sequencerError)
+				continue
+			}
+
+			if !sequencerStaked {
+				sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
+				continue
+			}
+
+			// Will check the block for fraudlent behaviour and slash parties accordingly.
+			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
+			// If we do not stop the network from processing, blocks will continue to be built from other sequencers
+			// resulting in block number missmatches and fraud will potentially be corrupted.
+			if _, err := fraudResolver.CheckAndSlash(); err != nil {
+				continue
+			}
+
+			// Is it my turn to generate next block?
+			if sw.IsNextSequencer(activeSequencersQuerier) {
+				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+				enableBlockProductionCh <- true
+				continue
+			} else {
+				sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+				enableBlockProductionCh <- false
+			}
+
+		case <-sw.closeCh:
+			if err := sw.stakingNode.UnStake(sw.nodeSignKey); err != nil {
+				sw.logger.Error("failed to unstake the node", "error", err)
+				return err
+			}
+			return nil
 		}
 	}
 }
 
-func (d *Avail) startSyncing() {
-	// Start the syncer
-	err := d.syncer.Start()
+func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.ActiveSequencers) bool {
+	sequencers, err := activeSequencersQuerier.Get()
 	if err != nil {
-		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
-	}
-
-	syncFunc := func(blk *types.Block) bool {
-		d.txpool.ResetWithHeaders(blk.Header)
+		sw.logger.Error("querying staked sequencers failed; quitting", "error", err)
 		return false
 	}
 
-	err = d.syncer.Sync(syncFunc)
-	if err != nil {
-		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
-	}
+	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
 }
 
-func (d *Avail) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var successful []*types.Transaction
+// runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
+func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool, activeSequencersQuerier staking.ActiveSequencers, fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) {
+	t := time.NewTicker(time.Duration(sw.blockProductionIntervalSec) * time.Second)
+	defer t.Stop()
 
-	d.txpool.Prepare()
+	shouldProduce := false
 
 	for {
-		tx := d.txpool.Peek()
-		if tx == nil {
-			break
-		}
-
-		if tx.ExceedsBlockGasLimit(gasLimit) {
-			d.txpool.Drop(tx)
-			d.logger.Warn("transaction exceeded gas limit - dropped it", "hash", tx.Hash.String())
-			continue
-		}
-
-		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-				d.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
-				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
-				d.logger.Warn("transaction caused application error", "hash", tx.Hash.String())
-				d.txpool.Demote(tx)
-			} else {
-				d.logger.Error("transaction caused unknown error", "error", err)
-				d.txpool.Drop(tx)
+		select {
+		case <-t.C:
+			if !shouldProduce {
+				continue
 			}
 
-			continue
+			// Means we are processing the disputed (fraud) block verification and should not create new
+			// blocks anywhere...
+			if fraudResolver.IsChainDisabled() {
+				continue
+			}
+
+			if !sw.IsNextSequencer(activeSequencersQuerier) {
+				sw.logger.Warn(
+					"it is not my turn to produce the block",
+					"sequencer_addr", myAccount.Address,
+				)
+				continue
+			} else {
+				sw.logger.Warn(
+					"it is my turn to produce the block",
+					"sequencer_addr", myAccount.Address,
+				)
+			}
+
+			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)
+
+			if err := sw.writeBlock(myAccount, signKey); err != nil {
+				sw.logger.Error("failed to mine block", "error", err)
+			}
+		case e := <-enableBlockProductionCh:
+			sw.logger.Debug("sequencer block producing status", "should_produce", e)
+			shouldProduce = e
+
+		case <-sw.closeCh:
+			sw.logger.Debug("received stop signal")
+			return
 		}
-
-		// no errors, pop the tx from the pool
-		d.txpool.Pop(tx)
-
-		successful = append(successful, tx)
 	}
-
-	return successful
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key, parent *types.Header) error {
+func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key) error {
+	parent := sw.blockchain.Header()
+
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -170,7 +270,7 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	}
 
 	// calculate gas limit based on parent header
-	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	gasLimit, err := sw.blockchain.CalculateGasLimit(header.Number)
 	if err != nil {
 		return err
 	}
@@ -179,7 +279,7 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(d.blockTime)
+	headerTime := parentTime.Add(sw.blockTime)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
@@ -193,12 +293,30 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 		return err
 	}
 
-	transition, err := d.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
+	transition, err := sw.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
 	if err != nil {
 		return err
 	}
 
-	txns := d.writeTransactions(gasLimit, transition)
+	txns := sw.writeTransactions(gasLimit, transition)
+
+	/* 	// TRIGGER SEQUENCER SLASHING
+	   	maliciousBlockWritten := false
+	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
+	   		if header.Number == 4 || header.Number == 5 {
+	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+	   			tx.Nonce = 1
+	   			txSigner := &crypto.FrontierSigner{}
+	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+	   			if err != nil {
+	   				sw.logger.Error("failed to sign fraud transaction", "error", err)
+	   				return err
+	   			}
+
+	   			txns = append(txns, dtx)
+	   			maliciousBlockWritten = true
+	   		}
+	   	} */
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -227,25 +345,108 @@ func (d *Avail) writeNewBlock(myAccount accounts.Account, signKey *keystore.Key,
 	// is sealed after all the committed seals
 	blk.Header.ComputeHash()
 
-	d.logger.Debug("sending block to avail")
+	sw.logger.Info(
+		"Sending new block to avail",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
 
-	err = d.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	err = sw.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
-		d.logger.Error("Error while submitting data to avail", "error", err)
+		sw.logger.Error("Error while submitting data to avail", "error", err)
 		return err
 	}
 
-	d.logger.Debug("sent block to avail")
-	d.logger.Debug("writing block to blockchain")
+	sw.logger.Info(
+		"Block successfully sent to avail. Writing block to local chain...",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlock(blk, "sequencer"); err != nil {
+	if err := sw.blockchain.WriteBlock(blk, sw.nodeType.String()); err != nil {
 		return err
 	}
 
-	// after the block has been written we reset the txpool so that
-	// the old transactions are removed
-	d.txpool.ResetWithHeaders(blk.Header)
+	sw.logger.Info(
+		"Successfully wrote new sequencer block to the local chain",
+		"sequencer_node_addr", sw.nodeAddr,
+		"block_number", blk.Number(),
+		"block_hash", blk.Hash(),
+		"block_parent_hash", blk.ParentHash(),
+	)
+
+	// After the block has been written we reset the txpool to remove stale transactions.
+	sw.txpool.ResetWithHeaders(blk.Header)
 
 	return nil
+}
+
+func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	var successful []*types.Transaction
+
+	sw.txpool.Prepare()
+
+	for {
+		tx := sw.txpool.Peek()
+		if tx == nil {
+			break
+		}
+
+		if tx.ExceedsBlockGasLimit(gasLimit) {
+			continue
+		}
+
+		if err := transition.Write(tx); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
+				sw.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				sw.logger.Warn("transaction caused application error", "hash", tx.Hash.String())
+				sw.txpool.Demote(tx)
+			} else {
+				sw.logger.Error("transaction caused unknown error", "error", err)
+				sw.txpool.Drop(tx)
+			}
+
+			continue
+		}
+
+		// no errors, pop the tx from the pool
+		sw.txpool.Pop(tx)
+
+		successful = append(successful, tx)
+	}
+
+	return successful
+}
+
+func NewSequencer(
+	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, v validator.Validator, availClient avail.Client,
+	availAccount signature.KeyringPair, availAppID avail_types.UCompact,
+	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
+	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
+	blockTime time.Duration, blockProductionIntervalSec uint64) (*SequencerWorker, error) {
+	return &SequencerWorker{
+		logger:                     logger,
+		blockchain:                 b,
+		executor:                   e,
+		validator:                  v,
+		txpool:                     txp,
+		apq:                        apq,
+		availAppID:                 availAppID,
+		availClient:                availClient,
+		availAccount:               availAccount,
+		nodeSignKey:                nodeSignKey,
+		nodeAddr:                   nodeAddr,
+		nodeType:                   nodeType,
+		stakingNode:                stakingNode,
+		availSender:                availSender,
+		blockTime:                  blockTime,
+		blockProductionIntervalSec: blockProductionIntervalSec,
+	}, nil
 }

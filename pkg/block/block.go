@@ -26,8 +26,8 @@ var (
 	ErrNoExtrinsicFound = errors.New("no compatible extrinsic found")
 )
 
-func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, callIdx avail_types.CallIndex) (*types.Block, error) {
-	logger := hclog.Default().Named("block")
+func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, callIdx avail_types.CallIndex, logger hclog.Logger) ([]*types.Block, error) {
+	toReturn := []*types.Block{}
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
 		if extrinsic.Signature.AppID.Int64() != appID.Int64() {
@@ -52,7 +52,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 				// Don't return just yet because there is no way of filtering
 				// uninteresting extrinsics / method.Args and failing decoding
 				// is the only way to distinct those.
-				logger.Debug("decoding block extrinsic's raw bytes from args failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
+				logger.Info("decoding block extrinsic's raw bytes from args failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
 
@@ -62,7 +62,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 				// Don't return just yet because there is no way of filtering
 				// uninteresting extrinsics / method.Args and failing decoding
 				// is the only way to distinct those.
-				logger.Debug("decoding blob from extrinsic data failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
+				logger.Info("decoding blob from extrinsic data failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
 		}
@@ -72,8 +72,14 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 			return nil, err
 		}
 
-		return &blk, nil
+		logger.Info("Received new edge block from avail.", "hash", blk.Header.Hash, "parent_hash", blk.Header.ParentHash)
+
+		toReturn = append(toReturn, &blk)
 	}
 
-	return nil, ErrNoExtrinsicFound
+	if len(toReturn) == 0 {
+		return nil, ErrNoExtrinsicFound
+	}
+
+	return toReturn, nil
 }

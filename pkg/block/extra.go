@@ -16,7 +16,15 @@ const (
 
 	// KeyFraudProofOf is key that identifies the fraudproof objected malicious
 	// block hash in `ExtraData` of the fraudproof block header.
-	KeyFraudProofOf = "FRAUDPROOF_OF"
+	KeyFraudProofOf = "FRAUD_PROOF_OF"
+
+	// KeyBeginDisputeResolutionOf used to understand which tx from the txpool we need to pick
+	// when writing fraud slash block
+	KeyBeginDisputeResolutionOf = "BEGIN_DISPUTE_RESOLUTION_OF"
+
+	// KeyEndDisputeResolutionOf used to understand which block hash was used to slash the node
+	// in order to end dispute resolution on all of the nodes
+	KeyEndDisputeResolutionOf = "END_DISPUTE_RESOLUTION_OF"
 )
 
 func EncodeExtraDataFields(data map[string][]byte) []byte {
@@ -139,6 +147,46 @@ func GetExtraDataFraudProofTarget(h *types.Header) (types.Hash, bool) {
 	}
 
 	data, exists := kv[KeyFraudProofOf]
+	if !exists {
+		return types.ZeroHash, false
+	}
+
+	toReturn := types.BytesToHash(data)
+
+	if toReturn == types.ZeroHash {
+		return types.ZeroHash, false
+	}
+
+	return toReturn, true
+}
+
+func GetExtraDataBeginDisputeResolutionTarget(h *types.Header) (types.Hash, bool) {
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return types.ZeroHash, false
+	}
+
+	data, exists := kv[KeyBeginDisputeResolutionOf]
+	if !exists {
+		return types.ZeroHash, false
+	}
+
+	toReturn := types.BytesToHash(data)
+
+	if toReturn == types.ZeroHash {
+		return types.ZeroHash, false
+	}
+
+	return toReturn, true
+}
+
+func GetExtraDataEndDisputeResolutionTarget(h *types.Header) (types.Hash, bool) {
+	kv, err := DecodeExtraDataFields(h.ExtraData)
+	if err != nil {
+		return types.ZeroHash, false
+	}
+
+	data, exists := kv[KeyEndDisputeResolutionOf]
 	if !exists {
 		return types.ZeroHash, false
 	}

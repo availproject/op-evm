@@ -26,7 +26,6 @@ type Builder interface {
 	SetExtraDataField(key string, value []byte) Builder
 	SetGasLimit(limit uint64) Builder
 	SetParentStateRoot(parentRoot types.Hash) Builder
-
 	AddTransactions(txs ...*types.Transaction) Builder
 
 	SignWith(signKey *ecdsa.PrivateKey) Builder
@@ -43,6 +42,7 @@ type blockBuilder struct {
 	coinbase   *types.Address
 	difficulty *uint64
 	parentRoot *types.Hash
+	parentHash *types.Hash
 	gasLimit   *uint64
 
 	header *types.Header
@@ -174,6 +174,11 @@ func (bb *blockBuilder) setDefaults() {
 	if bb.parentRoot == nil {
 		bb.parentRoot = new(types.Hash)
 		*bb.parentRoot = bb.parent.StateRoot
+	}
+
+	if bb.parentHash == nil {
+		bb.parentHash = new(types.Hash)
+		*bb.parentHash = bb.parent.ParentHash
 	}
 
 	if bb.gasLimit == nil {

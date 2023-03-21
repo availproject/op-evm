@@ -211,7 +211,7 @@ func TestSlashStaker(t *testing.T) {
 	err := dr.Begin(maliciousSequencerAddr, coinbaseSignKey)
 	tAssert.NoError(err)
 
-	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.True(isProbationSequencer)
 
@@ -220,7 +220,7 @@ func TestSlashStaker(t *testing.T) {
 	coinbaseSlashErr := Slash(blockchain, executor, hclog.Default(), sequencerAddr, sequencerSignKey, maliciousSequencerAddr, 1_000_000, "test")
 	tAssert.NoError(coinbaseSlashErr)
 
-	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousSequencerAddr)
+	isProbationSequencer, isProbationSequencerErr = dr.Contains(maliciousSequencerAddr, Sequencer)
 	tAssert.NoError(isProbationSequencerErr)
 	tAssert.False(isProbationSequencer)
 

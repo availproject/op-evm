@@ -1,13 +1,18 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"net/netip"
 	"net/url"
+	"os"
+	"path"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
@@ -17,8 +22,15 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
+)
+
+const (
+	availConsensus server.ConsensusType = "avail"
+
+	testAccountPath = "../data/test-accounts"
 )
 
 type Context struct {
@@ -27,20 +39,25 @@ type Context struct {
 }
 
 type instance struct {
-	nodeType avail.MechanismType
-	config   *server.Config
-	server   *server.Server
+	nodeType    consensus.MechanismType
+	accountPath string
+	config      *server.Config
+	server      *server.Server
 }
 
 // StartServers starts configured nodes
-func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr string, nodeTypes ...avail.MechanismType) (*Context, error) {
+func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...consensus.MechanismType) (*Context, error) {
 	t.Helper()
 
 	ctx := &Context{}
+	if err := createAvailAccounts(t, availAddr, nodeTypes); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
+	nnh := newNodeNameHelper()
 	for _, nt := range nodeTypes {
 		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
 		if err != nil {
@@ -49,11 +66,12 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		}
 
 		si := instance{
-			nodeType: nt,
-			config:   cfg,
+			nodeType:    nt,
+			config:      cfg,
+			accountPath: nnh.nextAccountPath(nt),
 		}
 
-		u, err := url.Parse("http://" + cfg.JSONRPC.JSONRPCAddr.String() + "/")
+		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.JSONRPC.JSONRPCAddr.String()))
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +87,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	}
 
 	for i, si := range ctx.servers {
-		bootnodes := make(map[avail.MechanismType]string)
+		bootnodes := make(map[consensus.MechanismType]string)
 
 		// Adjust the blockchain Genesis spec.
 		for j := range ctx.servers {
@@ -96,9 +114,9 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 			}
 		}
 
-		bootnodeAddr, exists := bootnodes[avail.BootstrapSequencer]
+		bootnodeAddr, exists := bootnodes[consensus.BootstrapSequencer]
 		if !exists {
-			bootnodeAddr, exists = bootnodes[avail.Sequencer]
+			bootnodeAddr, exists = bootnodes[consensus.Sequencer]
 		}
 
 		if !exists {
@@ -109,7 +127,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(si.config, availAddr, si.nodeType)
+		srv, err := startNode(si.config, availAddr, si.accountPath, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +142,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr str
 	return ctx, nil
 }
 
-func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
+func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.MechanismType, genesisCfgPath string) (*server.Config, error) {
 	t.Helper()
 
 	rawConfig := config.DefaultConfig()
@@ -189,7 +207,7 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 		return nil, fmt.Errorf("invalid p2p network address: %q", libp2pAddr.String())
 	}
 
-	if nodeType == avail.BootstrapSequencer || len(chainSpec.Bootnodes) == 0 {
+	if nodeType == consensus.BootstrapSequencer || len(chainSpec.Bootnodes) == 0 {
 		chainSpec.Bootnodes = append(chainSpec.Bootnodes, bootnodeAddr)
 	}
 
@@ -224,22 +242,46 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 		RestoreFile:        nil,
 		BlockTime:          rawConfig.BlockTime,
 		NodeType:           nodeType.String(),
-		LogLevel:           hclog.Error,
+		LogLevel:           hclog.Info,
 		LogFilePath:        rawConfig.LogFilePath,
 	}
 
 	return cfg, nil
 }
 
-func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismType) (*server.Server, error) {
-
-	bootnode := false
-	if nodeType == avail.BootstrapSequencer {
+func startNode(cfg *server.Config, availAddr, accountPath string, nodeType consensus.MechanismType) (*server.Server, error) {
+	var bootnode bool
+	if nodeType == consensus.BootstrapSequencer {
 		bootnode = true
 	}
 
+	availAccount, err := avail.AccountFromFile(accountPath)
+	if err != nil {
+		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
+	}
+
+	availClient, err := avail.NewClient(availAddr)
+	if err != nil {
+		log.Fatalf("failed to create Avail client: %s\n", err)
+	}
+
+	appID, err := avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+	if err != nil {
+		log.Fatalf("failed to get AppID from Avail: %s\n", err)
+	}
+
+	availSender := avail.NewSender(availClient, appID, availAccount)
+
+	factoryCfg := consensus.Config{
+		Bootnode:        bootnode,
+		AvailAccount:    availAccount,
+		AvailClient:     availClient,
+		AvailSender:     availSender,
+		AccountFilePath: accountPath,
+	}
+
 	// Attach the concensus to the Edge
-	err := server.RegisterConsensus(server.ConsensusType("avail"), avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
+	err = server.RegisterConsensus(availConsensus, consensus.Factory(factoryCfg))
 	if err != nil {
 		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}
@@ -250,7 +292,7 @@ func startNode(cfg *server.Config, availAddr string, nodeType avail.MechanismTyp
 	}
 
 	// Remove consensus from Edge to clean up our factory configuration.
-	err = server.UnRegisterConsensus(server.ConsensusType("avail"))
+	err = server.UnRegisterConsensus(availConsensus)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +356,7 @@ func (sc *Context) StopAll() {
 }
 
 // FirstRPCURLForNodeType looks up and returns the url of the node for the node type
-func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.URL, error) {
+func (sc *Context) FirstRPCURLForNodeType(nodeType consensus.MechanismType) (*url.URL, error) {
 	if len(sc.servers) != len(sc.jsonRPCURLs) {
 		return nil, fmt.Errorf("servers and jsonRPCURLs have different lengths")
 	}
@@ -325,4 +367,99 @@ func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.UR
 	}
 
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
+}
+
+func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []consensus.MechanismType) error {
+	t.Helper()
+
+	nnh := newNodeNameHelper()
+
+	var accountWg sync.WaitGroup
+
+	availClient, err := avail.NewClient(availAddr)
+	if err != nil {
+		return err
+	}
+
+	var nonceIncrement uint64
+	for _, nt := range nodeTypes {
+		accountWg.Add(1)
+
+		go func(accountPath string, nonceIncrement uint64) {
+			defer accountWg.Done()
+			// Initiate creation of the avail account if not present
+			err := createAvailAccount(t, availClient, accountPath, nonceIncrement)
+			if err != nil {
+				t.Fatalf("failed to create new avail account: %s", err)
+				return
+			}
+		}(nnh.nextAccountPath(nt), nonceIncrement)
+
+		nonceIncrement++
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	t.Log("Waiting for Avail accounts to be created...")
+	accountWg.Wait()
+	t.Log("Avail accounts created")
+	return err
+}
+
+func createAvailAccount(t testing.TB, availClient avail.Client, accountPath string, nonceIncrement uint64) error {
+	t.Helper()
+
+	// If file exists, make sure that we return the file and not go through account creation process.
+	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
+	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
+	if _, err := os.Stat(accountPath); !errors.Is(err, os.ErrNotExist) {
+		// In case that account path exists but is not visible in Avail (restart)
+		// make sure to go through the process of the account creation.
+		if ok, err := avail.AccountExistsFromMnemonic(availClient, accountPath); err == nil && ok {
+			return nil
+		}
+	}
+
+	availAccount, err := avail.NewAccount()
+	if err != nil {
+		return err
+	}
+
+	err = avail.DepositBalance(availClient, availAccount, 15*avail.AVL, nonceIncrement)
+	if err != nil {
+		return err
+	}
+
+	if _, err := avail.QueryAppID(availClient, avail.ApplicationKey); err != nil {
+		if err == avail.ErrAppIDNotFound {
+			_, err = avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+			if err != nil {
+				return err
+			}
+		}
+
+		return err
+	}
+
+	t.Logf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
+
+	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0o644); err != nil {
+		return err
+	}
+
+	t.Logf("Successfully written mnemonic into '%s'", accountPath)
+
+	return nil
+}
+
+type nodeNameHelper map[consensus.MechanismType]int
+
+func newNodeNameHelper() nodeNameHelper { return make(nodeNameHelper) }
+
+func (h nodeNameHelper) next(nodeType consensus.MechanismType) string {
+	h[nodeType]++
+	return fmt.Sprintf("%s-%d", nodeType, h[nodeType])
+}
+
+func (h nodeNameHelper) nextAccountPath(nodeType consensus.MechanismType) string {
+	return path.Join(testAccountPath, h.next(nodeType))
 }

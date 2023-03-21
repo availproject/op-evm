@@ -41,7 +41,7 @@ bootstrap-staking-contract: build-staking-contract
 	--artifacts-path "$(STAKING_CONTRACT_PATH)/artifacts/contracts/Staking.sol/Staking.json" \
 	--constructor-args "1" \
 	--constructor-args "10"
-	sed -i 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
+	sed -i '' -e 's/"balance": "0x0"/"balance": "0x3635c9adc5dea00000"/g' configs/genesis.json
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
@@ -76,19 +76,22 @@ build-edge:
 tools-wallet:
 	cd tools/wallet && go build
 
+tools-account:
+	cd tools/accounts && go build
+
 build: build-server build-client
+
+start-bootstrap-sequencer: build
+	rm -rf data/avail-bootnode-1/blockchain/
+	./server/server -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
 
 start-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
-	./server/server -bootstrap -config-file="./configs/bootnode.yaml"
-
-start-validator: build
-	rm -rf data/avail-node-1/blockchain/
-	./server/server -config-file="./configs/node-1.yaml"
+	./server/server -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
-	./server/server -config-file="./configs/watchtower-1.yaml"
+	./server/server -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
 
 start-e2e: build-e2e
 	./tools/e2e/e2e
@@ -98,6 +101,15 @@ start-fraud: build-fraud
 
 start-staking: build-staking 
 	./tools/staking/staking
+
+create-bootstrap-sequencer-account: tools-account
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer
+	
+create-sequencer-account: tools-account
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-sequencer
+
+create-watchtower-account: tools-account
+	./tools/accounts/accounts -balance 1000 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

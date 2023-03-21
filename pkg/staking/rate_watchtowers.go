@@ -52,7 +52,7 @@ func (st *watchtowerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 
 	setThresholdTx, setThresholdTxErr := SetMinimumWatchtowersTx(address, newMin, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new minimum watchtowers count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new minimum watchtowers count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -81,7 +81,7 @@ func (st *watchtowerRate) SetMaximum(newMax *big.Int, signKey *ecdsa.PrivateKey)
 
 	setThresholdTx, setThresholdTxErr := SetMaximumWatchtowersTx(address, newMax, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to set new maximum watchtowers count", "err", setThresholdTxErr)
+		st.logger.Error("failed to set new maximum watchtowers count", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -115,7 +115,7 @@ func (st *watchtowerRate) CurrentMinimum() (*big.Int, error) {
 
 	threshold, err := GetMinimumWatchtowersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current minimum watchtowers allowed", "err", err)
+		st.logger.Error("failed to query current minimum watchtowers allowed", "error", err)
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func (st *watchtowerRate) CurrentMaximum() (*big.Int, error) {
 
 	threshold, err := GetMaximumWatchtowersTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current maximum watchtowers allowed", "err", err)
+		st.logger.Error("failed to query current maximum watchtowers allowed", "error", err)
 		return nil, err
 	}
 

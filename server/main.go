@@ -9,7 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	golog "github.com/ipfs/go-log/v2"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
 )
 
@@ -19,9 +20,10 @@ const (
 
 func main() {
 	var bootnode bool
-	var availAddr, path string
+	var availAddr, path, accountPath string
 	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
 	flag.StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
+	flag.StringVar(&accountPath, "account-config-file", "./configs/account", "Path to the account mnemonic file")
 	flag.BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
 
 	flag.Parse()
@@ -39,8 +41,32 @@ func main() {
 
 	log.Printf("Server config: %+v", config)
 
+	availAccount, err := avail.AccountFromFile(accountPath)
+	if err != nil {
+		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
+	}
+
+	availClient, err := avail.NewClient(availAddr)
+	if err != nil {
+		log.Fatalf("failed to create Avail client: %s\n", err)
+	}
+
+	appID, err := avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+	if err != nil {
+		log.Fatalf("failed to get AppID from Avail: %s\n", err)
+	}
+
+	availSender := avail.NewSender(availClient, appID, availAccount)
+
 	// Attach the concensus to the server
-	err = server.RegisterConsensus(AvailConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr}))
+	cfg := consensus.Config{
+		AvailAccount: availAccount,
+		AvailClient:  availClient,
+		AvailSender:  availSender,
+		Bootnode:     bootnode,
+	}
+
+	err = server.RegisterConsensus(AvailConsensus, consensus.Factory(cfg))
 	if err != nil {
 		log.Fatalf("failure to register consensus: %s", err)
 	}

@@ -50,7 +50,7 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 
 	setThresholdTx, setThresholdTxErr := SetThresholdTx(address, newAmount, st.blockchain.Header().GasLimit)
 	if setThresholdTxErr != nil {
-		st.logger.Error("failed to query current staking threshold", "err", setThresholdTxErr)
+		st.logger.Error("failed to query current staking threshold", "error", setThresholdTxErr)
 		return err
 	}
 
@@ -84,7 +84,7 @@ func (st *threshold) Current() (*big.Int, error) {
 
 	threshold, err := GetThresholdTx(transition, header.GasLimit, minerAddress)
 	if err != nil {
-		st.logger.Error("failed to query current staking threshold", "err", err)
+		st.logger.Error("failed to query current staking threshold", "error", err)
 		return nil, err
 	}
 

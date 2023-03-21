@@ -109,23 +109,17 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 		asq := staking.NewActiveParticipantsQuerier(params.Blockchain, params.Executor, logger)
 
 		d := &Avail{
-			logger:         logger,
-			notifyCh:       make(chan struct{}),
-			closeCh:        make(chan struct{}),
-			blockchain:     params.Blockchain,
-			executor:       params.Executor,
-			verifier:       staking.NewVerifier(asq, logger.Named("verifier")),
-			txpool:         params.TxPool,
-			secretsManager: params.SecretsManager,
-			network:        params.Network,
-			blockTime:      time.Duration(params.BlockTime) * time.Second,
-			nodeType:       MechanismType(params.NodeType),
-			syncer: syncer.NewSyncer(
-				params.Logger,
-				params.Network,
-				params.Blockchain,
-				time.Duration(params.BlockTime)*3*time.Second,
-			),
+			logger:                     logger,
+			notifyCh:                   make(chan struct{}),
+			closeCh:                    make(chan struct{}),
+			blockchain:                 params.Blockchain,
+			executor:                   params.Executor,
+			verifier:                   staking.NewVerifier(asq, logger.Named("verifier")),
+			txpool:                     params.TxPool,
+			secretsManager:             params.SecretsManager,
+			network:                    params.Network,
+			blockTime:                  time.Duration(params.BlockTime) * time.Second,
+			nodeType:                   MechanismType(params.NodeType),
 			signKey:                    validatorKey,
 			minerAddr:                  validatorAddr,
 			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
@@ -134,6 +128,15 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			availAccount: config.AvailAccount,
 			availClient:  config.AvailClient,
 			availSender:  config.AvailSender,
+		}
+
+		if params.Network != nil {
+			d.syncer = syncer.NewSyncer(
+				params.Logger,
+				params.Network,
+				params.Blockchain,
+				time.Duration(params.BlockTime)*3*time.Second,
+			)
 		}
 
 		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
@@ -222,6 +225,11 @@ func (d *Avail) Start() error {
 }
 
 func (d *Avail) startSyncing() {
+	if d.syncer == nil {
+		d.logger.Warn("syncer not configured")
+		return
+	}
+
 	// Start the syncer
 	err := d.syncer.Start()
 	if err != nil {
@@ -259,7 +267,7 @@ func (d *Avail) PreCommitState(header *types.Header, tx *state.Transition) error
 }
 
 func (d *Avail) GetSyncProgression() *progress.Progression {
-	return nil //d.syncer.GetSyncProgression()
+	return nil // d.syncer.GetSyncProgression()
 }
 
 func (d *Avail) Prepare(header *types.Header) error {

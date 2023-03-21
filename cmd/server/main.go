@@ -7,15 +7,12 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/server"
+
 	golog "github.com/ipfs/go-log/v2"
 	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
-)
-
-const (
-	AvailConsensus server.ConsensusType = "avail"
+	"github.com/maticnetwork/avail-settlement/server"
 )
 
 func main() {
@@ -66,12 +63,7 @@ func main() {
 		Bootnode:     bootnode,
 	}
 
-	err = server.RegisterConsensus(AvailConsensus, consensus.Factory(cfg))
-	if err != nil {
-		log.Fatalf("failure to register consensus: %s", err)
-	}
-
-	serverInstance, err := server.NewServer(config)
+	serverInstance, err := server.NewServer(config, consensus.Factory(cfg))
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)
 	}

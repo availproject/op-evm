@@ -45,17 +45,16 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 	return executor, bchain
 }
 
-func NewBlockchainWithTxPool(t *testing.T, verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool) {
-	chain := NewChain(t, basepath)
-	executor := NewInMemExecutor(t, chain)
+func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool) {
+	executor := NewInMemExecutor(t, chainSpec)
 
-	gr := executor.WriteGenesis(chain.Genesis.Alloc)
-	chain.Genesis.StateRoot = gr
+	gr := executor.WriteGenesis(chainSpec.Genesis.Alloc)
+	chainSpec.Genesis.StateRoot = gr
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(uint64(chainSpec.Params.ChainID))
 
-	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor, signer)
+	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chainSpec, nil, executor, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +68,7 @@ func NewBlockchainWithTxPool(t *testing.T, verifier blockchain.Verifier, basepat
 
 	txPool, err := txpool.NewTxPool(
 		hclog.Default(),
-		chain.Params.Forks.At(0),
+		chainSpec.Params.Forks.At(0),
 		NewTxpoolHub(executor.State(), bchain),
 		nil,
 		nil,
@@ -97,7 +96,6 @@ func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
 }
 
 func getStakingContractBytecode(t *testing.T, basepath string) []byte {
-
 	jsonFile, err := os.Open(filepath.Join(basepath, "configs/genesis.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -133,10 +131,10 @@ func NewChain(t *testing.T, basepath string) *chain.Chain {
 	return &chain.Chain{
 		Genesis: &chain.Genesis{
 			Alloc: map[types.Address]*chain.GenesisAccount{
-				types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"): &chain.GenesisAccount{
+				types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"): {
 					Balance: balance,
 				},
-				types.StringToAddress("0x0110000000000000000000000000000000000001"): &chain.GenesisAccount{
+				types.StringToAddress("0x0110000000000000000000000000000000000001"): {
 					Code:    scBytecode,
 					Balance: balance,
 					Storage: map[types.Hash]types.Hash{

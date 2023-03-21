@@ -22,8 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
-	avail_client "github.com/maticnetwork/avail-settlement/pkg/avail"
+	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
@@ -39,14 +39,14 @@ type Context struct {
 }
 
 type instance struct {
-	nodeType    avail.MechanismType
+	nodeType    consensus.MechanismType
 	accountPath string
 	config      *server.Config
 	server      *server.Server
 }
 
 // StartServers starts configured nodes
-func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...avail.MechanismType) (*Context, error) {
+func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...consensus.MechanismType) (*Context, error) {
 	t.Helper()
 
 	ctx := &Context{}
@@ -87,7 +87,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	}
 
 	for i, si := range ctx.servers {
-		bootnodes := make(map[avail.MechanismType]string)
+		bootnodes := make(map[consensus.MechanismType]string)
 
 		// Adjust the blockchain Genesis spec.
 		for j := range ctx.servers {
@@ -114,9 +114,9 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 			}
 		}
 
-		bootnodeAddr, exists := bootnodes[avail.BootstrapSequencer]
+		bootnodeAddr, exists := bootnodes[consensus.BootstrapSequencer]
 		if !exists {
-			bootnodeAddr, exists = bootnodes[avail.Sequencer]
+			bootnodeAddr, exists = bootnodes[consensus.Sequencer]
 		}
 
 		if !exists {
@@ -142,7 +142,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	return ctx, nil
 }
 
-func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType, genesisCfgPath string) (*server.Config, error) {
+func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.MechanismType, genesisCfgPath string) (*server.Config, error) {
 	t.Helper()
 
 	rawConfig := config.DefaultConfig()
@@ -207,7 +207,7 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 		return nil, fmt.Errorf("invalid p2p network address: %q", libp2pAddr.String())
 	}
 
-	if nodeType == avail.BootstrapSequencer || len(chainSpec.Bootnodes) == 0 {
+	if nodeType == consensus.BootstrapSequencer || len(chainSpec.Bootnodes) == 0 {
 		chainSpec.Bootnodes = append(chainSpec.Bootnodes, bootnodeAddr)
 	}
 
@@ -249,14 +249,39 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType avail.MechanismType
 	return cfg, nil
 }
 
-func startNode(cfg *server.Config, availAddr, accountPath string, nodeType avail.MechanismType) (*server.Server, error) {
-	bootnode := false
-	if nodeType == avail.BootstrapSequencer {
+func startNode(cfg *server.Config, availAddr, accountPath string, nodeType consensus.MechanismType) (*server.Server, error) {
+	var bootnode bool
+	if nodeType == consensus.BootstrapSequencer {
 		bootnode = true
 	}
 
+	availAccount, err := avail.AccountFromFile(accountPath)
+	if err != nil {
+		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
+	}
+
+	availClient, err := avail.NewClient(availAddr)
+	if err != nil {
+		log.Fatalf("failed to create Avail client: %s\n", err)
+	}
+
+	appID, err := avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+	if err != nil {
+		log.Fatalf("failed to get AppID from Avail: %s\n", err)
+	}
+
+	availSender := avail.NewSender(availClient, appID, availAccount)
+
+	factoryCfg := consensus.Config{
+		Bootnode:        bootnode,
+		AvailAccount:    availAccount,
+		AvailClient:     availClient,
+		AvailSender:     availSender,
+		AccountFilePath: accountPath,
+	}
+
 	// Attach the concensus to the Edge
-	err := server.RegisterConsensus(availConsensus, avail.Factory(avail.Config{Bootnode: bootnode, AvailAddr: availAddr, AccountFilePath: accountPath}))
+	err = server.RegisterConsensus(availConsensus, consensus.Factory(factoryCfg))
 	if err != nil {
 		return nil, fmt.Errorf("failure to register consensus: %w", err)
 	}
@@ -331,7 +356,7 @@ func (sc *Context) StopAll() {
 }
 
 // FirstRPCURLForNodeType looks up and returns the url of the node for the node type
-func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.URL, error) {
+func (sc *Context) FirstRPCURLForNodeType(nodeType consensus.MechanismType) (*url.URL, error) {
 	if len(sc.servers) != len(sc.jsonRPCURLs) {
 		return nil, fmt.Errorf("servers and jsonRPCURLs have different lengths")
 	}
@@ -344,14 +369,14 @@ func (sc *Context) FirstRPCURLForNodeType(nodeType avail.MechanismType) (*url.UR
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
 }
 
-func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []avail.MechanismType) error {
+func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []consensus.MechanismType) error {
 	t.Helper()
 
 	nnh := newNodeNameHelper()
 
 	var accountWg sync.WaitGroup
 
-	availClient, err := avail_client.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr)
 	if err != nil {
 		return err
 	}
@@ -380,7 +405,7 @@ func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []avail.Mecha
 	return err
 }
 
-func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPath string, nonceIncrement uint64) error {
+func createAvailAccount(t testing.TB, availClient avail.Client, accountPath string, nonceIncrement uint64) error {
 	t.Helper()
 
 	// If file exists, make sure that we return the file and not go through account creation process.
@@ -389,24 +414,24 @@ func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPa
 	if _, err := os.Stat(accountPath); !errors.Is(err, os.ErrNotExist) {
 		// In case that account path exists but is not visible in Avail (restart)
 		// make sure to go through the process of the account creation.
-		if ok, err := avail_client.AccountExistsFromMnemonic(availClient, accountPath); err == nil && ok {
+		if ok, err := avail.AccountExistsFromMnemonic(availClient, accountPath); err == nil && ok {
 			return nil
 		}
 	}
 
-	availAccount, err := avail_client.NewAccount()
+	availAccount, err := avail.NewAccount()
 	if err != nil {
 		return err
 	}
 
-	err = avail_client.DepositBalance(availClient, availAccount, 15*avail_client.AVL, nonceIncrement)
+	err = avail.DepositBalance(availClient, availAccount, 15*avail.AVL, nonceIncrement)
 	if err != nil {
 		return err
 	}
 
-	if _, err := avail_client.QueryAppID(availClient, avail.AvailApplicationKey); err != nil {
-		if err == avail_client.ErrAppIDNotFound {
-			_, err = avail_client.EnsureApplicationKeyExists(availClient, avail.AvailApplicationKey, availAccount)
+	if _, err := avail.QueryAppID(availClient, avail.ApplicationKey); err != nil {
+		if err == avail.ErrAppIDNotFound {
+			_, err = avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
 			if err != nil {
 				return err
 			}
@@ -417,7 +442,7 @@ func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPa
 
 	t.Logf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
 
-	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0644); err != nil {
+	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0o644); err != nil {
 		return err
 	}
 
@@ -426,15 +451,15 @@ func createAvailAccount(t testing.TB, availClient avail_client.Client, accountPa
 	return nil
 }
 
-type nodeNameHelper map[avail.MechanismType]int
+type nodeNameHelper map[consensus.MechanismType]int
 
 func newNodeNameHelper() nodeNameHelper { return make(nodeNameHelper) }
 
-func (h nodeNameHelper) next(nodeType avail.MechanismType) string {
+func (h nodeNameHelper) next(nodeType consensus.MechanismType) string {
 	h[nodeType]++
 	return fmt.Sprintf("%s-%d", nodeType, h[nodeType])
 }
 
-func (h nodeNameHelper) nextAccountPath(nodeType avail.MechanismType) string {
+func (h nodeNameHelper) nextAccountPath(nodeType consensus.MechanismType) string {
 	return path.Join(testAccountPath, h.next(nodeType))
 }

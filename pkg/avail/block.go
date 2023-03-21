@@ -10,7 +10,7 @@ type DummyBlockSource struct {
 	blockNumber atomic.Int32
 }
 
-func (dbs *DummyBlockSource) DummyBlock(appID types.U32, callIdx types.CallIndex, extrinsics ...types.Extrinsic) *types.SignedBlock {
+func (dbs *DummyBlockSource) DummyBlock(appID types.UCompact, callIdx types.CallIndex, extrinsics ...types.Extrinsic) *types.SignedBlock {
 	blockNum := dbs.blockNumber.Add(1)
 
 	blk := &types.SignedBlock{

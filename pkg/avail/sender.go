@@ -68,7 +68,10 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		return fmt.Errorf("unsupported extrinsic status expectation: %#v", dstatus)
 	}
 
-	api := s.client.instance()
+	api, err := instance(s.client)
+	if err != nil {
+		return err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

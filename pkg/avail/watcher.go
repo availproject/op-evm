@@ -45,7 +45,10 @@ func NewBlockDataWatcher(client Client, appID types.UCompact, handler BlockDataH
 }
 
 func (bw *BlockDataWatcher) Start() error {
-	api := bw.client.instance()
+	api, err := instance(bw.client)
+	if err != nil {
+		return err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

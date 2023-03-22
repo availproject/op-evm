@@ -33,7 +33,6 @@ func EnsureApplicationKeyExists(client Client, applicationKey string, signingKey
 			return types.NewUCompactFromUInt(0), err
 		}
 	} else if err != nil {
-		fmt.Printf("error while querying appID: %#v\n", err)
 		return types.NewUCompactFromUInt(0), err
 	}
 
@@ -41,7 +40,10 @@ func EnsureApplicationKeyExists(client Client, applicationKey string, signingKey
 }
 
 func QueryAppID(client Client, applicationKey string) (types.UCompact, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return types.NewUCompactFromUInt(0), err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
@@ -66,20 +68,21 @@ func QueryAppID(client Client, applicationKey string) (types.UCompact, error) {
 	var aki AppKeyInfo
 	ok, err := api.RPC.State.GetStorageLatest(key, &aki)
 	if err != nil {
-		fmt.Printf("!!! failed to get the latest storage for appID\n")
 		return types.NewUCompactFromUInt(0), err
 	}
 
 	if ok {
 		return aki.AppID, nil
 	} else {
-		fmt.Printf("!!!! couldn't decode AppKeyInfo")
 		return types.NewUCompactFromUInt(0), ErrAppIDNotFound
 	}
 }
 
 func CreateApplicationKey(client Client, applicationKey string, signingKeyPair signature.KeyringPair) (types.UCompact, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return types.NewUCompactFromUInt(0), err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

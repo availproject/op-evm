@@ -43,18 +43,30 @@ func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
-func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
-	accountBytes, err := os.ReadFile(path)
+func AccountFromFile(filePath string) (signature.KeyringPair, error) {
+	accountBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return false, fmt.Errorf("failure to read account file '%s'", err)
+		return signature.KeyringPair{}, fmt.Errorf("failure to read account file '%s'", err)
 	}
 
-	account, err := NewAccountFromMnemonic(string(accountBytes))
+	availAccount, err := NewAccountFromMnemonic(string(accountBytes))
+	if err != nil {
+		return signature.KeyringPair{}, err
+	}
+
+	return availAccount, nil
+}
+
+func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
+	account, err := AccountFromFile(filePath)
 	if err != nil {
 		return false, err
 	}
 
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return false, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
@@ -71,14 +83,22 @@ func AccountExistsFromMnemonic(client Client, path string) (bool, error) {
 }
 
 func DepositBalance(client Client, account signature.KeyringPair, amount, nonceIncrement uint64) error {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
 		return err
 	}
 
-	c, err := types.NewCall(meta, "Balances.transfer", types.NewMultiAddressFromAccountID(account.PublicKey), types.NewUCompactFromUInt(amount))
+	addr, err := types.NewMultiAddressFromAccountID(account.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	c, err := types.NewCall(meta, "Balances.transfer", addr, types.NewUCompactFromUInt(amount))
 	if err != nil {
 		return err
 	}
@@ -120,7 +140,7 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 		Nonce:              types.NewUCompactFromUInt(nonce),
 		SpecVersion:        rv.SpecVersion,
 		Tip:                types.NewUCompactFromUInt(0),
-		AppID:              types.NewU32(0),
+		AppID:              types.NewUCompactFromUInt(0),
 		TransactionVersion: rv.TransactionVersion,
 	}
 
@@ -160,7 +180,10 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 }
 
 func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) {
-	api := client.instance()
+	api, err := instance(client)
+	if err != nil {
+		return nil, err
+	}
 
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

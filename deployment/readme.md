@@ -3,8 +3,11 @@
 ## Prerequisites
 - Install polygon-edge `make build-edge`
 - Build the server for linux `make build-server GOOS=linux` (the server binary will later be copied to the remote server and run there so the GOOS and GOARCH has to match)
+- Build the accounts tool for linux (since it's going to be run on the remote machine) `make tools-account GOOS=linux`
+- Build the staking contract `make build-staking-contract`
 - Install aws cli tool and run `aws configure`, copy your Access Key ID and Secret Access Key from the aws console.
 - Install terraform and run `terraform login`.
+- `jq` tool has to be present on your machine
 
 ## Provision the AWS resources using terraform and deploy the nodes
 

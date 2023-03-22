@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/hashicorp/go-hclog"
@@ -36,7 +35,7 @@ type SequencerWorker struct {
 	validator                  validator.Validator
 	txpool                     *txpool.TxPool
 	apq                        staking.ActiveParticipants
-	availAppID                 avail_types.U32
+	availAppID                 avail_types.UCompact
 	availClient                avail.Client
 	availAccount               signature.KeyringPair
 	nodeSignKey                *ecdsa.PrivateKey
@@ -58,17 +57,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	enableBlockProductionCh := make(chan bool)
 	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
 
-	accBalance, err := avail.GetBalance(sw.availClient, sw.availAccount)
-	if err != nil {
-		return fmt.Errorf("failed to discover account balance: %s", err)
-	}
-
-	sw.logger.Info(
-		"Avail account information",
-		"address", sw.availAccount.Address,
-		"balance", accBalance.Int64(),
-	)
-
 	callIdx, err := avail.FindCallIndex(sw.availClient)
 	if err != nil {
 		return fmt.Errorf("failed to discover avail call index: %s", err)
@@ -85,7 +73,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
-	availBlockStream := avail.NewBlockStream(sw.availClient, sw.logger, 0)
+	availBlockStream := sw.availClient.BlockStream(0)
 	defer availBlockStream.Close()
 
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
@@ -353,7 +341,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		"block_parent_hash", blk.ParentHash(),
 	)
 
-	err = sw.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
+	err = sw.availSender.SendAndWaitForStatus(blk, avail_types.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		sw.logger.Error("Error while submitting data to avail", "error", err)
 		return err
@@ -427,10 +415,11 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 
 func NewSequencer(
 	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, v validator.Validator, availClient avail.Client,
-	availAccount signature.KeyringPair, availAppID avail_types.U32,
+	availAccount signature.KeyringPair, availAppID avail_types.UCompact,
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
 	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
-	blockTime time.Duration, blockProductionIntervalSec uint64) (*SequencerWorker, error) {
+	blockTime time.Duration, blockProductionIntervalSec uint64,
+) (*SequencerWorker, error) {
 	return &SequencerWorker{
 		logger:                     logger,
 		blockchain:                 b,

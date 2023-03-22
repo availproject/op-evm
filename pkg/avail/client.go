@@ -1,14 +1,22 @@
 package avail
 
 import (
+	"errors"
+
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/hashicorp/go-hclog"
 )
+
+var ErrUnsupportedClient = errors.New("unsupported client")
 
 // Client is an abstraction on Avail JSON-RPC client.
 type Client interface {
+	// BlockStream creates a new Avail block stream, starting from block height
+	// `offset`.
+	BlockStream(offset uint64) BlockStream
+
 	GenesisHash() types.Hash
-	instance() *gsrpc.SubstrateAPI
 }
 
 type client struct {
@@ -35,8 +43,21 @@ func NewClient(url string) (Client, error) {
 	}, nil
 }
 
+func instance(c Client) (*gsrpc.SubstrateAPI, error) {
+	c2, ok := c.(*client)
+	if ok {
+		return c2.instance(), nil
+	}
+
+	return nil, ErrUnsupportedClient
+}
+
 func (c *client) instance() *gsrpc.SubstrateAPI {
 	return c.api
+}
+
+func (c *client) BlockStream(offset uint64) BlockStream {
+	return newBlockStream(c, hclog.Default(), offset)
 }
 
 func (c *client) GenesisHash() types.Hash {
@@ -44,7 +65,14 @@ func (c *client) GenesisHash() types.Hash {
 }
 
 func FindCallIndex(client Client) (types.CallIndex, error) {
-	meta, err := client.instance().RPC.State.GetMetadataLatest()
+	api, err := instance(client)
+	if err == ErrUnsupportedClient {
+		return types.CallIndex{}, nil
+	} else if err != nil {
+		return types.CallIndex{}, err
+	}
+
+	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {
 		return types.CallIndex{}, err
 	}

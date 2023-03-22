@@ -20,7 +20,7 @@ func getGenesisBasePath() string {
 }
 
 func NewTestAvail(t *testing.T, nodeType MechanismType) (*Avail, staking.ActiveParticipants) {
-	executor, blockchain, txpool := test.NewBlockchainWithTxPool(t, staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, txpool := test.NewBlockchainWithTxPool(t, test.NewChain(t, getGenesisBasePath()), staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default()))
 	asq := staking.NewActiveParticipantsQuerier(blockchain, executor, hclog.Default())
 
 	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
@@ -31,7 +31,7 @@ func NewTestAvail(t *testing.T, nodeType MechanismType) (*Avail, staking.ActiveP
 	verifier := staking.NewVerifier(asq, hclog.Default())
 	blockchain.SetConsensus(verifier)
 
-	sender := avail.NewTestSender()
+	sender := avail.NewBlackholeSender()
 	stakingNode := staking.NewNode(blockchain, executor, sender, hclog.Default(), staking.NodeType(nodeType))
 
 	return &Avail{

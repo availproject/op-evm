@@ -23,7 +23,7 @@ resource "aws_default_security_group" "default" {
 # Avail
 
 resource "aws_security_group" "avail" {
-  name        = "allow-rpc-node-${var.deployment_name}"
+  name        = "allow-avail-all-${var.deployment_name}"
   description = "Allow all rpc, ws and ssh traffic"
   vpc_id      = aws_vpc.devnet.id
   lifecycle {

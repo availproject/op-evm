@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
@@ -25,11 +26,11 @@ var (
 	ErrNoExtrinsicFound = errors.New("no compatible extrinsic found")
 )
 
-func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.U32, callIdx avail_types.CallIndex, logger hclog.Logger) ([]*types.Block, error) {
+func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, callIdx avail_types.CallIndex, logger hclog.Logger) ([]*types.Block, error) {
 	toReturn := []*types.Block{}
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
-		if extrinsic.Signature.AppID != appID {
+		if extrinsic.Signature.AppID.Int64() != appID.Int64() {
 			logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
 			continue
 		}
@@ -46,7 +47,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.U32, callId
 			// code to Avail server. See more information about this in
 			// sender.SubmitData().
 			var bs avail_types.Bytes
-			err := avail_types.DecodeFromBytes(extrinsic.Method.Args, &bs)
+			err := codec.Decode(extrinsic.Method.Args, &bs)
 			if err != nil {
 				// Don't return just yet because there is no way of filtering
 				// uninteresting extrinsics / method.Args and failing decoding

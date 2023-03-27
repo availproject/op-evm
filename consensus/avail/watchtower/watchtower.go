@@ -68,7 +68,7 @@ func (wt *watchTower) Check(blk *types.Block) error {
 		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock)
 	}
 
-	if err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
+	if _, err := wt.blockchain.VerifyFinalizedBlock(blk); err != nil {
 		wt.logger.Info("block cannot be verified", "block_number", blk.Number(), "block_hash", blk.Hash(), "parent_block_hash", blk.ParentHash(), "error", err)
 		return err
 	}

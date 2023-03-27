@@ -7,7 +7,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-func NewServerConfig(path string) (*server.Config, error) {
+type CustomServerConfig struct {
+	Config   *server.Config
+	NodeType string
+}
+
+func NewServerConfig(path string) (*CustomServerConfig, error) {
 	rawConfig, err := config.ReadConfigFile(path)
 	if err != nil {
 		return nil, err
@@ -58,45 +63,47 @@ func NewServerConfig(path string) (*server.Config, error) {
 		return nil, err
 	}
 
-	return &server.Config{
-		Chain: chain,
-		JSONRPC: &server.JSONRPC{
-			JSONRPCAddr:              jsonRpcAddr,
-			AccessControlAllowOrigin: rawConfig.Headers.AccessControlAllowOrigins,
-		},
-		GRPCAddr:   grpcAddr,
-		LibP2PAddr: libp2pAddr,
-		Telemetry: &server.Telemetry{
-			PrometheusAddr: prometheusAddr,
-		},
-		Network: &network.Config{
-			NoDiscover:       rawConfig.Network.NoDiscover,
-			Addr:             libp2pAddr,
-			NatAddr:          natAddr,
-			DNS:              dnsAddr,
-			DataDir:          rawConfig.DataDir,
-			MaxPeers:         rawConfig.Network.MaxPeers,
-			MaxInboundPeers:  rawConfig.Network.MaxInboundPeers,
-			MaxOutboundPeers: rawConfig.Network.MaxOutboundPeers,
-			Chain:            chain,
-		},
-		DataDir:            rawConfig.DataDir,
-		Seal:               rawConfig.ShouldSeal,
-		PriceLimit:         rawConfig.TxPool.PriceLimit,
-		MaxSlots:           rawConfig.TxPool.MaxSlots,
-		MaxAccountEnqueued: rawConfig.TxPool.MaxAccountEnqueued,
-		SecretsManager:     secretsConfig,
-		RestoreFile: func(cfg *config.Config) *string {
-			if cfg.RestoreFile != "" {
-				return &cfg.RestoreFile
-			}
+	return &CustomServerConfig{
+		Config: &server.Config{
+			Chain: chain,
+			JSONRPC: &server.JSONRPC{
+				JSONRPCAddr:              jsonRpcAddr,
+				AccessControlAllowOrigin: rawConfig.Headers.AccessControlAllowOrigins,
+			},
+			GRPCAddr:   grpcAddr,
+			LibP2PAddr: libp2pAddr,
+			Telemetry: &server.Telemetry{
+				PrometheusAddr: prometheusAddr,
+			},
+			Network: &network.Config{
+				NoDiscover:       rawConfig.Network.NoDiscover,
+				Addr:             libp2pAddr,
+				NatAddr:          natAddr,
+				DNS:              dnsAddr,
+				DataDir:          rawConfig.DataDir,
+				MaxPeers:         rawConfig.Network.MaxPeers,
+				MaxInboundPeers:  rawConfig.Network.MaxInboundPeers,
+				MaxOutboundPeers: rawConfig.Network.MaxOutboundPeers,
+				Chain:            chain,
+			},
+			DataDir:            rawConfig.DataDir,
+			Seal:               rawConfig.ShouldSeal,
+			PriceLimit:         rawConfig.TxPool.PriceLimit,
+			MaxSlots:           rawConfig.TxPool.MaxSlots,
+			MaxAccountEnqueued: rawConfig.TxPool.MaxAccountEnqueued,
+			SecretsManager:     secretsConfig,
+			RestoreFile: func(cfg *config.Config) *string {
+				if cfg.RestoreFile != "" {
+					return &cfg.RestoreFile
+				}
 
-			return nil
-		}(rawConfig),
-		BlockTime: rawConfig.BlockTime,
-		//IBFTBaseTimeout: rawConfig.IBFTBaseTimeout,
-		LogLevel:    hclog.LevelFromString(rawConfig.LogLevel),
-		LogFilePath: rawConfig.LogFilePath,
-		NodeType:    nodeType.String(),
+				return nil
+			}(rawConfig),
+			BlockTime: rawConfig.BlockTime,
+			//IBFTBaseTimeout: rawConfig.IBFTBaseTimeout,
+			LogLevel:    hclog.LevelFromString(rawConfig.LogLevel),
+			LogFilePath: rawConfig.LogFilePath,
+		},
+		NodeType: nodeType.String(),
 	}, nil
 }

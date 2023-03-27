@@ -85,10 +85,10 @@ func ParseSecretsConfig(cfg *config.Config) (*secrets.SecretsManagerConfig, erro
 	return secrets.ReadConfig(cfg.SecretsConfigPath)
 }
 
-func ParseNodeType(cfg *config.Config) (avail.MechanismType, error) {
-	if cfg.NodeType == "" {
+func ParseNodeType(nodeType string) (avail.MechanismType, error) {
+	if nodeType == "" {
 		return avail.Validator, nil
 	}
 
-	return avail.ParseType(cfg.NodeType)
+	return avail.ParseType(nodeType)
 }

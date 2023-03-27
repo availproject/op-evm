@@ -58,7 +58,7 @@ func NewServerConfig(path string) (*CustomServerConfig, error) {
 		return nil, err
 	}
 
-	nodeType, err := ParseNodeType(rawConfig)
+	nodeType, err := ParseNodeType(rawConfig.NodeType)
 	if err != nil {
 		return nil, err
 	}

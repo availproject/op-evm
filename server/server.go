@@ -179,7 +179,7 @@ func NewServer(config *server.Config, consensusFn func(params *consensus.Params)
 
 	// Set up datadog profiler
 	if ddErr := m.enableDataDogProfiler(); err != nil {
-		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
+		m.logger.Error("DataDog profiler setup failed", "error", ddErr.Error())
 	}
 
 	// Set up the secrets manager
@@ -214,12 +214,6 @@ func NewServer(config *server.Config, consensusFn func(params *consensus.Params)
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	// custom write genesis hook per consensus engine
-	/* 	engineName := m.config.Chain.Params.GetEngine()
-	   	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
-	   		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
-	   	} */
-
 	// apply allow list genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
 		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
@@ -227,29 +221,6 @@ func NewServer(config *server.Config, consensusFn func(params *consensus.Params)
 	}
 
 	var initialStateRoot = types.ZeroHash
-
-	/* 	if ConsensusType(engineName) == PolyBFTConsensus {
-	   		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
-	   		if err != nil {
-	   			return nil, err
-	   		}
-
-	   		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
-	   			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
-	   			if err != nil {
-	   				return nil, fmt.Errorf("error on state root verification %w", err)
-	   			}
-
-	   			if checkedInitialTrieRoot != polyBFTConfig.InitialTrieRoot {
-	   				return nil, errors.New("invalid initial state root")
-	   			}
-
-	   			logger.Info("Initial state root checked and correct")
-
-	   			initialStateRoot = polyBFTConfig.InitialTrieRoot
-	   		}
-	   	}
-	*/
 
 	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
@@ -837,22 +808,22 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
-		s.logger.Error("failed to close blockchain", "err", err.Error())
+		s.logger.Error("failed to close blockchain", "error", err.Error())
 	}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
-		s.logger.Error("failed to close networking", "err", err.Error())
+		s.logger.Error("failed to close networking", "error", err.Error())
 	}
 
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.logger.Error("failed to close consensus", "error", err.Error())
 	}
 
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
-		s.logger.Error("failed to close storage for trie", "err", err.Error())
+		s.logger.Error("failed to close storage for trie", "error", err.Error())
 	}
 
 	if s.prometheusServer != nil {
@@ -895,7 +866,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			s.logger.Error("Prometheus HTTP server ListenAndServe", "error", err)
 		}
 	}()
 

@@ -13,6 +13,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -207,8 +210,27 @@ func NewServer(config *server.Config, consensusFn func(params *consensus.Params)
 	// use the eip155 signer
 	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
 
+	// create storage instance for blockchain
+	var db storage.Storage
+	{
+		if m.config.DataDir == "" {
+			db, err = memory.NewMemoryStorage(nil)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			db, err = leveldb.NewLevelDBStorage(
+				filepath.Join(m.config.DataDir, "blockchain"),
+				m.logger,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +356,6 @@ func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*st
 
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		return 0
 	}
@@ -344,7 +365,6 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		if errors.Is(err, jsonrpc.ErrStateNotFound) {
 			return big.NewInt(0), nil

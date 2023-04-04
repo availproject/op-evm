@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -30,7 +31,12 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 	// use the eip155 signer
 	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
 
-	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor, signer)
+	db, err := memory.NewMemoryStorage(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bchain, err := blockchain.NewBlockchain(hclog.Default(), db, chain, nil, executor, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +60,12 @@ func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier bloc
 	// use the eip155 signer
 	signer := crypto.NewEIP155Signer(uint64(chainSpec.Params.ChainID))
 
-	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chainSpec, nil, executor, signer)
+	db, err := memory.NewMemoryStorage(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bchain, err := blockchain.NewBlockchain(hclog.Default(), db, chainSpec, nil, executor, signer)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -50,6 +50,7 @@ type Config struct {
 	AvailSender     avail.Sender
 	Bootnode        bool
 	AccountFilePath string
+	NodeType        string
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -119,7 +120,7 @@ func Factory(config Config) func(params *consensus.Params) (consensus.Consensus,
 			secretsManager:             params.SecretsManager,
 			network:                    params.Network,
 			blockTime:                  time.Duration(params.BlockTime) * time.Second,
-			nodeType:                   MechanismType(params.NodeType),
+			nodeType:                   MechanismType(config.NodeType),
 			signKey:                    validatorKey,
 			minerAddr:                  validatorAddr,
 			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
@@ -236,8 +237,8 @@ func (d *Avail) startSyncing() {
 		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
 	}
 
-	syncFunc := func(blk *types.Block) bool {
-		d.txpool.ResetWithHeaders(blk.Header)
+	syncFunc := func(blk *types.FullBlock) bool {
+		d.txpool.ResetWithHeaders(blk.Block.Header)
 		return false
 	}
 
@@ -268,6 +269,11 @@ func (d *Avail) PreCommitState(header *types.Header, tx *state.Transition) error
 
 func (d *Avail) GetSyncProgression() *progress.Progression {
 	return nil // d.syncer.GetSyncProgression()
+}
+
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (d *Avail) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
 }
 
 func (d *Avail) Prepare(header *types.Header) error {

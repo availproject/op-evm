@@ -24,11 +24,15 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 	chain := NewChain(t, basepath)
 	executor := NewInMemExecutor(t, chain)
 
-	gr := executor.WriteGenesis(chain.Genesis.Alloc)
+	gr, err := executor.WriteGenesis(chain.Genesis.Alloc, types.ZeroHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	chain.Genesis.StateRoot = gr
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chain.Params.Forks.At(0), uint64(chain.Params.ChainID))
 
 	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chain, nil, executor, signer)
 	if err != nil {
@@ -48,11 +52,15 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool) {
 	executor := NewInMemExecutor(t, chainSpec)
 
-	gr := executor.WriteGenesis(chainSpec.Genesis.Alloc)
+	gr, err := executor.WriteGenesis(chainSpec.Genesis.Alloc, types.ZeroHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	chainSpec.Genesis.StateRoot = gr
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(chainSpec.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chainSpec.Params.Forks.At(0), uint64(chainSpec.Params.ChainID))
 
 	bchain, err := blockchain.NewBlockchain(hclog.Default(), "", chainSpec, nil, executor, signer)
 	if err != nil {

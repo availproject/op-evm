@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Enable TxPool P2P gossiping
-	config.Seal = true
+	config.Config.Seal = true
 
 	log.Printf("Server config: %+v", config)
 
@@ -61,9 +61,10 @@ func main() {
 		AvailClient:  availClient,
 		AvailSender:  availSender,
 		Bootnode:     bootnode,
+		NodeType:     config.NodeType,
 	}
 
-	serverInstance, err := server.NewServer(config, consensus.Factory(cfg))
+	serverInstance, err := server.NewServer(config.Config, consensus.Factory(cfg))
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)
 	}

@@ -18,18 +18,18 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
-	"github.com/0xPolygon/polygon-edge/server"
+	edge_server "github.com/0xPolygon/polygon-edge/server"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
+	pkg_config "github.com/maticnetwork/avail-settlement/pkg/config"
+	"github.com/maticnetwork/avail-settlement/server"
 )
 
 const (
-	availConsensus server.ConsensusType = "avail"
-
 	testAccountPath = "../data/test-accounts"
 )
 
@@ -41,7 +41,7 @@ type Context struct {
 type instance struct {
 	nodeType    consensus.MechanismType
 	accountPath string
-	config      *server.Config
+	config      *edge_server.Config
 	server      *server.Server
 }
 
@@ -67,11 +67,11 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 
 		si := instance{
 			nodeType:    nt,
-			config:      cfg,
+			config:      cfg.Config,
 			accountPath: nnh.nextAccountPath(nt),
 		}
 
-		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.JSONRPC.JSONRPCAddr.String()))
+		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.Config.JSONRPC.JSONRPCAddr.String()))
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 	return ctx, nil
 }
 
-func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.MechanismType, genesisCfgPath string) (*server.Config, error) {
+func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.MechanismType, genesisCfgPath string) (*pkg_config.CustomServerConfig, error) {
 	t.Helper()
 
 	rawConfig := config.DefaultConfig()
@@ -215,41 +215,43 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.Mechanism
 		Balance: big.NewInt(0).Mul(big.NewInt(1000), common.ETH),
 	}
 
-	cfg := &server.Config{
-		Chain: chainSpec,
-		JSONRPC: &server.JSONRPC{
-			JSONRPCAddr:              net.TCPAddrFromAddrPort(jsonRpcAddr),
-			AccessControlAllowOrigin: rawConfig.Headers.AccessControlAllowOrigins,
+	cfg := &pkg_config.CustomServerConfig{
+		Config: &edge_server.Config{
+			Chain: chainSpec,
+			JSONRPC: &edge_server.JSONRPC{
+				JSONRPCAddr:              net.TCPAddrFromAddrPort(jsonRpcAddr),
+				AccessControlAllowOrigin: rawConfig.Headers.AccessControlAllowOrigins,
+			},
+			GRPCAddr:   net.TCPAddrFromAddrPort(grpcAddr),
+			LibP2PAddr: net.TCPAddrFromAddrPort(libp2pAddr),
+			Telemetry:  new(edge_server.Telemetry),
+			Network: &network.Config{
+				NoDiscover:       rawConfig.Network.NoDiscover,
+				Addr:             net.TCPAddrFromAddrPort(libp2pAddr),
+				DataDir:          rawConfig.DataDir,
+				MaxPeers:         rawConfig.Network.MaxPeers,
+				MaxInboundPeers:  rawConfig.Network.MaxInboundPeers,
+				MaxOutboundPeers: rawConfig.Network.MaxOutboundPeers,
+				Chain:            chainSpec,
+			},
+			DataDir:            rawConfig.DataDir,
+			Seal:               true, // Seal enables TxPool P2P gossiping
+			PriceLimit:         rawConfig.TxPool.PriceLimit,
+			MaxAccountEnqueued: 128,
+			MaxSlots:           rawConfig.TxPool.MaxSlots,
+			SecretsManager:     nil,
+			RestoreFile:        nil,
+			BlockTime:          rawConfig.BlockTime,
+			LogLevel:           hclog.Info,
+			LogFilePath:        rawConfig.LogFilePath,
 		},
-		GRPCAddr:   net.TCPAddrFromAddrPort(grpcAddr),
-		LibP2PAddr: net.TCPAddrFromAddrPort(libp2pAddr),
-		Telemetry:  new(server.Telemetry),
-		Network: &network.Config{
-			NoDiscover:       rawConfig.Network.NoDiscover,
-			Addr:             net.TCPAddrFromAddrPort(libp2pAddr),
-			DataDir:          rawConfig.DataDir,
-			MaxPeers:         rawConfig.Network.MaxPeers,
-			MaxInboundPeers:  rawConfig.Network.MaxInboundPeers,
-			MaxOutboundPeers: rawConfig.Network.MaxOutboundPeers,
-			Chain:            chainSpec,
-		},
-		DataDir:            rawConfig.DataDir,
-		Seal:               true, // Seal enables TxPool P2P gossiping
-		PriceLimit:         rawConfig.TxPool.PriceLimit,
-		MaxAccountEnqueued: 128,
-		MaxSlots:           rawConfig.TxPool.MaxSlots,
-		SecretsManager:     nil,
-		RestoreFile:        nil,
-		BlockTime:          rawConfig.BlockTime,
-		NodeType:           nodeType.String(),
-		LogLevel:           hclog.Info,
-		LogFilePath:        rawConfig.LogFilePath,
+		NodeType: nodeType.String(),
 	}
 
 	return cfg, nil
 }
 
-func startNode(cfg *server.Config, availAddr, accountPath string, nodeType consensus.MechanismType) (*server.Server, error) {
+func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType consensus.MechanismType) (*server.Server, error) {
 	var bootnode bool
 	if nodeType == consensus.BootstrapSequencer {
 		bootnode = true
@@ -278,23 +280,12 @@ func startNode(cfg *server.Config, availAddr, accountPath string, nodeType conse
 		AvailClient:     availClient,
 		AvailSender:     availSender,
 		AccountFilePath: accountPath,
+		NodeType:        string(nodeType),
 	}
 
-	// Attach the concensus to the Edge
-	err = server.RegisterConsensus(availConsensus, consensus.Factory(factoryCfg))
-	if err != nil {
-		return nil, fmt.Errorf("failure to register consensus: %w", err)
-	}
-
-	serverInstance, err := server.NewServer(cfg)
+	serverInstance, err := server.NewServer(cfg, consensus.Factory(factoryCfg))
 	if err != nil {
 		return nil, fmt.Errorf("failure to start node: %w", err)
-	}
-
-	// Remove consensus from Edge to clean up our factory configuration.
-	err = server.UnRegisterConsensus(availConsensus)
-	if err != nil {
-		return nil, err
 	}
 
 	return serverInstance, nil

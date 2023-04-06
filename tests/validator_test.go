@@ -40,7 +40,11 @@ func TestValidatorBlockCheck(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+			executor, blockchain, err := test.NewBlockchain(verifier, getGenesisBasePath())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
@@ -83,7 +87,11 @@ func TestValidatorApplyBlockToBlockchain(t *testing.T) {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
 
-			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+			executor, blockchain, err := test.NewBlockchain(verifier, getGenesisBasePath())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 
@@ -126,7 +134,11 @@ func TestValidatorProcessesFraudproof(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+			executor, blockchain, err := test.NewBlockchain(verifier, getGenesisBasePath())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			coinbaseAddr, signKey := test.NewAccount(t)
 			head := test.GetHeadBlock(t, blockchain)
 

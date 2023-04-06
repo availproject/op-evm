@@ -41,7 +41,11 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d: %s", i, tc.name), func(t *testing.T) {
 			verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
-			executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+			executor, blockchain, err := test.NewBlockchain(verifier, getGenesisBasePath())
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			head := test.GetHeadBlock(t, blockchain)
 
 			blockBuilder, err := block.NewBlockBuilderFactory(blockchain, executor, hclog.Default()).FromParentHash(head.Hash())
@@ -69,7 +73,10 @@ func TestWatchTowerBlockCheck(t *testing.T) {
 func TestWatchTowerBlockConstructFraudProof(t *testing.T) {
 	tAssert := assert.New(t)
 	verifier := staking.NewVerifier(new(staking.DumbActiveParticipants), hclog.Default())
-	executor, blockchain := test.NewBlockchain(t, verifier, getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(verifier, getGenesisBasePath())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
 

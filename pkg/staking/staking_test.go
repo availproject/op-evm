@@ -29,8 +29,8 @@ func TestIsContractDeployed(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, nil, getGenesisBasePath())
-
+	executor, blockchain, err := test.NewBlockchain(nil, getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -48,7 +48,8 @@ func TestGetSetStakingThreshold(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -82,7 +83,8 @@ func TestGetSetStakingThreshold(t *testing.T) {
 func TestIsContractStakedAndUnStaked(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -140,7 +142,8 @@ func TestIsContractStakedAndUnStaked(t *testing.T) {
 func TestSlashStaker(t *testing.T) {
 	tAssert := assert.New(t)
 
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -208,7 +211,7 @@ func TestSlashStaker(t *testing.T) {
 
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
-	err := dr.Begin(maliciousSequencerAddr, coinbaseSignKey)
+	err = dr.Begin(maliciousSequencerAddr, coinbaseSignKey)
 	tAssert.NoError(err)
 
 	isProbationSequencer, isProbationSequencerErr := dr.Contains(maliciousSequencerAddr, Sequencer)

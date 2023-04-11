@@ -79,100 +79,11 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
 
 	for {
+		var blk *avail_types.SignedBlock
+
 		select {
-		case blk := <-availBlockStream.Chan():
-			// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
-			// time sensitive logic in sequencer, such as block generation timeouts.
-			t.Store(int64(blk.Block.Header.Number))
-
-			// So this is the situation...
-			// Here we are not looking for if current node should be producing or not producing the block.
-			// What we are interested, prior to fraud resolver, if block is containing fraud check request.
-			edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
-			if len(edgeBlks) == 0 && err != nil {
-				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
-				// It is expected that not all Avail blocks contain a SL block. On any other error,
-				// log the error and wait for a next one.
-				if err != block.ErrNoExtrinsicFound {
-					sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
-					continue
-				}
-			}
-
-			// Write down blocks received from avail to make sure we're synced before processing with the
-			// fraud check or writing down new blocks...
-			for _, edgeBlk := range edgeBlks {
-				// In case that dispute resolution is ended, please make sure to set fraud resolution block
-				// to nil so whole chain and corrupted node can continue making our day good!
-				// Block does not have to be written into the chain as it's already written with syncer...
-				if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
-					sw.logger.Warn(
-						"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
-						"edge_block_hash", edgeBlk.Hash(),
-						"fraud_block_hash", fraudResolver.GetBlock().Hash(),
-					)
-					fraudResolver.EndDisputeResolution()
-				}
-
-				// We cannot write the fraud proof block to the blockchain at all due to following reasons:
-				// - Block number already exists and block won't be written.
-				// - Watchtower has syncer disabled and when writing block, next block can come in rejecting this block.
-				// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
-				//   trigger failures when writing down block due to already existing tx in the store.
-				if !fraudResolver.IsFraudProofBlock(edgeBlk) {
-					if err := validator.Check(edgeBlk); err == nil {
-						if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
-							sw.logger.Warn(
-								"failed to write edge block received from avail",
-								"edge_block_hash", edgeBlk.Hash(),
-								"error", err,
-							)
-						}
-					} else {
-						sw.logger.Warn(
-							"failed to validate edge block received from avail",
-							"edge_block_hash", edgeBlk.Hash(),
-							"error", err,
-						)
-					}
-				}
-			}
-
-			// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
-			fraudResolver.CheckAndSetFraudBlock(edgeBlks)
-
-			// Periodically verify that we are staked, before proceeding with sequencer
-			// logic. In the unexpected case of being slashed and dropping below the
-			// required sequencer staking threshold, we must stop processing, because
-			// otherwise we just get slashed more.
-			sequencerStaked, sequencerError := activeSequencersQuerier.Contains(sw.nodeAddr)
-			if sequencerError != nil {
-				sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "error", sequencerError)
-				continue
-			}
-
-			if !sequencerStaked {
-				sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
-				continue
-			}
-
-			// Will check the block for fraudlent behaviour and slash parties accordingly.
-			// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
-			// If we do not stop the network from processing, blocks will continue to be built from other sequencers
-			// resulting in block number missmatches and fraud will potentially be corrupted.
-			if _, err := fraudResolver.CheckAndSlash(); err != nil {
-				continue
-			}
-
-			// Is it my turn to generate next block?
-			if sw.IsNextSequencer(activeSequencersQuerier) {
-				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
-				enableBlockProductionCh <- true
-				continue
-			} else {
-				sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
-				enableBlockProductionCh <- false
-			}
+		case blk = <-availBlockStream.Chan():
+			// Process below.
 
 		case <-sw.closeCh:
 			if err := sw.stakingNode.UnStake(sw.nodeSignKey); err != nil {
@@ -180,6 +91,99 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				return err
 			}
 			return nil
+		}
+
+		// Time `t` is [mostly] monotonic clock, backed by Avail. It's used for all
+		// time sensitive logic in sequencer, such as block generation timeouts.
+		t.Store(int64(blk.Block.Header.Number))
+
+		// So this is the situation...
+		// Here we are not looking for if current node should be producing or not producing the block.
+		// What we are interested, prior to fraud resolver, if block is containing fraud check request.
+		edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
+		if len(edgeBlks) == 0 && err != nil {
+			sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
+			// It is expected that not all Avail blocks contain a SL block. On any other error,
+			// log the error and wait for a next one.
+			if err != block.ErrNoExtrinsicFound {
+				sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
+				continue
+			}
+		}
+
+		// Write down blocks received from avail to make sure we're synced before processing with the
+		// fraud check or writing down new blocks...
+		for _, edgeBlk := range edgeBlks {
+			// In case that dispute resolution is ended, please make sure to set fraud resolution block
+			// to nil so whole chain and corrupted node can continue making our day good!
+			// Block does not have to be written into the chain as it's already written with syncer...
+			if fraudResolver.IsDisputeResolutionEnded(edgeBlk.Header) {
+				sw.logger.Warn(
+					"Dispute resolution for fraud block has ended! Chain can now continue with new block production...",
+					"edge_block_hash", edgeBlk.Hash(),
+					"fraud_block_hash", fraudResolver.GetBlock().Hash(),
+				)
+				fraudResolver.EndDisputeResolution()
+			}
+
+			// We cannot write the fraud proof block to the blockchain at all due to following reasons:
+			// - Block number already exists and block won't be written.
+			// - Watchtower has syncer disabled and when writing block, next block can come in rejecting this block.
+			// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
+			//   trigger failures when writing down block due to already existing tx in the store.
+			if !fraudResolver.IsFraudProofBlock(edgeBlk) {
+				if err := validator.Check(edgeBlk); err == nil {
+					if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
+						sw.logger.Warn(
+							"failed to write edge block received from avail",
+							"edge_block_hash", edgeBlk.Hash(),
+							"error", err,
+						)
+					}
+				} else {
+					sw.logger.Warn(
+						"failed to validate edge block received from avail",
+						"edge_block_hash", edgeBlk.Hash(),
+						"error", err,
+					)
+				}
+			}
+		}
+
+		// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
+		fraudResolver.CheckAndSetFraudBlock(edgeBlks)
+
+		// Periodically verify that we are staked, before proceeding with sequencer
+		// logic. In the unexpected case of being slashed and dropping below the
+		// required sequencer staking threshold, we must stop processing, because
+		// otherwise we just get slashed more.
+		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(sw.nodeAddr)
+		if sequencerError != nil {
+			sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "error", sequencerError)
+			continue
+		}
+
+		if !sequencerStaked {
+			sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
+			continue
+		}
+
+		// Will check the block for fraudlent behaviour and slash parties accordingly.
+		// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
+		// If we do not stop the network from processing, blocks will continue to be built from other sequencers
+		// resulting in block number missmatches and fraud will potentially be corrupted.
+		if _, err := fraudResolver.CheckAndSlash(); err != nil {
+			continue
+		}
+
+		// Is it my turn to generate next block?
+		if sw.IsNextSequencer(activeSequencersQuerier) {
+			sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+			enableBlockProductionCh <- true
+			continue
+		} else {
+			sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+			enableBlockProductionCh <- false
 		}
 	}
 }

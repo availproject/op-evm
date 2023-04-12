@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
@@ -21,15 +20,23 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
-func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain) {
-	chain := NewChain(t, basepath)
-	executor := NewInMemExecutor(t, chain)
+func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, error) {
+	chain, err := NewChain(basepath)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	gr := executor.WriteGenesis(chain.Genesis.Alloc)
+	executor := NewInMemExecutor(chain)
+
+	gr, err := executor.WriteGenesis(chain.Genesis.Alloc, types.ZeroHash)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	chain.Genesis.StateRoot = gr
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chain.Params.Forks.At(0), uint64(chain.Params.ChainID))
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -38,27 +45,31 @@ func NewBlockchain(t *testing.T, verifier blockchain.Verifier, basepath string) 
 
 	bchain, err := blockchain.NewBlockchain(hclog.Default(), db, chain, nil, executor, signer)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 
 	bchain.SetConsensus(verifier)
 	executor.GetHash = bchain.GetHashHelper
 
 	if err := bchain.ComputeGenesis(); err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 
-	return executor, bchain
+	return executor, bchain, nil
 }
 
-func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool) {
-	executor := NewInMemExecutor(t, chainSpec)
+func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool, error) {
+	executor := NewInMemExecutor(chainSpec)
 
-	gr := executor.WriteGenesis(chainSpec.Genesis.Alloc)
+	gr, err := executor.WriteGenesis(chainSpec.Genesis.Alloc, types.ZeroHash)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	chainSpec.Genesis.StateRoot = gr
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(chainSpec.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chainSpec.Params.Forks.At(0), uint64(chainSpec.Params.ChainID))
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -67,14 +78,14 @@ func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier bloc
 
 	bchain, err := blockchain.NewBlockchain(hclog.Default(), db, chainSpec, nil, executor, signer)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, nil, err
 	}
 
 	bchain.SetConsensus(verifier)
 	executor.GetHash = bchain.GetHashHelper
 
 	if err := bchain.ComputeGenesis(); err != nil {
-		t.Fatal(err)
+		return nil, nil, nil, err
 	}
 
 	txPool, err := txpool.NewTxPool(
@@ -86,30 +97,25 @@ func NewBlockchainWithTxPool(t *testing.T, chainSpec *chain.Chain, verifier bloc
 		&txpool.Config{MaxSlots: 10, MaxAccountEnqueued: 100},
 	)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, nil, err
 	}
 
 	txPool.SetSigner(signer)
 	txPool.Start()
 
-	return executor, bchain, txPool
+	return executor, bchain, txPool, nil
 }
 
-func NewInMemExecutor(t *testing.T, c *chain.Chain) *state.Executor {
-	t.Helper()
-
+func NewInMemExecutor(c *chain.Chain) *state.Executor {
 	storage := itrie.NewMemoryStorage()
 	st := itrie.NewState(storage)
-
-	e := state.NewExecutor(c.Params, st, hclog.Default())
-
-	return e
+	return state.NewExecutor(c.Params, st, hclog.Default())
 }
 
-func getStakingContractBytecode(t *testing.T, basepath string) []byte {
+func getStakingContractBytecode(basepath string) ([]byte, error) {
 	jsonFile, err := os.Open(filepath.Join(basepath, "configs/genesis.json"))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	byteValue, _ := io.ReadAll(jsonFile)
@@ -117,7 +123,7 @@ func getStakingContractBytecode(t *testing.T, basepath string) []byte {
 	var data map[string]interface{}
 
 	if err := json.Unmarshal(byteValue, &data); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	genesisData := data["genesis"].(map[string]interface{})
@@ -127,17 +133,21 @@ func getStakingContractBytecode(t *testing.T, basepath string) []byte {
 			addrDataMap := addrData.(map[string]interface{})
 			bytecode, err := hex.DecodeHex(addrDataMap["code"].(string))
 			if err != nil {
-				t.Fatal(err)
+				return nil, err
 			}
-			return bytecode
+
+			return bytecode, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func NewChain(t *testing.T, basepath string) *chain.Chain {
+func NewChain(basepath string) (*chain.Chain, error) {
 	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
-	scBytecode := getStakingContractBytecode(t, basepath)
+	scBytecode, err := getStakingContractBytecode(basepath)
+	if err != nil {
+		return nil, err
+	}
 
 	return &chain.Chain{
 		Genesis: &chain.Genesis{
@@ -173,5 +183,5 @@ func NewChain(t *testing.T, basepath string) *chain.Chain {
 				},
 			},
 		},
-	}
+	}, nil
 }

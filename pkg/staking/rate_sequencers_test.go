@@ -14,7 +14,8 @@ func TestMinSequencerRater(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -39,7 +40,8 @@ func TestMaxSequencerRater(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 

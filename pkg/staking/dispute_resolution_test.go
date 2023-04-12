@@ -14,7 +14,8 @@ func TestBeginDisputeResolution(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -34,7 +35,7 @@ func TestBeginDisputeResolution(t *testing.T) {
 
 	dr := NewDisputeResolution(blockchain, executor, sender, hclog.Default())
 
-	err := dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
+	err = dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get(Sequencer)
@@ -84,7 +85,8 @@ func TestEndDisputeResolution(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -106,7 +108,7 @@ func TestEndDisputeResolution(t *testing.T) {
 
 	// BEGIN THE DISPUTE RESOLUTION
 
-	err := dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
+	err = dr.Begin(byzantineSequencerAddr, watchtowerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get(Sequencer)
@@ -137,7 +139,8 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 	tAssert := assert.New(t)
 
 	// TODO: Check if verifier is even necessary to be applied. For now skipping it.
-	executor, blockchain := test.NewBlockchain(t, NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	executor, blockchain, err := test.NewBlockchain(NewVerifier(new(DumbActiveParticipants), hclog.Default()), getGenesisBasePath())
+	tAssert.Nil(err)
 	tAssert.NotNil(executor)
 	tAssert.NotNil(blockchain)
 
@@ -159,7 +162,7 @@ func TestFailedEndDisputeResolution(t *testing.T) {
 
 	// BEGIN THE DISPUTE RESOLUTION
 
-	err := dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
+	err = dr.Begin(byzantineSequencerAddr, byzantineSequencerSignKey)
 	tAssert.NoError(err)
 
 	probationSequencers, err := dr.Get(Sequencer)

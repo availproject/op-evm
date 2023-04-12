@@ -2,6 +2,7 @@ package snapshot
 
 import "github.com/0xPolygon/polygon-edge/network"
 
+// nolint:unused
 const topicNameV1 = "stateSnapshots/0.1"
 
 type Distributor interface {

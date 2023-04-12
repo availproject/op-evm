@@ -55,7 +55,7 @@ func main() {
 
 	availSender := avail.NewSender(availClient, appID, availAccount)
 
-	// Attach the concensus to the server
+	// Attach the consensus to the server
 	cfg := consensus.Config{
 		AvailAccount: availAccount,
 		AvailClient:  availClient,

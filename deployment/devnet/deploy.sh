@@ -64,6 +64,7 @@ EOF
 
 function generate_service {
     avail_addr=$1
+    node_type=$2
     cat <<EOF
 [Unit]
 Description=
@@ -71,7 +72,9 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/ubuntu/avail-settlement -config-file=/home/ubuntu/config.yaml -avail-addr ws://${avail_addr}:9944/v1/json-rpc -account-config-file="/home/ubuntu/account-mnemonic"
+ExecStart=/home/ubuntu/avail-settlement $( [ "$node_type" = "bootstrap-sequencer" ] && echo '-bootstrap' ) -config-file=/home/ubuntu/config.yaml -avail-addr ws://${avail_addr}:9944/v1/json-rpc -account-config-file="/home/ubuntu/account-mnemonic"
+User=ubuntu
+Group=ubuntu
 
 [Install]
 WantedBy=multi-user.target
@@ -97,6 +100,7 @@ while read -r i; do
 done < <(echo "$all_instances" | jq -c '.[]')
 
 bootnodes=()
+addresses=()
 while read -r i; do
     node_type=$(echo "$i" | jq -r .tags.NodeType)
     public_ip=$(echo "$i" | jq -r .public_ip)
@@ -110,14 +114,15 @@ while read -r i; do
     fi
 
     mkdir -p "configs/${node_addr}"
-    node_id=$(../../third_party/polygon-edge/polygon-edge secrets init --data-dir "./configs/${node_addr}/data" --json | jq -r .[0].node_id)
+    secrets_json=$(polygon-edge secrets init --data-dir "./configs/${node_addr}/data" --json --insecure)
 
+    addresses+=("$(echo "$secrets_json" | jq -r .[0].address)")
     if [ "$node_type" = "bootstrap-sequencer"  ] || [ "$node_type" = "sequencer"  ]; then
-      bootnodes+=("/ip4/$public_ip/tcp/$p2p_port/p2p/$node_id")
+      bootnodes+=("/ip4/$public_ip/tcp/$p2p_port/p2p/$(echo "$secrets_json" | jq -r .[0].node_id)")
     fi
 
     generate_config "$grpc_port" "$jsonrpc_port" "$p2p_port" "$node_type" "$public_ip" > "./configs/$node_addr/config.yaml"
-    generate_service "$avail_addr" > "./configs/$node_addr/node.service"
+    generate_service "$avail_addr" "$node_type" > "./configs/$node_addr/node.service"
 
 done < <(echo "$all_instances" | jq -c '.[]')
 
@@ -127,14 +132,24 @@ for i in "${!bootnodes[@]}"
 do
   genesis=$(echo "$genesis" | jq ".bootnodes[$i] = \"${bootnodes[$i]}\"")
 done
+for addr in "${addresses[@]}"
+do
+  genesis=$(echo "$genesis" | jq ".genesis.alloc[\"${addr}\"] = {\"balance\": \"0x3635c9adc5dea00000\"}")
+done
 echo "$genesis" > ./configs/genesis.json
 
+remote_exec "$avail_addr" "sudo systemctl stop avail"
+remote_exec "$avail_addr" "rm -rf ./data"
 remote_copy "$avail_addr" "./run-avail.sh" "/home/ubuntu/"
 remote_copy "$avail_addr" "./avail.service" "/home/ubuntu/"
 remote_exec "$avail_addr" "./run-avail.sh"
 
+sleep 10
+
 for node_addr in "${nodes_addr[@]}"
 do
+  remote_exec "$node_addr" "sudo systemctl stop node"
+  remote_exec "$node_addr" "rm -rf ./data"
   remote_copy "$node_addr" "./configs/$node_addr/." "/home/ubuntu/"
   remote_copy "$node_addr" "./configs/genesis.json" "/home/ubuntu/"
   remote_copy "$node_addr" "../../avail-settlement" "/home/ubuntu/"

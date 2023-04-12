@@ -10,6 +10,9 @@ ifndef $(GOPATH)
     export GOPATH
 endif
 
+install-polygon-edge:
+	go install github.com/0xPolygon/polygon-edge@v0.8.0
+
 run-benchmarks:
 	go test ./tests -bench=. -run ^$$
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-wget https://github.com/maticnetwork/avail/releases/download/v1.4.0-rc3/data-avail-linux-aarch64.tar.gz
+wget https://github.com/maticnetwork/avail/releases/download/v1.3.0-rc3/data-avail-linux-aarch64.tar.gz
 tar -xzvf data-avail-linux-aarch64.tar.gz
 sudo mv avail.service /etc/systemd/system/
 sudo systemctl daemon-reload

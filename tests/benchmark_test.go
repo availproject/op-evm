@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"net/netip"
+	"net/url"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -14,9 +15,16 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/maticnetwork/avail-settlement-contracts/testing/pkg/testtoken"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 )
 
 const walletsDir = "../data/wallets"
+
+type ContextInterface interface {
+	StopAll()
+	GethClient() (*ethclient.Client, error)
+	FirstRPCURLForNodeType(nodeType consensus.MechanismType) (*url.URL, error)
+}
 
 func Benchmark_SendingTransactions(b *testing.B) {
 	b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
@@ -29,10 +37,19 @@ func Benchmark_SendingTransactions(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	b.Log("starting nodes")
-	ctx, err := StartNodes(b, addr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
-	if err != nil {
-		b.Fatal(err)
+	var ctx ContextInterface
+	if *awsInstancesFlag == "" {
+		b.Log("starting nodes")
+		ctx, err = StartNodes(b, addr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		if err != nil {
+			b.Fatal(err)
+		}
+	} else {
+		log.Println("Test test")
+		ctx, err = NewDevnetContext(*awsInstancesFlag)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Shutdown all nodes once test finishes.

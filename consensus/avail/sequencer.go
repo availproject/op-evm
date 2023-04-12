@@ -32,7 +32,6 @@ type SequencerWorker struct {
 	logger                     hclog.Logger
 	blockchain                 *blockchain.Blockchain
 	executor                   *state.Executor
-	validator                  validator.Validator
 	txpool                     *txpool.TxPool
 	apq                        staking.ActiveParticipants
 	availAppID                 avail_types.UCompact
@@ -418,7 +417,7 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 }
 
 func NewSequencer(
-	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, v validator.Validator, availClient avail.Client,
+	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, availClient avail.Client,
 	availAccount signature.KeyringPair, availAppID avail_types.UCompact,
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
 	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
@@ -428,7 +427,6 @@ func NewSequencer(
 		logger:                     logger,
 		blockchain:                 b,
 		executor:                   e,
-		validator:                  v,
 		txpool:                     txp,
 		apq:                        apq,
 		availAppID:                 availAppID,

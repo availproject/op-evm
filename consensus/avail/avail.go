@@ -207,8 +207,8 @@ func (d *Avail) Start() error {
 	case Sequencer, BootstrapSequencer:
 		sequencerWorker, _ := NewSequencer(
 			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
-			d.validator, d.availClient, d.availAccount, d.availAppID,
-			d.signKey, d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
+			d.availClient, d.availAccount, d.availAppID, d.signKey,
+			d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 			d.blockTime, d.blockProductionIntervalSec,
 		)
 		go func() {

@@ -29,7 +29,7 @@ var accountPath = flag.String("account-config-file", "../configs/account", "Path
 var awsInstancesFlag = flag.String("aws-instances", "", "file containing all the information about the aws instances deployed as json, if provided will be used to connect instead of spawning up own instances")
 
 func Test_MultipleSequencers(t *testing.T) {
-	//t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
+	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 

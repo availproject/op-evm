@@ -22,11 +22,9 @@ resource "aws_instance" "avail" {
 resource "aws_instance" "bootnode" {
   ami                         = var.base_ami
   instance_type               = var.base_instance_type
-  count                       = var.bootnode_count
   key_name                    = aws_key_pair.devnet.key_name
-  subnet_id                   = element(aws_subnet.devnet_public, count.index).id
+  subnet_id                   = aws_subnet.devnet_public[0].id
   associate_public_ip_address = true
-  #  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   root_block_device {
     delete_on_termination = true
     volume_size           = 30
@@ -34,11 +32,11 @@ resource "aws_instance" "bootnode" {
   }
 
   tags = {
-    Name        = format("bootnode-%s-%02d", var.deployment_name, count.index + 1)
-    Hostname    = format("bootnode-%s-%02d", var.deployment_name, count.index + 1)
-    GRPCPort    = format("30%03d", count.index + 1)
-    JsonRPCPort = format("31%03d", count.index + 1)
-    P2PPort     = format("32%03d", count.index + 1)
+    Name        = format("bootnode-%s", var.deployment_name)
+    Hostname    = format("bootnode-%s", var.deployment_name)
+    GRPCPort    = "30001"
+    JsonRPCPort = "31001"
+    P2PPort     = "32001"
     NodeType    = "bootstrap-sequencer"
     Provisioner = data.aws_caller_identity.provisioner.account_id
   }
@@ -51,7 +49,6 @@ resource "aws_instance" "node" {
   key_name                    = aws_key_pair.devnet.key_name
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
   associate_public_ip_address = true
-  #  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   root_block_device {
     delete_on_termination = true
@@ -77,7 +74,6 @@ resource "aws_instance" "watchtower" {
   key_name                    = aws_key_pair.devnet.key_name
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
   associate_public_ip_address = true
-  #  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   root_block_device {
     delete_on_termination = true

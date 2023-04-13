@@ -2,8 +2,8 @@ POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/polygon-edge
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
 STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
-GOOS="darwin"
-GOARCH="arm64"
+GOOS=
+GOARCH=
 
 ifndef $(GOPATH)
     GOPATH=$(shell go env GOPATH)
@@ -11,7 +11,7 @@ ifndef $(GOPATH)
 endif
 
 install-polygon-edge:
-	go install github.com/0xPolygon/polygon-edge@v0.8.0
+	go install github.com/0xPolygon/polygon-edge@v0.8.1
 
 run-benchmarks:
 	go test ./tests -bench=. -run ^$$

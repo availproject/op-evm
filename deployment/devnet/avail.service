@@ -1,5 +1,5 @@
 [Unit]
-Description=
+Description=Avail DA Node
 After=network.target
 
 [Service]

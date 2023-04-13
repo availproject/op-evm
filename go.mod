@@ -8,18 +8,20 @@ replace (
 )
 
 require (
-	github.com/0xPolygon/polygon-edge v0.8.0
+	github.com/0xPolygon/polygon-edge v0.8.1
 	github.com/armon/go-metrics v0.4.1
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.3
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/go-hclog v1.3.1
+	github.com/hashicorp/hcl v1.0.0
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-libp2p v0.22.0
 	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/prometheus/client_golang v1.13.1
 	github.com/stretchr/testify v1.8.1
+	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/test-go/testify v1.1.4
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/umbracle/ethgo v0.1.4-0.20230126112511-6a4d02533af6
@@ -27,6 +29,7 @@ require (
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -108,7 +111,6 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/go-version v1.5.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
-	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/vault/api v1.8.2 // indirect
 	github.com/hashicorp/vault/sdk v0.6.0 // indirect
 	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87 // indirect
@@ -191,7 +193,6 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cobra v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
@@ -224,7 +225,6 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20220617031823-097006376321 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )

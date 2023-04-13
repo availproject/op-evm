@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
 # Make sure the script is always executed from the directory where the script is located
-current_dir=$(pwd)
-cd "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" || exit
+pushd "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" || exit
 function cleanup {
   rm -rf configs
-  cd "$current_dir" || exit
+  popd || exit
 }
 trap cleanup EXIT
 #TODO make sure the needed binaries exist before running this script!

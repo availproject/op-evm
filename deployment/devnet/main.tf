@@ -40,5 +40,5 @@ resource "aws_key_pair" "devnet" {
 data "aws_caller_identity" "provisioner" {}
 
 locals {
-  all_instances = concat([aws_instance.avail], aws_instance.node, aws_instance.bootnode, aws_instance.watchtower)
+  all_instances = concat([aws_instance.avail], [aws_instance.bootnode], aws_instance.node, aws_instance.watchtower)
 }

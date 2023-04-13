@@ -43,23 +43,9 @@ resource "aws_subnet" "devnet_public" {
   }
 }
 
-#resource "aws_subnet" "devnet_private" {
-#  vpc_id            = aws_vpc.devnet.id
-#  count             = length(var.zones)
-#  availability_zone = element(var.zones, count.index)
-#  cidr_block        = element(var.devnet_private_subnet, count.index)
-#  tags = {
-#    Name        = "private-subnet-${var.deployment_name}"
-#    Provisioner = data.aws_caller_identity.provisioner.account_id
-#  }
-#}
-
 resource "aws_route_table" "devnet_public" {
   vpc_id = aws_vpc.devnet.id
 }
-#resource "aws_route_table" "devnet_private" {
-#  vpc_id = aws_vpc.devnet.id
-#}
 
 resource "aws_route" "public_internet_gateway" {
   route_table_id         = aws_route_table.devnet_public.id
@@ -67,21 +53,9 @@ resource "aws_route" "public_internet_gateway" {
   gateway_id             = aws_internet_gateway.igw.id
 }
 
-#resource "aws_route" "private_nat_gateway" {
-#  route_table_id         = aws_route_table.devnet_private.id
-#  destination_cidr_block = "0.0.0.0/0"
-#  gateway_id             = aws_nat_gateway.nat.id
-#}
-
 resource "aws_route_table_association" "public" {
   count          = length(var.zones)
   subnet_id      = element(aws_subnet.devnet_public, count.index).id
   route_table_id = aws_route_table.devnet_public.id
 }
-
-#resource "aws_route_table_association" "private" {
-#  count          = length(var.zones)
-#  subnet_id      = element(aws_subnet.devnet_private, count.index).id
-#  route_table_id = aws_route_table.devnet_private.id
-#}
 

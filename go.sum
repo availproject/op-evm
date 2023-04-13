@@ -49,8 +49,8 @@ filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 github.com/0xPolygon/go-ibft v0.4.0 h1:WwevpA/J5PI2ztQuIis/0uRlVZrJgps9NhPewoYZDus=
 github.com/0xPolygon/go-ibft v0.4.0/go.mod h1:mJGwdcGvLdg9obtnzBqx1aAzuhzvGeWav5AiUWN7F3Q=
-github.com/0xPolygon/polygon-edge v0.8.0 h1:W5hiu/xtcSqN9VcYx9M6khXQq04IycR0FIZp1lZGVtA=
-github.com/0xPolygon/polygon-edge v0.8.0/go.mod h1:rcWqj8tRuAH9aRzNBDx/6cHnCj812pvOTHncyGBZd+E=
+github.com/0xPolygon/polygon-edge v0.8.1 h1:qfMJ3KlBU7HPr0eH/LMCAH16c/5oRZmBFdx+R9wJ5MU=
+github.com/0xPolygon/polygon-edge v0.8.1/go.mod h1:rcWqj8tRuAH9aRzNBDx/6cHnCj812pvOTHncyGBZd+E=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=

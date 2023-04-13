@@ -115,8 +115,7 @@ resource "aws_network_interface_sg_attachment" "sg_watchtower_attachment_p2p" {
 # Boot node
 
 resource "aws_security_group" "bootnode" {
-  count       = length(aws_instance.bootnode)
-  name        = format("allow-p2p-bootnode-%s-%02d", var.deployment_name, count.index + 1)
+  name        = format("allow-p2p-bootnode-%s", var.deployment_name)
   description = "Allow all p2p, grpc, jsonrpc and ssh traffic"
   vpc_id      = aws_vpc.devnet.id
   lifecycle {
@@ -124,45 +123,40 @@ resource "aws_security_group" "bootnode" {
   }
 }
 resource "aws_security_group_rule" "bootnode_grpc" {
-  count             = length(aws_instance.bootnode)
   type              = "ingress"
-  from_port         = element(aws_instance.bootnode, count.index).tags.GRPCPort
-  to_port           = element(aws_instance.bootnode, count.index).tags.GRPCPort
+  from_port         = aws_instance.bootnode.tags.GRPCPort
+  to_port           = aws_instance.bootnode.tags.GRPCPort
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = element(aws_security_group.bootnode, count.index).id
+  security_group_id = aws_security_group.bootnode.id
 }
 resource "aws_security_group_rule" "bootnode_jsonrpc" {
-  count             = length(aws_instance.bootnode)
   type              = "ingress"
-  from_port         = element(aws_instance.bootnode, count.index).tags.JsonRPCPort
-  to_port           = element(aws_instance.bootnode, count.index).tags.JsonRPCPort
+  from_port         = aws_instance.bootnode.tags.JsonRPCPort
+  to_port           = aws_instance.bootnode.tags.JsonRPCPort
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = element(aws_security_group.bootnode, count.index).id
+  security_group_id = aws_security_group.bootnode.id
 }
 resource "aws_security_group_rule" "bootnode_p2p" {
-  count             = length(aws_instance.bootnode)
   type              = "ingress"
-  from_port         = element(aws_instance.bootnode, count.index).tags.P2PPort
-  to_port           = element(aws_instance.bootnode, count.index).tags.P2PPort
+  from_port         = aws_instance.bootnode.tags.P2PPort
+  to_port           = aws_instance.bootnode.tags.P2PPort
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = element(aws_security_group.bootnode, count.index).id
+  security_group_id = aws_security_group.bootnode.id
 }
 resource "aws_security_group_rule" "bootnode_ssh" {
-  count             = length(aws_instance.bootnode)
   type              = "ingress"
   from_port         = "22"
   to_port           = "22"
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = element(aws_security_group.bootnode, count.index).id
+  security_group_id = aws_security_group.bootnode.id
 }
 resource "aws_network_interface_sg_attachment" "sg_bootnode_attachment_p2p" {
-  count                = length(aws_instance.bootnode)
-  security_group_id    = element(aws_security_group.bootnode, count.index).id
-  network_interface_id = element(aws_instance.bootnode, count.index).primary_network_interface_id
+  security_group_id    = aws_security_group.bootnode.id
+  network_interface_id = aws_instance.bootnode.primary_network_interface_id
 }
 
 # Node

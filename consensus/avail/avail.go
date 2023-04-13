@@ -45,12 +45,21 @@ const (
 )
 
 type Config struct {
+	AccountFilePath string
 	AvailAccount    signature.KeyringPair
 	AvailClient     avail.Client
 	AvailSender     avail.Sender
+	Blockchain      *blockchain.Blockchain
+	BlockTime       uint64
 	Bootnode        bool
-	AccountFilePath string
+	Context         context.Context
+	Config          *consensus.Config
+	Executor        *state.Executor
+	Logger          hclog.Logger
+	Network         *network.Server
 	NodeType        string
+	SecretsManager  secrets.SecretsManager
+	TxPool          *txpool.TxPool
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -75,8 +84,6 @@ type Avail struct {
 	executor   *state.Executor
 	verifier   blockchain.Verifier
 
-	updateCh chan struct{} // nolint:unused // Update channel
-
 	network        *network.Server // Reference to the networking layer
 	secretsManager secrets.SecretsManager
 	blockTime      time.Duration // Minimum block generation time in seconds
@@ -90,92 +97,89 @@ type Avail struct {
 	validator                  validator.Validator
 }
 
-// Factory returns the consensus factory method
-func Factory(config Config) func(params *consensus.Params) (consensus.Consensus, error) {
-	return func(params *consensus.Params) (consensus.Consensus, error) {
-		logger := params.Logger.Named("avail")
+func New(config Config) (consensus.Consensus, error) {
+	logger := config.Logger.Named("avail")
 
-		bs, err := params.SecretsManager.GetSecret(secrets.ValidatorKey)
-		if err != nil {
-			panic("can't find validator key! - " + err.Error())
-		}
-
-		validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
-		if err != nil {
-			panic("validator key decoding failed: " + err.Error())
-		}
-
-		validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
-
-		asq := staking.NewActiveParticipantsQuerier(params.Blockchain, params.Executor, logger)
-
-		d := &Avail{
-			logger:                     logger,
-			notifyCh:                   make(chan struct{}),
-			closeCh:                    make(chan struct{}),
-			blockchain:                 params.Blockchain,
-			executor:                   params.Executor,
-			verifier:                   staking.NewVerifier(asq, logger.Named("verifier")),
-			txpool:                     params.TxPool,
-			secretsManager:             params.SecretsManager,
-			network:                    params.Network,
-			blockTime:                  time.Duration(params.BlockTime) * time.Second,
-			nodeType:                   MechanismType(config.NodeType),
-			signKey:                    validatorKey,
-			minerAddr:                  validatorAddr,
-			validator:                  validator.New(params.Blockchain, params.Executor, validatorAddr, logger),
-			blockProductionIntervalSec: DefaultBlockProductionIntervalS,
-
-			availAccount: config.AvailAccount,
-			availClient:  config.AvailClient,
-			availSender:  config.AvailSender,
-		}
-
-		if params.Network != nil {
-			d.syncer = syncer.NewSyncer(
-				params.Logger,
-				params.Network,
-				params.Blockchain,
-				time.Duration(params.BlockTime)*3*time.Second,
-			)
-		}
-
-		if d.mechanisms, err = ParseMechanismConfigTypes(params.Config.Config["mechanisms"]); err != nil {
-			return nil, fmt.Errorf("invalid avail mechanism type/s provided")
-		}
-
-		if d.nodeType == BootstrapSequencer && !config.Bootnode {
-			return nil, fmt.Errorf("invalid avail node type provided: cannot specify bootstrap-sequencer type without -bootnode flag")
-		}
-
-		if d.nodeType == Sequencer && config.Bootnode {
-			d.nodeType = BootstrapSequencer
-		}
-
-		rawInterval, ok := params.Config.Config["interval"]
-		if ok {
-			interval, ok := rawInterval.(uint64)
-			if !ok {
-				return nil, fmt.Errorf("interval expected int")
-			}
-
-			d.interval = interval
-		}
-
-		blockProductionIntervalSecRaw, ok := params.Config.Config["blockProductionIntervalSec"]
-		if ok {
-			blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
-			if !ok {
-				return nil, fmt.Errorf("blockProductionIntervalSec expected int")
-			}
-
-			d.blockProductionIntervalSec = blockProductionIntervalSec
-		}
-
-		d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
-
-		return d, nil
+	bs, err := config.SecretsManager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		panic("can't find validator key! - " + err.Error())
 	}
+
+	validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+	if err != nil {
+		panic("validator key decoding failed: " + err.Error())
+	}
+
+	validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+
+	asq := staking.NewActiveParticipantsQuerier(config.Blockchain, config.Executor, logger)
+
+	d := &Avail{
+		logger:                     logger,
+		notifyCh:                   make(chan struct{}),
+		closeCh:                    make(chan struct{}),
+		blockchain:                 config.Blockchain,
+		executor:                   config.Executor,
+		verifier:                   staking.NewVerifier(asq, logger.Named("verifier")),
+		txpool:                     config.TxPool,
+		secretsManager:             config.SecretsManager,
+		network:                    config.Network,
+		blockTime:                  time.Duration(config.BlockTime) * time.Second,
+		nodeType:                   MechanismType(config.NodeType),
+		signKey:                    validatorKey,
+		minerAddr:                  validatorAddr,
+		validator:                  validator.New(config.Blockchain, config.Executor, validatorAddr, logger),
+		blockProductionIntervalSec: DefaultBlockProductionIntervalS,
+
+		availAccount: config.AvailAccount,
+		availClient:  config.AvailClient,
+		availSender:  config.AvailSender,
+	}
+
+	if config.Network != nil {
+		d.syncer = syncer.NewSyncer(
+			config.Logger,
+			config.Network,
+			config.Blockchain,
+			time.Duration(config.BlockTime)*3*time.Second,
+		)
+	}
+
+	if d.mechanisms, err = ParseMechanismConfigTypes(config.Config.Config["mechanisms"]); err != nil {
+		return nil, fmt.Errorf("invalid avail mechanism type/s provided")
+	}
+
+	if d.nodeType == BootstrapSequencer && !config.Bootnode {
+		return nil, fmt.Errorf("invalid avail node type provided: cannot specify bootstrap-sequencer type without -bootnode flag")
+	}
+
+	if d.nodeType == Sequencer && config.Bootnode {
+		d.nodeType = BootstrapSequencer
+	}
+
+	rawInterval, ok := config.Config.Config["interval"]
+	if ok {
+		interval, ok := rawInterval.(uint64)
+		if !ok {
+			return nil, fmt.Errorf("interval expected int")
+		}
+
+		d.interval = interval
+	}
+
+	blockProductionIntervalSecRaw, ok := config.Config.Config["blockProductionIntervalSec"]
+	if ok {
+		blockProductionIntervalSec, ok := blockProductionIntervalSecRaw.(uint64)
+		if !ok {
+			return nil, fmt.Errorf("blockProductionIntervalSec expected int")
+		}
+
+		d.blockProductionIntervalSec = blockProductionIntervalSec
+	}
+
+	d.stakingNode = staking.NewNode(d.blockchain, d.executor, d.availSender, d.logger, staking.NodeType(d.nodeType))
+
+	return d, nil
 }
 
 // Initialize initializes the consensus

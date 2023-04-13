@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server"
+	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -144,7 +145,7 @@ func newLoggerFromConfig(config *server.Config) (hclog.Logger, error) {
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
-func NewServer(config *server.Config, consensusFn func(params *consensus.Params) (consensus.Consensus, error)) (*Server, error) {
+func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Server, error) {
 	logger, err := newLoggerFromConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup new logger instance, %w", err)
@@ -296,7 +297,7 @@ func NewServer(config *server.Config, consensusFn func(params *consensus.Params)
 
 	{
 		// Setup consensus
-		if err := m.setupConsensus(consensusFn); err != nil {
+		if err := m.setupConsensus(consensusCfg); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
@@ -467,7 +468,7 @@ func (s *Server) setupSecretsManager() error {
 }
 
 // setupConsensus sets up the consensus mechanism
-func (s *Server) setupConsensus(consensusFn func(params *consensus.Params) (consensus.Consensus, error)) error {
+func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
 	if !ok {
@@ -480,21 +481,18 @@ func (s *Server) setupConsensus(consensusFn func(params *consensus.Params) (cons
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
 
-	consensus, err := consensusFn(
-		&consensus.Params{
-			Context:               context.Background(),
-			Config:                config,
-			TxPool:                s.txpool,
-			Network:               s.network,
-			Blockchain:            s.blockchain,
-			Executor:              s.executor,
-			Grpc:                  s.grpcServer,
-			Logger:                s.logger,
-			SecretsManager:        s.secretsManager,
-			BlockTime:             s.config.BlockTime,
-			NumBlockConfirmations: s.config.NumBlockConfirmations,
-		},
-	)
+	// Fill-in server dependencies.
+	consensusCfg.Blockchain = s.blockchain
+	consensusCfg.BlockTime = s.config.BlockTime
+	consensusCfg.Config = config
+	consensusCfg.Context = context.Background()
+	consensusCfg.Executor = s.executor
+	consensusCfg.Logger = s.logger
+	consensusCfg.Network = s.network
+	consensusCfg.TxPool = s.txpool
+	consensusCfg.SecretsManager = s.secretsManager
+
+	consensus, err := avail_consensus.New(consensusCfg)
 	if err != nil {
 		return err
 	}

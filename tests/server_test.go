@@ -274,7 +274,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType 
 
 	availSender := avail.NewSender(availClient, appID, availAccount)
 
-	factoryCfg := consensus.Config{
+	consensusCfg := consensus.Config{
 		Bootnode:        bootnode,
 		AvailAccount:    availAccount,
 		AvailClient:     availClient,
@@ -283,7 +283,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType 
 		NodeType:        string(nodeType),
 	}
 
-	serverInstance, err := server.NewServer(cfg, consensus.Factory(factoryCfg))
+	serverInstance, err := server.NewServer(cfg, consensusCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failure to start node: %w", err)
 	}

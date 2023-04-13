@@ -64,7 +64,7 @@ func main() {
 		NodeType:     config.NodeType,
 	}
 
-	serverInstance, err := server.NewServer(config.Config, consensus.Factory(cfg))
+	serverInstance, err := server.NewServer(config.Config, cfg)
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)
 	}

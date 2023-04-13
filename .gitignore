@@ -77,5 +77,8 @@ tools/accounts/accounts
 node_modules
 contracts/stake/node_modules
 data/test-accounts/*
+deployment/devnet/.terraform
+deployment/devnet/configs
+
 cmd/server/server
 avail-settlement

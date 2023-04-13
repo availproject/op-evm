@@ -26,6 +26,8 @@ var genesisCfgPath = flag.String("genesis-config", "../configs/genesis.json", "P
 // nolint:unused
 var accountPath = flag.String("account-config-file", "../configs/account", "Path to the account mnemonic file")
 
+var awsInstancesFlag = flag.String("aws-instances", "", "file containing all the information about the aws instances deployed as json, if provided will be used to connect instead of spawning up own instances")
+
 func Test_MultipleSequencers(t *testing.T) {
 	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
 
@@ -38,16 +40,23 @@ func Test_MultipleSequencers(t *testing.T) {
 
 	*genesisCfgPath = filepath.Join(cwd, *genesisCfgPath)
 
-	t.Log("starting nodes")
+	var ctx ContextInterface
+	if *awsInstancesFlag == "" {
+		t.Log("starting nodes")
+		bindAddr, err := netip.ParseAddr(*bindInterface)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	bindAddr, err := netip.ParseAddr(*bindInterface)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
-	if err != nil {
-		t.Fatal(err)
+		ctx, err = StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		ctx, err = NewDevnetContext(*awsInstancesFlag)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Shutdown all nodes once test finishes.

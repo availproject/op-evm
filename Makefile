@@ -2,11 +2,16 @@ POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/polygon-edge
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
 STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
+GOOS=
+GOARCH=
 
 ifndef $(GOPATH)
     GOPATH=$(shell go env GOPATH)
     export GOPATH
 endif
+
+install-polygon-edge:
+	go install github.com/0xPolygon/polygon-edge@v0.8.1
 
 run-benchmarks:
 	go test ./tests -bench=. -run ^$$
@@ -30,7 +35,8 @@ bootstrap-genesis:
 	--premine 0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031:1000000000000000000000 \
 	--consensus ibft \
 	--bootnode /ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa \
-	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
+	--ibft-validator 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864 \
+	--ibft-validator-type "ecdsa"
 
 build-staking-contract:
 	cd $(STAKING_CONTRACT_PATH) && make build
@@ -51,13 +57,13 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	go build -o avail-settlement ./cmd/server/...
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement ./cmd/server/...
 
 build-client:
-	cd client && go build -o client
+	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
 
 build-e2e:
-	cd tools/e2e && go build -o e2e
+	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
 
 build-fraud: build-fraud-contract
 	cd tools/fraud && go build -o fraud
@@ -77,7 +83,7 @@ tools-wallet:
 	cd tools/wallet && go build
 
 tools-account:
-	cd tools/accounts && go build
+	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
 build: build-server build-client
 

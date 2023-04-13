@@ -21,6 +21,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -33,6 +34,8 @@ type SequencerWorker struct {
 	blockchain                 *blockchain.Blockchain
 	executor                   *state.Executor
 	txpool                     *txpool.TxPool
+	snapshotter                snapshot.Snapshotter
+	snapshotDistributor        snapshot.Distributor
 	apq                        staking.ActiveParticipants
 	availAppID                 avail_types.UCompact
 	availClient                avail.Client
@@ -83,6 +86,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		select {
 		case blk = <-availBlockStream.Chan():
 			// Process below.
+
+		case _ = <-sw.snapshotDistributor.Receive():
+			// TODO: Process the state snapshot.
 
 		case <-sw.closeCh:
 			if err := sw.stakingNode.UnStake(sw.nodeSignKey); err != nil {
@@ -417,8 +423,9 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 }
 
 func NewSequencer(
-	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, availClient avail.Client,
-	availAccount signature.KeyringPair, availAppID avail_types.UCompact,
+	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool,
+	snapshotter snapshot.Snapshotter, snapshotDistributor snapshot.Distributor,
+	availClient avail.Client, availAccount signature.KeyringPair, availAppID avail_types.UCompact,
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
 	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
 	blockTime time.Duration, blockProductionIntervalSec uint64,
@@ -428,6 +435,8 @@ func NewSequencer(
 		blockchain:                 b,
 		executor:                   e,
 		txpool:                     txp,
+		snapshotter:                snapshotter,
+		snapshotDistributor:        snapshotDistributor,
 		apq:                        apq,
 		availAppID:                 availAppID,
 		availClient:                availClient,

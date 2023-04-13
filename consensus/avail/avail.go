@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -59,6 +60,7 @@ type Config struct {
 	Network         *network.Server
 	NodeType        string
 	SecretsManager  secrets.SecretsManager
+	Snapshotter     snapshot.Snapshotter
 	TxPool          *txpool.TxPool
 }
 
@@ -80,9 +82,11 @@ type Avail struct {
 	interval uint64
 	txpool   *txpool.TxPool
 
-	blockchain *blockchain.Blockchain
-	executor   *state.Executor
-	verifier   blockchain.Verifier
+	blockchain          *blockchain.Blockchain
+	executor            *state.Executor
+	snapshotter         snapshot.Snapshotter
+	snapshotDistributor snapshot.Distributor
+	verifier            blockchain.Verifier
 
 	network        *network.Server // Reference to the networking layer
 	secretsManager secrets.SecretsManager
@@ -143,7 +147,14 @@ func New(config Config) (consensus.Consensus, error) {
 			config.Blockchain,
 			time.Duration(config.BlockTime)*3*time.Second,
 		)
-	}
+
+		d.snapshotDistributor, err = snapshot.NewDistributor(d.network)
+		if err != nil {
+			return nil, err
+		}
+	} /* TODO: Implement /dev/null snapshot distributor for no-network situations.
+		else {
+	} */
 
 	if d.mechanisms, err = ParseMechanismConfigTypes(config.Config.Config["mechanisms"]); err != nil {
 		return nil, fmt.Errorf("invalid avail mechanism type/s provided")
@@ -211,6 +222,7 @@ func (d *Avail) Start() error {
 	case Sequencer, BootstrapSequencer:
 		sequencerWorker, _ := NewSequencer(
 			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
+			d.snapshotter, d.snapshotDistributor,
 			d.availClient, d.availAccount, d.availAppID, d.signKey,
 			d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 			d.blockTime, d.blockProductionIntervalSec,

@@ -87,6 +87,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		case blk = <-availBlockStream.Chan():
 			// Process below.
 
+		// nolint:gosimple
 		case _ = <-sw.snapshotDistributor.Receive():
 			// TODO: Process the state snapshot.
 

@@ -18,12 +18,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server"
 	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
@@ -78,6 +76,9 @@ type Server struct {
 
 	// state executor
 	executor *state.Executor
+
+	// EVM & blockchain state snapshotter
+	snapshotter snapshot.Snapshotter
 
 	// jsonrpc stack
 	jsonrpcServer *jsonrpc.JSONRPC
@@ -212,7 +213,19 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.stateStorage = stateStorage
 
-	st := itrie.NewState(stateStorage)
+	blockchainDBPath := m.config.DataDir
+	if blockchainDBPath != "" {
+		blockchainDBPath = filepath.Join(m.config.DataDir, "blockchain")
+	}
+
+	snapshotter, blockchainStorage, wrappedStateStorage, err := snapshot.NewSnapshotter(logger, stateStorage, blockchainDBPath)
+	if err != nil {
+		return nil, err
+	}
+
+	m.snapshotter = snapshotter
+
+	st := itrie.NewState(wrappedStateStorage)
 	m.state = st
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
@@ -236,27 +249,8 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 	// use the eip155 signer
 	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
 
-	// create storage instance for blockchain
-	var db storage.Storage
-	{
-		if m.config.DataDir == "" {
-			db, err = memory.NewMemoryStorage(nil)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			db, err = leveldb.NewLevelDBStorage(
-				filepath.Join(m.config.DataDir, "blockchain"),
-				m.logger,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(logger, blockchainStorage, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -491,6 +485,7 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	consensusCfg.Network = s.network
 	consensusCfg.TxPool = s.txpool
 	consensusCfg.SecretsManager = s.secretsManager
+	consensusCfg.Snapshotter = s.snapshotter
 
 	consensus, err := avail_consensus.New(consensusCfg)
 	if err != nil {

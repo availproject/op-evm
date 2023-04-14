@@ -3,19 +3,33 @@ package snapshot
 import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/vedhavyas/go-subkey/scale"
 )
 
 type Snapshot struct {
-	blockchainSnapshot BlockchainSnapshot
-	stateSnapshot      StateStorageSnapshot
+	BlockNumber uint64
+	BlockHash   types.Hash
+	StateRoot   types.Hash
+
+	BlockchainSnapshot *BlockchainSnapshot
+	StateSnapshot      *StateStorageSnapshot
+}
+
+func (s *Snapshot) Encode(e scale.Encoder) error {
+	return e.Encode(s)
+}
+
+func (s *Snapshot) Decode(d scale.Decoder) error {
+	return d.Decode(s)
 }
 
 type Snapshotter interface {
 	Begin()
-	End() Snapshot
+	End() *Snapshot
 
-	Apply(Snapshot) error
+	Apply(*Snapshot) error
 }
 
 type snapshotter struct {
@@ -53,20 +67,20 @@ func (s *snapshotter) Begin() {
 	s.blockchainSnapshotter.Begin()
 }
 
-func (s *snapshotter) End() Snapshot {
-	snapshot := Snapshot{
-		blockchainSnapshot: s.blockchainSnapshotter.End(),
-		stateSnapshot:      s.stateSnapshotter.End(),
+func (s *snapshotter) End() *Snapshot {
+	snapshot := &Snapshot{
+		BlockchainSnapshot: s.blockchainSnapshotter.End(),
+		StateSnapshot:      s.stateSnapshotter.End(),
 	}
 
 	return snapshot
 }
 
-func (s *snapshotter) Apply(snapshot Snapshot) error {
-	err := s.blockchainSnapshotter.Apply(snapshot.blockchainSnapshot)
+func (s *snapshotter) Apply(snapshot *Snapshot) error {
+	err := s.blockchainSnapshotter.Apply(snapshot.BlockchainSnapshot)
 	if err != nil {
 		return err
 	}
 
-	return s.stateSnapshotter.Apply(snapshot.stateSnapshot)
+	return s.stateSnapshotter.Apply(snapshot.StateSnapshot)
 }

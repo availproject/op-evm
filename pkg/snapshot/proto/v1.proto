@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/pkg/snapshot/proto";
+
+
+message StateSnapshot {
+    uint64 BlockNumber = 1;
+    bytes BlockHash = 2;
+    bytes StateRoot = 3;
+    
+    KeyValuePairs blockchainSnapshot = 4;
+    KeyValuePairs stateSnapshot = 5;
+}
+
+message KeyValuePairs {
+    repeated bytes Keys = 1;
+    repeated bytes Values = 2;
+}
+
+

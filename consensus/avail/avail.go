@@ -124,6 +124,7 @@ func New(config Config) (consensus.Consensus, error) {
 		closeCh:                    make(chan struct{}),
 		blockchain:                 config.Blockchain,
 		executor:                   config.Executor,
+		snapshotter:                config.Snapshotter,
 		verifier:                   staking.NewVerifier(asq, logger.Named("verifier")),
 		txpool:                     config.TxPool,
 		secretsManager:             config.SecretsManager,
@@ -148,7 +149,7 @@ func New(config Config) (consensus.Consensus, error) {
 			time.Duration(config.BlockTime)*3*time.Second,
 		)
 
-		d.snapshotDistributor, err = snapshot.NewDistributor(d.network)
+		d.snapshotDistributor, err = snapshot.NewDistributor(d.logger, d.network)
 		if err != nil {
 			return nil, err
 		}
@@ -218,6 +219,17 @@ func (d *Avail) Start() error {
 		return err
 	}
 
+	// XXX: This callback takes care of closing syncer after the node has
+	// taked. This should be fixed ASAP. This is structured like this because
+	// currently the sequencer is disconnected from Avail consensus struct, but
+	// the introduction of state snapshot distribution requires it to be
+	// shutdown.
+	afterStaked := func() {
+		// Stop P2P blockchain syncing and follow the blockstream only via Avail.
+		d.syncer.Close()
+		d.syncer = nil
+	}
+
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
 		sequencerWorker, _ := NewSequencer(
@@ -228,12 +240,12 @@ func (d *Avail) Start() error {
 			d.blockTime, d.blockProductionIntervalSec,
 		)
 		go func() {
-			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
+			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}, afterStaked); err != nil {
 				panic(err)
 			}
 		}()
 	case WatchTower:
-		go d.runWatchTower(activeParticipantsQuerier, account, key)
+		go d.runWatchTower(activeParticipantsQuerier, account, key, afterStaked)
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

@@ -10,6 +10,10 @@ ifndef $(GOPATH)
     export GOPATH
 endif
 
+.PHONY: protoc
+protoc:
+	protoc --go_out=. --go-grpc_out=. -I . ./pkg/snapshot/proto/*.proto
+
 install-polygon-edge:
 	go install github.com/0xPolygon/polygon-edge@v0.8.1
 

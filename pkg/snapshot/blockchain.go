@@ -4,24 +4,28 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/vedhavyas/go-subkey/scale"
 )
 
-type BlockchainSnapshot interface {
-	Diff() map[string][]byte
+type BlockchainSnapshot struct {
+	Keys   [][]byte
+	Values [][]byte
 }
 
-type blockchainSnapshot map[string][]byte
+func (bs *BlockchainSnapshot) Encode(e scale.Encoder) error {
+	return e.Encode(bs)
+}
 
-func (bs blockchainSnapshot) Diff() map[string][]byte {
-	return bs
+func (bs *BlockchainSnapshot) Decode(d scale.Decoder) error {
+	return d.Decode(bs)
 }
 
 type BlockchainKVSnapshotter interface {
 	storage.KV
 
 	Begin()
-	End() BlockchainSnapshot
-	Apply(snapshot BlockchainSnapshot) error
+	End() *BlockchainSnapshot
+	Apply(snapshot *BlockchainSnapshot) error
 }
 
 // blockchainKVStorage is the leveldb implementation of the kv storage
@@ -39,22 +43,33 @@ func (bs *blockchainKVStorage) Begin() {
 	bs.changes = make(map[string][]byte)
 }
 
-func (bs *blockchainKVStorage) End() BlockchainSnapshot {
+func (bs *blockchainKVStorage) End() *BlockchainSnapshot {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
 
-	ret := blockchainSnapshot(bs.changes)
+	ret := &BlockchainSnapshot{
+		Keys:   make([][]byte, len(bs.changes)),
+		Values: make([][]byte, len(bs.changes)),
+	}
+
+	i := 0
+	for k, v := range bs.changes {
+		ret.Keys[i] = []byte(k)
+		ret.Values[i] = v
+		i++
+	}
+
 	bs.changes = nil
 
 	return ret
 }
 
-func (bs *blockchainKVStorage) Apply(snapshot BlockchainSnapshot) error {
+func (bs *blockchainKVStorage) Apply(snapshot *BlockchainSnapshot) error {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
 
-	for k, v := range snapshot.Diff() {
-		err := bs.db.Set([]byte(k), v)
+	for i := 0; i < len(snapshot.Keys); i++ {
+		err := bs.db.Set([]byte(snapshot.Keys[i]), snapshot.Values[i])
 		if err != nil {
 			return err
 		}

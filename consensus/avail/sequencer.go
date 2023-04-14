@@ -50,7 +50,7 @@ type SequencerWorker struct {
 	blockProductionIntervalSec uint64
 }
 
-func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
+func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key, afterStaked func()) error {
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
 	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
@@ -66,6 +66,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	// Will wait until contract is updated and there's a staking transaction written
 	sw.waitForStakedSequencer(activeSequencersQuerier, sw.nodeAddr)
+
+	// XXX: This is an ugly workaround before proper fix; This callback closes the `syncer` from Avail consensus.
+	afterStaked()
 
 	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
 	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
@@ -85,11 +88,38 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 		select {
 		case blk = <-availBlockStream.Chan():
-			// Process below.
+			// Processed below in the for-loop's main body.
 
-		// nolint:gosimple
-		case _ = <-sw.snapshotDistributor.Receive():
-			// TODO: Process the state snapshot.
+		case ss := <-sw.snapshotDistributor.Receive():
+			sw.logger.Info("received snapshot from peer", "block_number", ss.BlockNumber)
+
+			// Verify that the snapshot is immediate continuation to current local blockchain.
+			head := sw.blockchain.Header()
+			if head.Number+1 != ss.BlockNumber {
+				sw.logger.Warn("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
+				continue
+			}
+
+			err := sw.snapshotter.Apply(ss)
+			if err != nil {
+				sw.logger.Error("failed to apply state diff snapshot", "error", err)
+			}
+
+			// Refresh the internal HEAD block in `blockchain`.
+			sw.blockchain.ComputeGenesis()
+
+			// refresh head after snapshot application.
+			head = sw.blockchain.Header()
+
+			if head.Number != ss.BlockNumber {
+				sw.logger.Error("blockchain HEAD block number doesn't match snapshot block number", "expected", ss.BlockNumber, "got", head.Number)
+			}
+			if head.Hash != ss.BlockHash {
+				sw.logger.Error("blockchain HEAD block hash doesn't match snapshot block hash", "expected", ss.BlockHash.String(), "got", head.Hash.String())
+			}
+			// TODO: Does StateRoot provide any added security here?
+
+			continue
 
 		case <-sw.closeCh:
 			if err := sw.stakingNode.UnStake(sw.nodeSignKey); err != nil {
@@ -291,6 +321,13 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
+	// Begin snapshot for P2P state distribution.
+	sw.snapshotter.Begin()
+
+	// Ensure that snapshotter is not gathering changes in case an error occurs
+	// during block generation.
+	defer func() { sw.snapshotter.End() }()
+
 	transition, err := sw.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
 	if err != nil {
 		return err
@@ -380,6 +417,18 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	// After the block has been written we reset the txpool to remove stale transactions.
 	sw.txpool.ResetWithHeaders(blk.Header)
+
+	// Gather changes from EVM and blockchain storages.
+	snapshot := sw.snapshotter.End()
+
+	// Augment the snapshot with block metadata.
+	snapshot.BlockNumber = blk.Header.Number
+	snapshot.BlockHash = blk.Header.Hash
+	snapshot.StateRoot = blk.Header.StateRoot
+
+	// Distribute snapshot to other sequencers over P2P.
+	sw.snapshotDistributor.Send(snapshot)
+	sw.logger.Debug("state snapshot sent over P2P")
 
 	return nil
 }

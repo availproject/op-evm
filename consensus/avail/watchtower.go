@@ -14,16 +14,15 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
+func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key, afterStaked func()) {
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
 	// Start watching HEAD from Avail.
 	availBlockStream := d.availClient.BlockStream(0)
 
-	// Stop P2P blockchain syncing and follow the blockstream only via Avail.
-	d.syncer.Close()
-	d.syncer = nil
+	// XXX: This is an ugly workaround before proper fix; This callback closes the `syncer` from Avail consensus.
+	afterStaked()
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {

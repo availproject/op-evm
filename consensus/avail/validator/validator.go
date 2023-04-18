@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
 	"github.com/hashicorp/go-hclog"
@@ -41,16 +40,14 @@ type ValidatorSet []types.Address
 
 type validator struct {
 	blockchain *blockchain.Blockchain
-	executor   *state.Executor
 
 	logger           hclog.Logger
 	sequencerAddress types.Address
 }
 
-func New(blockchain *blockchain.Blockchain, executor *state.Executor, sequencer types.Address, logger hclog.Logger) Validator {
+func New(blockchain *blockchain.Blockchain, sequencer types.Address, logger hclog.Logger) Validator {
 	return &validator{
 		blockchain: blockchain,
-		executor:   executor,
 
 		logger:           logger.Named("validator"),
 		sequencerAddress: sequencer,
@@ -111,7 +108,6 @@ func (v *validator) verifyFinalizedBlock(blk *types.Block) error {
 	}
 
 	return nil
-
 }
 
 // verifyBlock does the base (common) block verification steps by

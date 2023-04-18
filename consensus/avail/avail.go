@@ -133,7 +133,7 @@ func New(config Config) (consensus.Consensus, error) {
 		nodeType:                   MechanismType(config.NodeType),
 		signKey:                    validatorKey,
 		minerAddr:                  validatorAddr,
-		validator:                  validator.New(config.Blockchain, config.Executor, validatorAddr, logger),
+		validator:                  validator.New(config.Blockchain, validatorAddr, logger),
 		blockProductionIntervalSec: DefaultBlockProductionIntervalS,
 
 		availAccount: config.AvailAccount,

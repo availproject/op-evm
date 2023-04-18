@@ -53,7 +53,7 @@ type SequencerWorker struct {
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key, afterStaked func()) error {
 	t := new(atomic.Int64)
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
-	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
+	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
 	enableBlockProductionCh := make(chan bool)

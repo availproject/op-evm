@@ -25,6 +25,8 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+const availBlockWindowLen = 7
+
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
@@ -80,6 +82,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
 
+	isNextSequencer := false
 	for {
 		var blk *avail_types.SignedBlock
 
@@ -183,11 +186,16 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		}
 
 		// Is it my turn to generate next block?
-		if sw.IsNextSequencer(activeSequencersQuerier) {
-			sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
-			enableBlockProductionCh <- true
+		if blk.Block.Header.Number%availBlockWindowLen != 0 {
+			if isNextSequencer {
+				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+				enableBlockProductionCh <- true
+				// Reset back to false so it doesn't reenable block production needlessly
+				isNextSequencer = false
+			}
 			continue
 		} else {
+			isNextSequencer = sw.IsNextSequencer(activeSequencersQuerier)
 			sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
 			enableBlockProductionCh <- false
 		}

@@ -54,8 +54,13 @@ type SequencerWorker struct {
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
-	validator := validator.New(sw.blockchain, sw.executor, sw.nodeAddr, sw.logger)
+	
+	// Return same seed value for the period of  `availWindowLen`.
+	randomSeedFn := func() int64 {
+		return t.Load() / availBlockWindowLen
+	}
+	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
+	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
 	enableBlockProductionCh := make(chan bool)
@@ -82,7 +87,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
 
-	isNextSequencer := false
 	for {
 		var blk *avail_types.SignedBlock
 
@@ -185,18 +189,21 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			continue
 		}
 
-		// Is it my turn to generate next block?
-		if blk.Block.Header.Number%availBlockWindowLen != 0 {
-			if isNextSequencer {
-				sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
+		availBlockNum := blk.Block.Header.Number
+		// Check if this node is the current sequencer.
+		if sw.IsNextSequencer(activeSequencersQuerier) {
+			// When availBlockNum is 0, 1, 2 ... (availBlockWindowLen - 1), enable the block production.
+			if availBlockNum%availBlockWindowLen < availBlockWindowLen-1 {
+				sw.logger.Debug("it's my turn; enable block producing", "t", availBlockNum)
 				enableBlockProductionCh <- true
-				// Reset back to false so it doesn't reenable block production needlessly
-				isNextSequencer = false
+			} else {
+				// This is the last block of `availBlockWindowLen` -> stop block production to allow nodes to synchronize.
+				sw.logger.Debug("it's my turn; last block on availBlockWindowLen. disabling block production", "t", availBlockNum)
+				enableBlockProductionCh <- false
 			}
-			continue
 		} else {
-			isNextSequencer = sw.IsNextSequencer(activeSequencersQuerier)
-			sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+			// Under no circumstances, blocks should be produced when the node is not an active sequencer.
+			sw.logger.Debug("it's not my turn; disable block producing", "t", availBlockNum)
 			enableBlockProductionCh <- false
 		}
 	}

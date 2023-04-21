@@ -25,6 +25,8 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+const availBlockWindowLen = 7
+
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
@@ -52,7 +54,12 @@ type SequencerWorker struct {
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(t.Load, sw.apq)
+	
+	// Return same seed value for the period of  `availWindowLen`.
+	randomSeedFn := func() int64 {
+		return t.Load() / availBlockWindowLen
+	}
+	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
@@ -182,13 +189,21 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			continue
 		}
 
-		// Is it my turn to generate next block?
+		availBlockNum := blk.Block.Header.Number
+		// Check if this node is the current sequencer.
 		if sw.IsNextSequencer(activeSequencersQuerier) {
-			sw.logger.Debug("it's my turn; enable block producing", "t", blk.Block.Header.Number)
-			enableBlockProductionCh <- true
-			continue
+			// When availBlockNum is 0, 1, 2 ... (availBlockWindowLen - 1), enable the block production.
+			if availBlockNum%availBlockWindowLen < availBlockWindowLen-1 {
+				sw.logger.Debug("it's my turn; enable block producing", "t", availBlockNum)
+				enableBlockProductionCh <- true
+			} else {
+				// This is the last block of `availBlockWindowLen` -> stop block production to allow nodes to synchronize.
+				sw.logger.Debug("it's my turn; last block on availBlockWindowLen. disabling block production", "t", availBlockNum)
+				enableBlockProductionCh <- false
+			}
 		} else {
-			sw.logger.Debug("it's not my turn; disable block producing", "t", blk.Block.Header.Number)
+			// Under no circumstances, blocks should be produced when the node is not an active sequencer.
+			sw.logger.Debug("it's not my turn; disable block producing", "t", availBlockNum)
 			enableBlockProductionCh <- false
 		}
 	}

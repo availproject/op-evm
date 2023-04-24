@@ -131,7 +131,7 @@ func New(config Config) (consensus.Consensus, error) {
 		nodeType:                   MechanismType(config.NodeType),
 		signKey:                    signKey,
 		minerAddr:                  minerAddr,
-		validator:                  validator.New(config.Blockchain, config.Executor, minerAddr, logger),
+		validator:                  validator.New(config.Blockchain, minerAddr, logger),
 		blockProductionIntervalSec: DefaultBlockProductionIntervalS,
 		availAccount:               config.AvailAccount,
 		availClient:                config.AvailClient,

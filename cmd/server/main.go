@@ -53,6 +53,8 @@ func main() {
 		log.Fatalf("failed to get AppID from Avail: %s\n", err)
 	}
 
+	//panic(appID.Int64())
+
 	availSender := avail.NewSender(availClient, appID, availAccount)
 
 	// Attach the consensus to the server
@@ -62,6 +64,7 @@ func main() {
 		AvailSender:  availSender,
 		Bootnode:     bootnode,
 		NodeType:     config.NodeType,
+		AvailAppID:   appID,
 	}
 
 	serverInstance, err := server.NewServer(config.Config, cfg)

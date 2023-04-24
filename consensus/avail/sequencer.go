@@ -48,6 +48,7 @@ type SequencerWorker struct {
 	closeCh                    chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
+	currentNodeSyncIndex       uint64
 }
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
@@ -64,9 +65,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		return fmt.Errorf("failed to discover avail call index: %s", err)
 	}
 
-	// Will wait until contract is updated and there's a staking transaction written
-	sw.waitForStakedSequencer(activeSequencersQuerier, sw.nodeAddr)
-
 	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
 	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
 
@@ -75,7 +73,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
-	availBlockStream := sw.availClient.BlockStream(0)
+	availBlockStream := sw.availClient.BlockStream(sw.currentNodeSyncIndex)
 	defer availBlockStream.Close()
 
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
@@ -155,6 +153,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				}
 			}
 		}
+
+		sw.logger.Warn("Current header", "number", sw.blockchain.Header().Number)
 
 		// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
 		fraudResolver.CheckAndSetFraudBlock(edgeBlks)
@@ -429,7 +429,7 @@ func NewSequencer(
 	availClient avail.Client, availAccount signature.KeyringPair, availAppID avail_types.UCompact,
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
 	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
-	blockTime time.Duration, blockProductionIntervalSec uint64,
+	blockTime time.Duration, blockProductionIntervalSec uint64, currentNodeSyncIndex uint64,
 ) (*SequencerWorker, error) {
 	return &SequencerWorker{
 		logger:                     logger,
@@ -449,5 +449,6 @@ func NewSequencer(
 		availSender:                availSender,
 		blockTime:                  blockTime,
 		blockProductionIntervalSec: blockProductionIntervalSec,
+		currentNodeSyncIndex:       currentNodeSyncIndex,
 	}, nil
 }

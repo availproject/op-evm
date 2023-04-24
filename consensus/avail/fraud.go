@@ -127,13 +127,13 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 
 			isWatchtower, err := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
 			if err != nil {
-				f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
+				//f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
 				continue
 			}
 
 			isBeginDisputeResolutionTx, err := staking.IsBeginDisputeResolutionTx(tx)
 			if err != nil {
-				f.logger.Debug("failure while checking if tx is type of begin dispute resolution", "error", err)
+				//f.logger.Debug("failure while checking if tx is type of begin dispute resolution", "error", err)
 				continue
 			}
 

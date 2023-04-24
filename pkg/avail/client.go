@@ -15,7 +15,7 @@ type Client interface {
 	// BlockStream creates a new Avail block stream, starting from block height
 	// `offset`.
 	BlockStream(offset uint64) BlockStream
-
+	SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBlock, error)
 	GenesisHash() types.Hash
 }
 

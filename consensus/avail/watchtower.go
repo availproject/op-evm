@@ -21,10 +21,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 	// Start watching HEAD from Avail.
 	availBlockStream := d.availClient.BlockStream(0)
 
-	// Stop P2P blockchain syncing and follow the blockstream only via Avail.
-	d.syncer.Close()
-	d.syncer = nil
-
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
 		panic(err)
@@ -44,8 +40,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 			continue
 		}
 
-		// Stop P2P blockchain syncing and follow the blockstream only via Avail.
-		d.syncer.Close()
 		break
 	}
 

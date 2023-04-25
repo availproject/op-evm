@@ -55,7 +55,7 @@ type SequencerWorker struct {
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	
+
 	// Return same seed value for the period of  `availWindowLen`.
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
@@ -151,6 +151,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"error", err,
 						)
 					}
+					//panic(fmt.Sprintf("Abc: %v", edgeBlk.Header.Number))
 				} else {
 					sw.logger.Warn(
 						"failed to validate edge block received from avail",

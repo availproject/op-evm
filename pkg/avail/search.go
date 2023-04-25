@@ -7,11 +7,11 @@ import (
 )
 
 // SearchFunc is an interface to function that determines seek offset based on current Avail block.
-type SearchFunc func(*types.SignedBlock, types.CallIndex) (int, error)
+type SearchFunc func(*types.SignedBlock, uint64, types.CallIndex) (int, bool, error)
 
 // SearchBlock
-// -
-func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBlock, error) {
+// What we really need is to figure out in which
+func (c *client) SearchBlock(offset int, targetEdgeBlock uint64, searchFunc SearchFunc) (*types.SignedBlock, error) {
 	meta, err := c.instance().RPC.State.GetMetadataLatest()
 	if err != nil {
 		return nil, err
@@ -34,7 +34,6 @@ func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBl
 
 	blkHash, err := c.api.RPC.Chain.GetBlockHash(uint64(offset))
 	if err != nil {
-		fmt.Print("HERE ERROR GBH")
 		return nil, err
 	}
 
@@ -43,12 +42,12 @@ func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBl
 		return nil, err
 	}
 
-	fmt.Printf("GOT BLOCK %+v \n", blk)
-
-	offset, err = searchFunc(blk, callIdx)
+	offset, _, err = searchFunc(blk, targetEdgeBlock, callIdx)
 	if err != nil {
 		return nil, err
 	}
+
+	var found bool
 
 	for {
 		if offset == 0 {
@@ -63,7 +62,6 @@ func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBl
 
 		blkHash, err := c.api.RPC.Chain.GetBlockHash(uint64(blk.Block.Header.Number) + uint64(offset))
 		if err != nil {
-			fmt.Print("HERE ERROR GBH L \n")
 			return nil, err
 		}
 
@@ -72,11 +70,13 @@ func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBl
 			return nil, err
 		}
 
-		fmt.Printf("Offset: %d \n", blk.Block.Header.Number)
-
-		offset, err = searchFunc(blk, callIdx)
+		offset, found, err = searchFunc(blk, targetEdgeBlock, callIdx)
 		if err != nil {
 			return nil, err
+		}
+
+		if found {
+			return blk, nil
 		}
 	}
 

@@ -8,33 +8,38 @@ import (
 func (d *Avail) syncNode() uint64 {
 	head := d.blockchain.Header()
 
+	//panic(fmt.Sprintf("Block number: %d", head.Number))
+
 	/// We have new blockchain. Allow syncing from last to 1st block
 	if head.Number == 0 {
 		return 1
 	}
 
-	_, err := d.availClient.SearchBlock(0, d.syncFunc)
+	blk, err := d.availClient.SearchBlock(0, head.Number, d.syncFunc)
 	if err != nil {
 		d.logger.Error("failure to sync node", "error", err)
 		return 0
 	}
-
-	return 0
+	//panic(fmt.Sprintf("Block number: %d", uint64(blk.Block.Header.Number)))
+	return uint64(blk.Block.Header.Number)
 }
 
-func (d *Avail) syncFunc(availBlk *avail_types.SignedBlock, callIdx avail_types.CallIndex) (int, error) {
-	head := d.blockchain.Header()
-
+// Searches for the edge block in the Avail and returns back avail block for future catch up by the node
+func (d *Avail) syncFunc(availBlk *avail_types.SignedBlock, targetEdgeBlock uint64, callIdx avail_types.CallIndex) (int, bool, error) {
 	blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
 	if err != nil && err != block.ErrNoExtrinsicFound {
-		return -1, err
+		return -1, false, err
 	}
 
 	if blks == nil || len(blks) < 1 {
-		return -1, nil
+		return -1, false, nil
 	}
 
-	offset := blks[0].Number() - head.Number
-	//fmt.Printf("SEARCH OFFSET: %d\n", offset)
-	return -1 * int(offset), nil
+	for _, blk := range blks {
+		if blk.Header.Number == targetEdgeBlock {
+			return int(availBlk.Block.Header.Number), true, nil
+		}
+	}
+
+	return -1, false, nil
 }

@@ -71,7 +71,7 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 			}
 
 			if staked {
-				d.logger.Debug("Node is successfully staked... Rechecking in few seconds for potential changes...")
+				d.logger.Info("Node is successfully staked... Rechecking in few seconds for potential changes...")
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -81,9 +81,15 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 				// Staking smart contract does not support `BootstrapSequencer` MachineType.
 				returnErr = d.stakeParticipant(false, Sequencer.String())
 			case Sequencer:
-				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+				staked, returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+				if staked {
+					return
+				}
 			case WatchTower:
-				returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+				staked, returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+				if staked {
+					return
+				}
 			}
 		}
 	}()
@@ -154,7 +160,7 @@ func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 	return nil
 }
 
-func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) error {
+func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) (bool, error) {
 	// We need to have at least one node available to be able successfully push tx to the neighborhood peers
 	for {
 		if d.network == nil || d.network.GetBootnodeConnCount() > 0 {
@@ -165,16 +171,21 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		continue
 	}
 
+	// Apparently, we still need to wait a bit more time than boot node count to be able
+	// process staking. If there's only bootstrap sequencer and one sequencer without this sleep
+	// txpool tx will be added but bootstrap sequencer won't receive it.
+	time.Sleep(5 * time.Second)
+
 	stakeAmount := big.NewInt(0).Mul(big.NewInt(10), common.ETH)
 	tx, err := staking.StakeTx(d.minerAddr, stakeAmount, d.nodeType.String(), 1_000_000)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	txSigner := &crypto.FrontierSigner{}
 	tx, err = txSigner.SignTx(tx, d.signKey)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	for retries := 0; retries < 10; retries++ {
@@ -190,7 +201,7 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 	}
 
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Syncer will be syncing the blockchain in the background, so once an active
@@ -201,11 +212,11 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		d.logger.Info("Submitted transaction, waiting for staking contract update...")
 		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
 		if err != nil {
-			return err
+			return false, err
 		}
 		// Wait a bit before checking again.
 		time.Sleep(3 * time.Second)
 	}
 
-	return nil
+	return true, nil
 }

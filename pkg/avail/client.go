@@ -17,6 +17,7 @@ type Client interface {
 	BlockStream(offset uint64) BlockStream
 	SearchBlock(offset int, targetEdgeBlock uint64, searchFunc SearchFunc) (*types.SignedBlock, error)
 	GenesisHash() types.Hash
+	GetLatestHeader() (*types.Header, error)
 }
 
 type client struct {
@@ -62,6 +63,10 @@ func (c *client) BlockStream(offset uint64) BlockStream {
 
 func (c *client) GenesisHash() types.Hash {
 	return c.genesisHash
+}
+
+func (c *client) GetLatestHeader() (*types.Header, error) {
+	return c.api.RPC.Chain.GetHeaderLatest()
 }
 
 func FindCallIndex(client Client) (types.CallIndex, error) {

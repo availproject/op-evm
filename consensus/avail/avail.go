@@ -203,7 +203,11 @@ func (d *Avail) Start() error {
 	d.txpool.SetSealing(true)
 
 	// Start P2P syncing.
-	d.currentNodeSyncIndex = d.syncNode()
+	var err error
+	d.currentNodeSyncIndex, err = d.syncNode()
+	if err != nil {
+		return err
+	}
 
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {

@@ -181,6 +181,7 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		// Submit staking transaction for execution by active sequencer.
 		err = d.txpool.AddTx(tx)
 		if err != nil {
+			d.logger.Error("Failure to add staking tx to the txpool err: %s", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -197,6 +198,7 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 	// effective and visible to us as well, via blockchain.
 	var staked bool
 	for !staked {
+		d.logger.Info("Submitted transaction, waiting for staking contract update...")
 		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
 		if err != nil {
 			return err

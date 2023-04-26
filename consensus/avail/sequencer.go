@@ -60,6 +60,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
 	}
+
 	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)

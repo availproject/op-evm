@@ -72,8 +72,7 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 
 			if staked {
 				d.logger.Info("Node is successfully staked... Rechecking in few seconds for potential changes...")
-				time.Sleep(3 * time.Second)
-				continue
+				return
 			}
 
 			switch MechanismType(d.nodeType) {

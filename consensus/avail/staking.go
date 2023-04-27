@@ -7,32 +7,12 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/types"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
-
-func (sw *SequencerWorker) waitForStakedSequencer(activeParticipantsQuerier staking.ActiveSequencers, nodeAddr types.Address) bool {
-	for {
-		sequencerStaked, sequencerError := activeParticipantsQuerier.Contains(nodeAddr)
-		if sequencerError != nil {
-			sw.logger.Error("failed to check if my account is among active staked sequencers. Retrying in few seconds...", "error", sequencerError)
-			time.Sleep(3 * time.Second)
-			continue
-		}
-
-		if !sequencerStaked {
-			sw.logger.Warn("my account is not among active staked sequencers. Retrying in few seconds...", "address", nodeAddr.String())
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		break
-	}
-	return true
-}
 
 func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType

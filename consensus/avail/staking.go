@@ -3,7 +3,6 @@ package avail
 import (
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -14,7 +13,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staking.ActiveParticipants) error {
+func (d *Avail) ensureStaked(activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType
 
 	switch d.nodeType {
@@ -32,26 +31,26 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		for {
 			inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
 			if err != nil {
-				d.logger.Error("Failed to check if participant is currently in probation... Rechecking again in few seconds...", "error", err)
+				d.logger.Error("Failed to check if participant is currently in probation... Rechecking again in few seconds...", "error", err, "node_type", d.nodeType)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			if inProbation {
-				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking again in few seconds...", "error", err)
+				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking again in few seconds...", "error", err, "node_type", d.nodeType)
 				time.Sleep(5 * time.Second)
 				continue
 			}
 
 			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
 			if err != nil {
-				d.logger.Error("Failed to check if participant exists... Rechecking again in few seconds...", "error", err)
+				d.logger.Error("Failed to check if participant exists... Rechecking again in few seconds...", "error", err, "node_type", d.nodeType)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 
 			if staked {
-				d.logger.Info("Node is successfully staked... Rechecking in few seconds for potential changes...")
+				d.logger.Info("Node is successfully staked... Rechecking in few seconds for potential changes...", "node_type", d.nodeType)
 				return
 			}
 
@@ -73,6 +72,8 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		}
 	}()
 
+	// TODO: XXX: This error gets value from asynchronous goroutine. This
+	// structure here is wrong. The error will be never handled.
 	return returnErr
 }
 

@@ -160,6 +160,8 @@ func New(config Config) (consensus.Consensus, error) {
 		d.nodeType = BootstrapSequencer
 	}
 
+	fmt.Printf("==================================================================\nnodeType: %q\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n", d.nodeType)
+
 	rawInterval, ok := config.Config.Config["interval"]
 	if ok {
 		interval, ok := rawInterval.(uint64)
@@ -210,7 +212,7 @@ func (d *Avail) Start() error {
 	}
 
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
-	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+	if err := d.ensureStaked(activeParticipantsQuerier); err != nil {
 		return err
 	}
 

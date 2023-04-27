@@ -7,30 +7,34 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
-func (d *Avail) getNextAvailBlockNumber() uint64 {
+func (d *Avail) getAvailBlockstreamOffset() (uint64, error) {
 	head := d.blockchain.Header()
 
 	/// We have new blockchain. Allow syncing from last to 1st block
 	if head.Number == 0 {
-		return 1
+		return 1, nil
 	}
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 
-	blk, err := d.availClient.SearchBlock(0, d.syncFunc(head.Number, callIdx))
+	blk, err := d.availClient.SearchBlock(0, d.syncFunc(int64(head.Number), callIdx))
 	if err != nil {
 		d.logger.Error("failure to sync node", "error", err)
-		return 0
+		return 0, err
 	}
 
-	return uint64(blk.Block.Header.Number)
+	return uint64(blk.Block.Header.Number), nil
 }
 
 func (d *Avail) syncNode() (uint64, error) {
-	availNextBlockNumber := d.getNextAvailBlockNumber()
+	availNextBlockNumber, err := d.getAvailBlockstreamOffset()
+	if err != nil {
+		d.logger.Error("failed to search for Avail offset to catch up the blockchain", "error", err)
+		return 0, err
+	}
 
 	hdr, err := d.availClient.GetLatestHeader()
 	if err != nil {
@@ -112,8 +116,8 @@ func (d *Avail) syncNode() (uint64, error) {
 }
 
 // Searches for the edge block in the Avail and returns back avail block for future catch up by the node
-func (d *Avail) syncFunc(targetEdgeBlock uint64, callIdx avail_types.CallIndex) avail.SearchFunc {
-	return func(availBlk *avail_types.SignedBlock) (int, bool, error) {
+func (d *Avail) syncFunc(targetEdgeBlock int64, callIdx avail_types.CallIndex) avail.SearchFunc {
+	return func(availBlk *avail_types.SignedBlock) (int64, bool, error) {
 		blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
 		if err != nil && err != block.ErrNoExtrinsicFound {
 			return -1, false, err
@@ -123,12 +127,37 @@ func (d *Avail) syncFunc(targetEdgeBlock uint64, callIdx avail_types.CallIndex) 
 			return -1, false, nil
 		}
 
+		availBlockNum := int64(availBlk.Block.Header.Number)
+
+		offsets := []int64{}
 		for _, blk := range blks {
-			if blk.Header.Number == targetEdgeBlock {
-				return int(availBlk.Block.Header.Number), true, nil
+			edgeBlockNum := int64(blk.Header.Number)
+
+			switch {
+			case edgeBlockNum > targetEdgeBlock:
+				offsets = append(offsets, availBlockNum-(edgeBlockNum-targetEdgeBlock))
+			case edgeBlockNum == targetEdgeBlock:
+				return int64(availBlk.Block.Header.Number), true, nil
+			case edgeBlockNum < targetEdgeBlock:
+				offsets = append(offsets, availBlockNum+(targetEdgeBlock-edgeBlockNum))
 			}
 		}
 
-		return -1, false, nil
+		smallest := offsets[0]
+		for i := 1; i < len(offsets); i++ {
+			if abs(smallest) > abs(offsets[i]) {
+				smallest = offsets[i]
+			}
+		}
+
+		return smallest, false, nil
+	}
+}
+
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	} else {
+		return x
 	}
 }

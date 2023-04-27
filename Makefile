@@ -1,4 +1,4 @@
-POLYGON_EDGE_BIN=.$(pwd)/third_party/polygon-edge/polygon-edge
+POLYGON_EDGE_BIN=polygon-edge
 POLYGON_EDGE_DATA_DIR=$(pwd)/data
 POLYGON_EDGE_CONFIGS_DIR=$(shell pwd)/configs
 STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
@@ -24,9 +24,9 @@ bootstrap-config:
 	sed -i 's/data_dir: ""/data_dir: ".\/data\/avail-chain-1"/g' configs/edge-config.yaml
 
 bootstrap-secrets:
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-bootnode-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-2
+	$(POLYGON_EDGE_BIN) secrets init --insecure --data-dir ./data/avail-bootnode-1
+	$(POLYGON_EDGE_BIN) secrets init --insecure --data-dir ./data/avail-node-1
+	$(POLYGON_EDGE_BIN) secrets init --insecure --data-dir ./data/avail-node-2
 
 bootstrap-genesis:
 	rm $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json || true

@@ -51,6 +51,13 @@ type SequencerWorker struct {
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
 	currentNodeSyncIndex       uint64
+
+	// availBlockNumWhenStaked is a used to fence the sequencing logic until
+	// this node is staked and there is a start of a fresh new Avail block window.
+	// Point type is used intentionally. `nil` means that this node has not staked
+	// yet or it's not visible in the blockchain yet. The value gets set when the
+	// staking is visible and it must not be modified afterwards.
+	availBlockNumWhenStaked *int64
 }
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
@@ -61,7 +68,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		return t.Load() / availBlockWindowLen
 	}
 
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
+	activeSequencersQuerier := staking.NewCachingRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
@@ -85,6 +92,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	defer availBlockStream.Close()
 
 	sw.logger.Info("Block stream successfully started.", "node_type", sw.nodeType)
+	sw.logger.Info("Starting sequencer", "node_type", sw.nodeType)
 
 	for {
 		var blk *avail_types.SignedBlock
@@ -114,11 +122,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		// What we are interested, prior to fraud resolver, if block is containing fraud check request.
 		edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
 		if len(edgeBlks) == 0 && err != nil {
-			sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
 			// It is expected that not all Avail blocks contain a SL block. On any other error,
 			// log the error and wait for a next one.
 			if err != block.ErrNoExtrinsicFound {
-				sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
+				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
 				continue
 			}
 		}
@@ -152,7 +159,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"error", err,
 						)
 					}
-					//panic(fmt.Sprintf("Abc: %v", edgeBlk.Header.Number))
 				} else {
 					sw.logger.Warn(
 						"failed to validate edge block received from avail",
@@ -181,6 +187,23 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		if !sequencerStaked {
 			sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
 			continue
+		} else {
+			if sw.availBlockNumWhenStaked == nil {
+				sw.availBlockNumWhenStaked = new(int64)
+				*sw.availBlockNumWhenStaked = t.Load()
+			}
+
+			// Only proceed with the sequencing logic after the "join window" changes to
+			// next one. This logic is needed because on a new node, that joins in the
+			// middle of the Avail block window, the ActiveSequencer cache is not
+			// consistent with the other nodes in the network. When all the nodes renew
+			// their active sequencer list on a start of the new block window, they gain
+			// coherent view into who is the next "leader" (i.e. the active sequencer
+			// allowed to produce a block).
+			if (*sw.availBlockNumWhenStaked / availBlockWindowLen) == (t.Load() / availBlockWindowLen) {
+				sw.logger.Error("sequencer account staked, but waiting for a fresh Avail block window after joining the network")
+				continue
+			}
 		}
 
 		// Will check the block for fraudlent behaviour and slash parties accordingly.

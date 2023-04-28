@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -29,9 +30,10 @@ var accountPath = flag.String("account-config-file", "../configs/account", "Path
 var awsInstancesFlag = flag.String("aws-instances", "", "file containing all the information about the aws instances deployed as json, if provided will be used to connect instead of spawning up own instances")
 
 func Test_MultipleSequencers(t *testing.T) {
-	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
+	// t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
+	runtime.GOMAXPROCS(32)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -48,7 +50,8 @@ func Test_MultipleSequencers(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx, err = StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		// ctx, err = StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		ctx, err = StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer) //, avail.Sequencer, avail.Sequencer)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,7 +72,7 @@ func Test_MultipleSequencers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	waitForPeers(t, ethClient, 3)
+	waitForPeers(t, ethClient, 1)
 
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -82,7 +85,7 @@ func Test_MultipleSequencers(t *testing.T) {
 		cancel()
 
 		// Wait for 5 blocks
-		if bNum > 4 {
+		if bNum > 49 {
 			break
 		}
 

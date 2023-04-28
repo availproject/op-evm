@@ -277,6 +277,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType 
 	consensusCfg := consensus.Config{
 		Bootnode:        bootnode,
 		AvailAccount:    availAccount,
+		AvailAppID:      appID,
 		AvailClient:     availClient,
 		AvailSender:     availSender,
 		AccountFilePath: accountPath,

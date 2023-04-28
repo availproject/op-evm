@@ -99,6 +99,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 		select {
 		case blk = <-availBlockStream.Chan():
+			sw.logger.Info("=={[ received block from avail ]}", "block_number", blk.Block.Header.Number)
 			// Process below.
 
 		// nolint:gosimple
@@ -120,6 +121,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		// So this is the situation...
 		// Here we are not looking for if current node should be producing or not producing the block.
 		// What we are interested, prior to fraud resolver, if block is containing fraud check request.
+		sw.logger.Info("=={[ extracting Edge blocks from Avail block ]}", "block_number", blk.Block.Header.Number, "availAppID", sw.availAppID, "callIdx", callIdx)
 		edgeBlks, err := block.FromAvail(blk, sw.availAppID, callIdx, sw.logger)
 		if len(edgeBlks) == 0 && err != nil {
 			// It is expected that not all Avail blocks contain a SL block. On any other error,
@@ -128,6 +130,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
 				continue
 			}
+
+			sw.logger.Info("=={[ received block DID NOT contain any Edge blocks ]}", "block_number", blk.Block.Header.Number)
+		} else {
+			sw.logger.Info("=={[ received block HAD Edge blocks ]}", "block_number", blk.Block.Header.Number)
 		}
 
 		// Write down blocks received from avail to make sure we're synced before processing with the
@@ -158,6 +164,9 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"edge_block_hash", edgeBlk.Hash(),
 							"error", err,
 						)
+					} else {
+						sw.txpool.ResetWithHeaders(edgeBlk.Header)
+						sw.logger.Info("=={[ wrote edge block to blockchain ]}", "block_number", blk.Block.Header.Number, "edge_block_number", edgeBlk.Header.Number)
 					}
 				} else {
 					sw.logger.Warn(
@@ -166,6 +175,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						"error", err,
 					)
 				}
+			} else {
+				sw.logger.Info("=={[ fraudResolver thinks that this edge block is a Fraud Proof block ]}", "block_number", blk.Block.Header.Number, "edge_block_number", edgeBlk.Header.Number)
 			}
 		}
 
@@ -191,6 +202,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			if sw.availBlockNumWhenStaked == nil {
 				sw.availBlockNumWhenStaked = new(int64)
 				*sw.availBlockNumWhenStaked = t.Load()
+				sw.logger.Info("=={[ staking observed in block chain; storing avail block number ]}", "block_number", blk.Block.Header.Number)
 			}
 
 			// Only proceed with the sequencing logic after the "join window" changes to
@@ -203,6 +215,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			if (*sw.availBlockNumWhenStaked / availBlockWindowLen) == (t.Load() / availBlockWindowLen) {
 				sw.logger.Error("sequencer account staked, but waiting for a fresh Avail block window after joining the network")
 				continue
+			} else {
+				sw.logger.Info("=={[ past the point of ramp ump window ]}", "block_number", blk.Block.Header.Number)
 			}
 		}
 
@@ -211,6 +225,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		// If we do not stop the network from processing, blocks will continue to be built from other sequencers
 		// resulting in block number missmatches and fraud will potentially be corrupted.
 		if _, err := fraudResolver.CheckAndSlash(); err != nil {
+			sw.logger.Info("=={[ error while fraudResolver performs CheckAndSlash() ]}", "block_number", blk.Block.Header.Number, "error", err)
 			continue
 		}
 

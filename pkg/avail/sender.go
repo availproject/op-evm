@@ -138,6 +138,7 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 		return err
 	}
 
+	fmt.Printf("=={[ sending block to Avail; AppID: %d ]}\n", s.appID.Int64())
 	sub, err := api.RPC.Author.SubmitAndWatchExtrinsic(ext)
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package avail
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -26,54 +27,47 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		return fmt.Errorf("unknown node type: %q", d.nodeType)
 	}
 
-	var returnErr error
+	inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
+	if err != nil {
+		d.logger.Error("Failed to check if participant is currently in probation", "error", err)
+		return err
+	}
 
-	go func() {
-		for {
-			inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
-			if err != nil {
-				d.logger.Error("Failed to check if participant is currently in probation... Rechecking again in few seconds...", "error", err)
-				time.Sleep(3 * time.Second)
-				continue
-			}
+	if inProbation {
+		d.logger.Warn("Participant (node/miner) is currently in probation.", "error", err)
+		return errors.New("participant is under probation")
+	}
 
-			if inProbation {
-				d.logger.Warn("Participant (node/miner) is currently in probation.... Rechecking again in few seconds...", "error", err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
+	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
+	if err != nil {
+		d.logger.Error("Failed to check if participant exists...", "error", err)
+		return err
+	}
 
-			staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
-			if err != nil {
-				d.logger.Error("Failed to check if participant exists... Rechecking again in few seconds...", "error", err)
-				time.Sleep(3 * time.Second)
-				continue
-			}
+	if staked {
+		d.logger.Info("Node is successfully staked...")
+		return nil
+	}
 
-			if staked {
-				d.logger.Info("Node is successfully staked... Rechecking in few seconds for potential changes...")
-				return
-			}
-
-			switch MechanismType(d.nodeType) {
-			case BootstrapSequencer:
-				// Staking smart contract does not support `BootstrapSequencer` MachineType.
-				returnErr = d.stakeParticipant(false, Sequencer.String())
-			case Sequencer:
-				staked, returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
-				if staked {
-					return
-				}
-			case WatchTower:
-				staked, returnErr = d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
-				if staked {
-					return
-				}
-			}
+	switch MechanismType(d.nodeType) {
+	case BootstrapSequencer:
+		// Staking smart contract does not support `BootstrapSequencer` MachineType.
+		if returnErr := d.stakeParticipant(false, Sequencer.String()); returnErr != nil {
+			return returnErr
 		}
-	}()
+	case Sequencer, WatchTower:
+		staked, returnErr := d.stakeParticipantThroughTxPool(activeParticipantsQuerier)
+		if returnErr != nil {
+			return returnErr
+		}
 
-	return returnErr
+		if staked {
+			return nil
+		}
+	}
+
+	d.logger.Info("I am here...")
+	return nil
 }
 
 func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
@@ -168,14 +162,14 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 	}
 
 	for retries := 0; retries < 10; retries++ {
+		d.logger.Info("Submitting stake to the tx pool", "retry", retries)
 		// Submit staking transaction for execution by active sequencer.
-		err = d.txpool.AddTx(tx)
-		if err != nil {
+		if err := d.txpool.AddTx(tx); err != nil {
 			d.logger.Error("Failure to add staking tx to the txpool err: %s", err)
-			time.Sleep(2 * time.Second)
+			time.Sleep(1 * time.Second)
 			continue
 		}
-
+		d.logger.Info("Stake submitted to the tx pool", "retry", retries)
 		break
 	}
 
@@ -183,19 +177,25 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		return false, err
 	}
 
+	// NOTE: In order to enable it here we'd need to make sure initial syncer does not stop
+	// looking for new blocks until stake tx is found.
+
 	// Syncer will be syncing the blockchain in the background, so once an active
 	// sequencer picks up the staking transaction from the txpool, it becomes
 	// effective and visible to us as well, via blockchain.
-	var staked bool
-	for !staked {
-		d.logger.Info("Submitted transaction, waiting for staking contract update...")
-		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
-		if err != nil {
-			return false, err
-		}
-		// Wait a bit before checking again.
-		time.Sleep(3 * time.Second)
-	}
+	/* 	var staked bool
+	   	for !staked {
+	   		d.logger.Info("Submitted transaction, waiting for staking contract update...")
+	   		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
+	   		if err != nil {
+	   			return false, err
+	   		}
+	   		// Wait a bit before checking again.
+	   		time.Sleep(3 * time.Second)
+	   	}
+	*/
 
+	// Assume staked if it's sent as we're going to wait for main sequencer loop to
+	// do the synchronization...
 	return true, nil
 }

@@ -202,6 +202,9 @@ func (d *Avail) Start() error {
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
 
+	// Start the txpool!
+	d.txpool.Start()
+
 	// Start P2P syncing.
 	var err error
 	d.currentNodeSyncIndex, err = d.syncNode()

@@ -216,7 +216,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 				sw.logger.Error("sequencer account staked, but waiting for a fresh Avail block window after joining the network")
 				continue
 			} else {
-				sw.logger.Info("=={[ past the point of ramp ump window ]}", "block_number", blk.Block.Header.Number)
+				sw.logger.Info("=={[ past the point of ramp up window ]}", "block_number", blk.Block.Header.Number)
 			}
 		}
 

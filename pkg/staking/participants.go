@@ -23,12 +23,15 @@ func (dasq *DumbActiveParticipants) Get(nodeType NodeType) ([]types.Address, err
 func (dasq *DumbActiveParticipants) Contains(_ types.Address, nodeType NodeType) (bool, error) {
 	return true, nil
 }
+
 func (dasq *DumbActiveParticipants) GetBalance(_ types.Address) (*big.Int, error) {
 	return nil, nil
 }
+
 func (dasq *DumbActiveParticipants) GetTotalStakedAmount() (*big.Int, error) {
 	return nil, nil
 }
+
 func (dasq *DumbActiveParticipants) InProbation(_ types.Address) (bool, error) {
 	return true, nil
 }
@@ -112,11 +115,7 @@ func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType Node
 		}
 	}
 
-	asq.logger.Debug("Staking contract address discovery information", strings.ToLower(string(nodeType)), addrs)
-	asq.logger.Debug(fmt.Sprintf("Stake not discovered for '%s'. Need to stake the %s.", addr, strings.ToLower(string(nodeType))))
-
 	return false, nil
-
 }
 
 func (asq *activeParticipantsQuerier) InProbation(address types.Address) (bool, error) {
@@ -237,7 +236,6 @@ func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address)
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +312,6 @@ func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) (
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +339,6 @@ func QuerySequencersInProbation(t *state.Transition, gasLimit uint64, from types
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +366,6 @@ func QueryWatchtower(t *state.Transition, gasLimit uint64, from types.Address) (
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +428,6 @@ func QueryParticipantBalance(t *state.Transition, gasLimit uint64, from types.Ad
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +455,6 @@ func QueryParticipantTotalStakedAmount(t *state.Transition, gasLimit uint64, fro
 		Gas:      gasLimit,
 		Nonce:    t.GetNonce(from),
 	})
-
 	if err != nil {
 		return nil, err
 	}

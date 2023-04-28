@@ -66,7 +66,6 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 		}
 	}
 
-	d.logger.Info("I am here...")
 	return nil
 }
 

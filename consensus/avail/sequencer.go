@@ -229,6 +229,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			continue
 		}
 
+		sw.logger.Info("=={[ about to check my sequencer status ]}", "random_seed", randomSeedFn())
+
 		availBlockNum := blk.Block.Header.Number
 		// Check if this node is the current sequencer.
 		if sw.IsNextSequencer(activeSequencersQuerier) {

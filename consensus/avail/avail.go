@@ -160,8 +160,6 @@ func New(config Config) (consensus.Consensus, error) {
 		d.nodeType = BootstrapSequencer
 	}
 
-	fmt.Printf("==================================================================\nnodeType: %q\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n", d.nodeType)
-
 	rawInterval, ok := config.Config.Config["interval"]
 	if ok {
 		interval, ok := rawInterval.(uint64)

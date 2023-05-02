@@ -43,7 +43,10 @@ func (c *cachingRandomizedActiveSequencersQuerier) Contains(addr types.Address) 
 
 	if c.lastSequencers == nil || c.lastSeed != seed {
 		// Refresh cache.
-		c.Get()
+		_, err := c.Get()
+		if err != nil {
+			return false, err
+		}
 	}
 
 	for _, s := range c.lastSequencers {

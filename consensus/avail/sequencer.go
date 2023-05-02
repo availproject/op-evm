@@ -54,7 +54,7 @@ type SequencerWorker struct {
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	
+
 	// Return same seed value for the period of  `availWindowLen`.
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
@@ -152,6 +152,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"edge_block_hash", edgeBlk.Hash(),
 							"error", err,
 						)
+					} else {
+						// Clear out the executed transactions from the TxPool after the block
+						// has been written.
+						sw.txpool.ResetWithHeaders(edgeBlk.Header)
 					}
 				} else {
 					sw.logger.Warn(

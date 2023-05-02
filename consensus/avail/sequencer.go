@@ -50,11 +50,18 @@ type SequencerWorker struct {
 	closeCh                    chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
+
+	// availBlockNumWhenStaked is a used to fence the sequencing logic until
+	// this node is staked and there is a start of a fresh new Avail block window.
+	// Point type is used intentionally. `nil` means that this node has not staked
+	// yet or it's not visible in the blockchain yet. The value gets set when the
+	// staking is visible and it must not be modified afterwards.
+	availBlockNumWhenStaked *int64
 }
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	
+
 	// Return same seed value for the period of  `availWindowLen`.
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
@@ -179,6 +186,26 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		if !sequencerStaked {
 			sw.logger.Warn("my account is not among active staked sequencers; cannot continue", "address", sw.nodeAddr.String())
 			continue
+		} else {
+			if sw.availBlockNumWhenStaked == nil {
+				sw.availBlockNumWhenStaked = new(int64)
+				*sw.availBlockNumWhenStaked = t.Load()
+				sw.logger.Debug("staking observed in the blockchain; storing avail block number", "block_number", blk.Block.Header.Number)
+			}
+
+			// Only proceed with the sequencing logic after the "join window" changes to
+			// next one. This logic is needed because on a new node, that joins in the
+			// middle of the Avail block window, the ActiveSequencer cache is not
+			// consistent with the other nodes in the network. When all the nodes renew
+			// their active sequencer list on a start of the new block window, they gain
+			// coherent view into who is the next "leader" (i.e. the active sequencer
+			// allowed to produce a block).
+			if (*sw.availBlockNumWhenStaked / availBlockWindowLen) == (t.Load() / availBlockWindowLen) {
+				sw.logger.Debug("sequencer account staked, but waiting for a fresh Avail block window after joining the network")
+				continue
+			} else {
+				sw.logger.Debug("past the point of sequencer ramp up window", "block_number", blk.Block.Header.Number)
+			}
 		}
 
 		// Will check the block for fraudlent behaviour and slash parties accordingly.

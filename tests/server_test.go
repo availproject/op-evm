@@ -281,6 +281,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType 
 		AvailSender:     availSender,
 		AccountFilePath: accountPath,
 		NodeType:        string(nodeType),
+		AvailAppID:      appID,
 	}
 
 	serverInstance, err := server.NewServer(cfg, consensusCfg)

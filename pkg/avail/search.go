@@ -51,8 +51,6 @@ func (c *client) SearchBlock(offset int64, searchFunc SearchFunc) (*types.Signed
 			break
 		}
 
-		fmt.Printf("NEXT BLOCK HASH: %d - OFFSET: %d \n", uint64(blk.Block.Header.Number)+uint64(offset), offset)
-
 		blkHash, err := c.api.RPC.Chain.GetBlockHash(uint64(blk.Block.Header.Number) + uint64(offset))
 		if err != nil {
 			return nil, err

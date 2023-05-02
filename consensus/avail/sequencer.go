@@ -54,12 +54,12 @@ type SequencerWorker struct {
 
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
-	
+
 	// Return same seed value for the period of  `availWindowLen`.
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
 	}
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
+	activeSequencersQuerier := staking.NewCachingRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 

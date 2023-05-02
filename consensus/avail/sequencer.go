@@ -151,6 +151,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"edge_block_hash", edgeBlk.Hash(),
 							"error", err,
 						)
+					} else {
+						// Clear out the executed transactions from the TxPool after the block
+						// has been written.
+						sw.txpool.ResetWithHeaders(edgeBlk.Header)
 					}
 				} else {
 					sw.logger.Warn(

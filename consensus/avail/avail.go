@@ -105,12 +105,12 @@ func New(config Config) (consensus.Consensus, error) {
 
 	bs, err := config.SecretsManager.GetSecret(secrets.ValidatorKey)
 	if err != nil {
-		panic("can't find validator key! - " + err.Error())
+		panic("can't find sign key! - " + err.Error())
 	}
 
 	signKey, err := crypto.BytesToECDSAPrivateKey(bs)
 	if err != nil {
-		panic("validator key decoding failed: " + err.Error())
+		panic("sign key decoding failed: " + err.Error())
 	}
 
 	minerAddr := crypto.PubKeyToAddress(&signKey.PublicKey)

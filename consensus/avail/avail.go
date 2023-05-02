@@ -232,7 +232,7 @@ func (d *Avail) Start() error {
 			}
 		}()
 	case WatchTower:
-		go d.runWatchTower(activeParticipantsQuerier, account, key)
+		go d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, account, key)
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

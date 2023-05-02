@@ -14,12 +14,12 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
-func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, myAccount accounts.Account, signKey *keystore.Key) {
+func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, currentNodeSyncIndex uint64, myAccount accounts.Account, signKey *keystore.Key) {
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
 
 	// Start watching HEAD from Avail.
-	availBlockStream := d.availClient.BlockStream(0)
+	availBlockStream := d.availClient.BlockStream(currentNodeSyncIndex)
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {

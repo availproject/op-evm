@@ -35,12 +35,6 @@ func NewBlockDataWatcher(client Client, appID types.UCompact, handler BlockDataH
 		handler: handler,
 		stop:    make(chan struct{}),
 	}
-
-	//err := watcher.start()
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	return &watcher, nil
 }
 

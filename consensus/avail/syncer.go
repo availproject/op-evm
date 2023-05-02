@@ -113,7 +113,7 @@ func (d *Avail) syncNode() (uint64, error) {
 
 // Searches for the edge block in the Avail and returns back avail block for future catch up by the node
 func (d *Avail) syncFunc(targetEdgeBlock uint64, callIdx avail_types.CallIndex) avail.SearchFunc {
-	return func(availBlk *avail_types.SignedBlock) (int, bool, error) {
+	return func(availBlk *avail_types.SignedBlock) (int64, bool, error) {
 		blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
 		if err != nil && err != block.ErrNoExtrinsicFound {
 			return -1, false, err
@@ -125,7 +125,7 @@ func (d *Avail) syncFunc(targetEdgeBlock uint64, callIdx avail_types.CallIndex) 
 
 		for _, blk := range blks {
 			if blk.Header.Number == targetEdgeBlock {
-				return int(availBlk.Block.Header.Number), true, nil
+				return int64(availBlk.Block.Header.Number), true, nil
 			}
 		}
 

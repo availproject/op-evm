@@ -10,11 +10,11 @@ import (
 // current Avail block. The function returns the next block number to continue
 // search from, a boolean whether the searched block was found or an error if
 // something went wrong.
-type SearchFunc func(*types.SignedBlock) (int, bool, error)
+type SearchFunc func(*types.SignedBlock) (int64, bool, error)
 
 // SearchBlock
 // What we really need is to figure out in which
-func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBlock, error) {
+func (c *client) SearchBlock(offset int64, searchFunc SearchFunc) (*types.SignedBlock, error) {
 	// In case offset is zero, it means that we have new chain node and we need to sync it
 	// from latest head in avail towards first block.
 	if offset == 0 {
@@ -22,7 +22,7 @@ func (c *client) SearchBlock(offset int, searchFunc SearchFunc) (*types.SignedBl
 		if err != nil {
 			return nil, err
 		}
-		offset = int(header.Number)
+		offset = int64(header.Number)
 	}
 
 	blkHash, err := c.api.RPC.Chain.GetBlockHash(uint64(offset))

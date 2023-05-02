@@ -107,15 +107,15 @@ func New(config Config) (consensus.Consensus, error) {
 
 	bs, err := config.SecretsManager.GetSecret(secrets.ValidatorKey)
 	if err != nil {
-		panic("can't find validator key! - " + err.Error())
+		panic("can't find sign key! - " + err.Error())
 	}
 
-	validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+	signKey, err := crypto.BytesToECDSAPrivateKey(bs)
 	if err != nil {
-		panic("validator key decoding failed: " + err.Error())
+		panic("sign key decoding failed: " + err.Error())
 	}
 
-	validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+	minerAddr := crypto.PubKeyToAddress(&signKey.PublicKey)
 
 	asq := staking.NewActiveParticipantsQuerier(config.Blockchain, config.Executor, logger)
 
@@ -131,9 +131,9 @@ func New(config Config) (consensus.Consensus, error) {
 		network:                    config.Network,
 		blockTime:                  time.Duration(config.BlockTime) * time.Second,
 		nodeType:                   MechanismType(config.NodeType),
-		signKey:                    validatorKey,
-		minerAddr:                  validatorAddr,
-		validator:                  validator.New(config.Blockchain, validatorAddr, logger),
+		signKey:                    signKey,
+		minerAddr:                  minerAddr,
+		validator:                  validator.New(config.Blockchain, minerAddr, logger),
 		blockProductionIntervalSec: DefaultBlockProductionIntervalS,
 
 		availAccount: config.AvailAccount,

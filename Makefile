@@ -98,7 +98,8 @@ start-sequencer: build
 	./avail-settlement -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
 
 start-watchtower: build
-# rm -rf data/avail-watchtower-1/blockchain/
+	rm -rf data/avail-watchtower-1/blockchain/
+	rm -rf data/avail-watchtower-1/trie/
 	./avail-settlement -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
 
 start-e2e: build-e2e

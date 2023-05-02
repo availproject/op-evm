@@ -31,12 +31,12 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
 		if extrinsic.Signature.AppID.Int64() != appID.Int64() {
-			//logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
+			logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
 			continue
 		}
 
 		if extrinsic.Method.CallIndex != callIdx {
-			//logger.Debug("block extrinsic's Method.CallIndex doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_call_index", extrinsic.Method.CallIndex, "filter_call_index", callIdx)
+			logger.Debug("block extrinsic's Method.CallIndex doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_call_index", extrinsic.Method.CallIndex, "filter_call_index", callIdx)
 			continue
 		}
 

@@ -282,9 +282,3 @@ func (d *Avail) Close() error {
 	close(d.closeCh)
 	return nil
 }
-
-/**
-// Sequencer / Watchtower whatever:
-
-
-**/

@@ -62,6 +62,7 @@ type Config struct {
 	SecretsManager  secrets.SecretsManager
 	Snapshotter     snapshot.Snapshotter
 	TxPool          *txpool.TxPool
+	AvailAppID      avail_types.UCompact
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -138,6 +139,7 @@ func New(config Config) (consensus.Consensus, error) {
 		availAccount: config.AvailAccount,
 		availClient:  config.AvailClient,
 		availSender:  config.AvailSender,
+		availAppID:   config.AvailAppID,
 	}
 
 	if config.Network != nil {

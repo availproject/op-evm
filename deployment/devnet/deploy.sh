@@ -25,9 +25,9 @@ function generate_config {
     nat_addr=$5
 
     cat <<EOF
-chain_config: /home/ubuntu/genesis.json
+chain_config: /home/ubuntu/workspace/genesis.json
 secrets_config: ""
-data_dir: /home/ubuntu/data
+data_dir: /home/ubuntu/workspace/data
 block_gas_target: "0x0"
 grpc_addr: :${grpc_port}
 jsonrpc_addr: :${jsonrpc_port}
@@ -71,7 +71,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/ubuntu/avail-settlement $( [ "$node_type" = "bootstrap-sequencer" ] && echo '-bootstrap' ) -config-file=/home/ubuntu/config.yaml -avail-addr ws://${avail_addr}:9944/v1/json-rpc -account-config-file="/home/ubuntu/account-mnemonic"
+ExecStart=/home/ubuntu/workspace/avail-settlement $( [ "$node_type" = "bootstrap-sequencer" ] && echo '-bootstrap' ) -config-file=/home/ubuntu/workspace/config.yaml -avail-addr ws://${avail_addr}:9944/v1/json-rpc -account-config-file="/home/ubuntu/workspace/account-mnemonic"
 User=ubuntu
 Group=ubuntu
 
@@ -85,12 +85,14 @@ terraform output --raw ssh_pk > ./configs/id_rsa
 chmod 400 ./configs/id_rsa
 
 all_instances=$(terraform output --json all_instances)
+all_eips=$(terraform output --json all_eips)
 
 avail_addr=
 nodes_addr=()
 while read -r i; do
   node_type=$(echo "$i" | jq -r .tags.NodeType)
-  node_addr=$(echo "$i" | jq -r .public_dns)
+  instance_id=$(echo "$i" | jq -r .id)
+  node_addr=$(echo "$all_eips" | jq -r ".[] | select(.instance == \"$instance_id\") | .public_dns")
   if [ "$node_type" = "avail" ]; then
         avail_addr=$node_addr
   else
@@ -102,8 +104,10 @@ bootnodes=()
 addresses=()
 while read -r i; do
     node_type=$(echo "$i" | jq -r .tags.NodeType)
-    public_ip=$(echo "$i" | jq -r .public_ip)
-    node_addr=$(echo "$i" | jq -r .public_dns)
+    instance_id=$(echo "$i" | jq -r .id)
+    ip_and_dns_for_instance=$(echo "$all_eips" | jq -r ".[] | select(.instance == \"$instance_id\") | {public_ip, public_dns}")
+    public_ip=$(echo "$ip_and_dns_for_instance" | jq -r .public_ip)
+    node_addr=$(echo "$ip_and_dns_for_instance" | jq -r .public_dns)
     p2p_port=$(echo "$i" | jq -r .tags_all.P2PPort)
     grpc_port=$(echo "$i" | jq -r .tags_all.GRPCPort)
     jsonrpc_port=$(echo "$i" | jq -r .tags_all.JsonRPCPort)
@@ -138,21 +142,21 @@ done
 echo "$genesis" > ./configs/genesis.json
 
 remote_exec "$avail_addr" "sudo systemctl stop avail"
-remote_exec "$avail_addr" "rm -rf ./data"
-remote_copy "$avail_addr" "./run-avail.sh" "/home/ubuntu/"
-remote_copy "$avail_addr" "./avail.service" "/home/ubuntu/"
-remote_exec "$avail_addr" "./run-avail.sh"
+remote_exec "$avail_addr" "rm -rf /home/ubuntu/workspace/data"
+remote_copy "$avail_addr" "./run-avail.sh" "/home/ubuntu/workspace"
+remote_copy "$avail_addr" "./avail.service" "/home/ubuntu/workspace"
+remote_exec "$avail_addr" "./workspace/run-avail.sh"
 
 sleep 10
 
 for node_addr in "${nodes_addr[@]}"
 do
   remote_exec "$node_addr" "sudo systemctl stop node"
-  remote_exec "$node_addr" "rm -rf ./data"
-  remote_copy "$node_addr" "./configs/$node_addr/." "/home/ubuntu/"
-  remote_copy "$node_addr" "./configs/genesis.json" "/home/ubuntu/"
-  remote_copy "$node_addr" "../../avail-settlement" "/home/ubuntu/"
-  remote_copy "$node_addr" "../../tools/accounts/accounts" "/home/ubuntu/"
-  remote_copy "$node_addr" "./run-node.sh" "/home/ubuntu/"
-  remote_exec "$node_addr" "./run-node.sh $avail_addr"
+  remote_exec "$node_addr" "rm -rf /home/ubuntu/workspace/data"
+  remote_copy "$node_addr" "./configs/$node_addr/." "/home/ubuntu/workspace"
+  remote_copy "$node_addr" "./configs/genesis.json" "/home/ubuntu/workspace"
+  remote_copy "$node_addr" "../../avail-settlement" "/home/ubuntu/workspace"
+  remote_copy "$node_addr" "../../tools/accounts/accounts" "/home/ubuntu/workspace"
+  remote_copy "$node_addr" "./run-node.sh" "/home/ubuntu/workspace"
+  remote_exec "$node_addr" "./workspace/run-node.sh $avail_addr"
 done

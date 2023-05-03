@@ -16,6 +16,7 @@ type Client interface {
 	// `offset`.
 	BlockStream(offset uint64) BlockStream
 	GenesisHash() types.Hash
+	GetLatestHeader() (*types.Header, error)
 	SearchBlock(offset int64, searchFunc SearchFunc) (*types.SignedBlock, error)
 }
 

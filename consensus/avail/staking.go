@@ -143,6 +143,8 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		continue
 	}
 
+	// XXX: This is a workaround for now.
+	// TODO: Fix this with peer check to get rid of static sleep.
 	// Apparently, we still need to wait a bit more time than boot node count to be able
 	// process staking. If there's only bootstrap sequencer and one sequencer without this sleep
 	// txpool tx will be added but bootstrap sequencer won't receive it.
@@ -175,24 +177,6 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 	if err != nil {
 		return false, err
 	}
-
-	// NOTE: In order to enable it here we'd need to make sure initial syncer does not stop
-	// looking for new blocks until stake tx is found.
-
-	// Syncer will be syncing the blockchain in the background, so once an active
-	// sequencer picks up the staking transaction from the txpool, it becomes
-	// effective and visible to us as well, via blockchain.
-	/* 	var staked bool
-	   	for !staked {
-	   		d.logger.Info("Submitted transaction, waiting for staking contract update...")
-	   		staked, err = activeParticipantsQuerier.Contains(d.minerAddr, staking.NodeType(d.nodeType))
-	   		if err != nil {
-	   			return false, err
-	   		}
-	   		// Wait a bit before checking again.
-	   		time.Sleep(3 * time.Second)
-	   	}
-	*/
 
 	// Assume staked if it's sent as we're going to wait for main sequencer loop to
 	// do the synchronization...

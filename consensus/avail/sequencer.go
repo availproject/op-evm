@@ -50,7 +50,7 @@ type SequencerWorker struct {
 	closeCh                    chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
-  blockProductionEnabled     *atomic.Bool
+	blockProductionEnabled     *atomic.Bool
 	currentNodeSyncIndex       uint64
 
 	// availBlockNumWhenStaked is a used to fence the sequencing logic until
@@ -68,7 +68,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
 	}
-  
+
 	activeSequencersQuerier := staking.NewCachingRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)

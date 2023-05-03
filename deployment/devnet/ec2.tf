@@ -2,12 +2,14 @@ resource "aws_instance" "avail" {
   ami                         = var.base_ami
   instance_type               = var.base_instance_type
   key_name                    = aws_key_pair.devnet.key_name
-  subnet_id                   = element(aws_subnet.devnet_public, 0).id
-  associate_public_ip_address = true
+  subnet_id                   = aws_subnet.devnet_public[0].id
+  availability_zone           = aws_subnet.devnet_public[0].availability_zone
+  associate_public_ip_address = false
+  user_data                   = file("${path.module}/ebs-mount.sh")
 
   root_block_device {
     delete_on_termination = true
-    volume_size           = 30
+    volume_size           = 10
     volume_type           = "gp2"
   }
 
@@ -24,10 +26,13 @@ resource "aws_instance" "bootnode" {
   instance_type               = var.base_instance_type
   key_name                    = aws_key_pair.devnet.key_name
   subnet_id                   = aws_subnet.devnet_public[0].id
-  associate_public_ip_address = true
+  availability_zone           = aws_subnet.devnet_public[0].availability_zone
+  associate_public_ip_address = false
+  user_data                   = file("${path.module}/ebs-mount.sh")
+
   root_block_device {
     delete_on_termination = true
-    volume_size           = 30
+    volume_size           = 10
     volume_type           = "gp2"
   }
 
@@ -48,11 +53,13 @@ resource "aws_instance" "node" {
   count                       = var.node_count
   key_name                    = aws_key_pair.devnet.key_name
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
-  associate_public_ip_address = true
+  availability_zone           = element(aws_subnet.devnet_public, count.index).availability_zone
+  associate_public_ip_address = false
+  user_data                   = file("${path.module}/ebs-mount.sh")
 
   root_block_device {
     delete_on_termination = true
-    volume_size           = 30
+    volume_size           = 10
     volume_type           = "gp2"
   }
 
@@ -73,11 +80,13 @@ resource "aws_instance" "watchtower" {
   count                       = var.watchtower_count
   key_name                    = aws_key_pair.devnet.key_name
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
-  associate_public_ip_address = true
+  availability_zone           = element(aws_subnet.devnet_public, count.index).availability_zone
+  associate_public_ip_address = false
+  user_data                   = file("${path.module}/ebs-mount.sh")
 
   root_block_device {
     delete_on_termination = true
-    volume_size           = 30
+    volume_size           = 10
     volume_type           = "gp2"
   }
 
@@ -91,3 +100,52 @@ resource "aws_instance" "watchtower" {
     Provisioner = data.aws_caller_identity.provisioner.account_id
   }
 }
+
+resource "aws_ebs_volume" "avail" {
+  availability_zone = aws_subnet.devnet_public[0].availability_zone
+  size              = 30
+}
+
+resource "aws_ebs_volume" "bootnode" {
+  availability_zone = aws_subnet.devnet_public[0].availability_zone
+  size              = 30
+}
+
+resource "aws_ebs_volume" "node" {
+  count             = var.node_count
+  availability_zone = element(aws_subnet.devnet_public, count.index).availability_zone
+  size              = 30
+}
+
+resource "aws_ebs_volume" "watchtower" {
+  count             = var.watchtower_count
+  availability_zone = element(aws_subnet.devnet_public, count.index).availability_zone
+  size              = 30
+}
+
+resource "aws_volume_attachment" "avail" {
+  device_name = "/dev/sdh"
+  volume_id   = aws_ebs_volume.avail.id
+  instance_id = aws_instance.avail.id
+}
+
+resource "aws_volume_attachment" "bootnode" {
+  device_name = "/dev/sdh"
+  volume_id   = aws_ebs_volume.bootnode.id
+  instance_id = aws_instance.bootnode.id
+}
+
+resource "aws_volume_attachment" "node" {
+  count       = var.node_count
+  device_name = "/dev/sdh"
+  volume_id   = element(aws_ebs_volume.node, count.index).id
+  instance_id = element(aws_instance.node, count.index).id
+}
+
+resource "aws_volume_attachment" "watchtower" {
+  count       = var.watchtower_count
+  device_name = "/dev/sdh"
+  volume_id   = element(aws_ebs_volume.watchtower, count.index).id
+  instance_id = element(aws_instance.watchtower, count.index).id
+}
+

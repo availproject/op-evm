@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
@@ -62,6 +61,7 @@ type Config struct {
 	SecretsManager  secrets.SecretsManager
 	Snapshotter     snapshot.Snapshotter
 	TxPool          *txpool.TxPool
+	AvailAppID      avail_types.UCompact
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -69,8 +69,6 @@ type Avail struct {
 	logger     hclog.Logger
 	mechanisms []MechanismType
 	nodeType   MechanismType
-
-	syncer syncer.Syncer // Reference to the sync protocol
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
@@ -99,6 +97,7 @@ type Avail struct {
 
 	blockProductionIntervalSec uint64
 	validator                  validator.Validator
+	currentNodeSyncIndex       uint64
 }
 
 func New(config Config) (consensus.Consensus, error) {
@@ -106,15 +105,15 @@ func New(config Config) (consensus.Consensus, error) {
 
 	bs, err := config.SecretsManager.GetSecret(secrets.ValidatorKey)
 	if err != nil {
-		panic("can't find validator key! - " + err.Error())
+		panic("can't find sign key! - " + err.Error())
 	}
 
-	validatorKey, err := crypto.BytesToECDSAPrivateKey(bs)
+	signKey, err := crypto.BytesToECDSAPrivateKey(bs)
 	if err != nil {
-		panic("validator key decoding failed: " + err.Error())
+		panic("sign key decoding failed: " + err.Error())
 	}
 
-	validatorAddr := crypto.PubKeyToAddress(&validatorKey.PublicKey)
+	minerAddr := crypto.PubKeyToAddress(&signKey.PublicKey)
 
 	asq := staking.NewActiveParticipantsQuerier(config.Blockchain, config.Executor, logger)
 
@@ -131,24 +130,17 @@ func New(config Config) (consensus.Consensus, error) {
 		network:                    config.Network,
 		blockTime:                  time.Duration(config.BlockTime) * time.Second,
 		nodeType:                   MechanismType(config.NodeType),
-		signKey:                    validatorKey,
-		minerAddr:                  validatorAddr,
-		validator:                  validator.New(config.Blockchain, validatorAddr, logger),
+		signKey:                    signKey,
+		minerAddr:                  minerAddr,
+		validator:                  validator.New(config.Blockchain, minerAddr, logger),
 		blockProductionIntervalSec: DefaultBlockProductionIntervalS,
-
-		availAccount: config.AvailAccount,
-		availClient:  config.AvailClient,
-		availSender:  config.AvailSender,
+		availAccount:               config.AvailAccount,
+		availClient:                config.AvailClient,
+		availSender:                config.AvailSender,
+		availAppID:                 config.AvailAppID,
 	}
 
 	if config.Network != nil {
-		d.syncer = syncer.NewSyncer(
-			config.Logger,
-			config.Network,
-			config.Blockchain,
-			time.Duration(config.BlockTime)*3*time.Second,
-		)
-
 		d.snapshotDistributor, err = snapshot.NewDistributor(d.logger, d.network)
 		if err != nil {
 			return nil, err
@@ -212,22 +204,15 @@ func (d *Avail) Start() error {
 	d.txpool.SetSealing(true)
 
 	// Start P2P syncing.
-	go d.startSyncing()
+	var err error
+	d.currentNodeSyncIndex, err = d.syncNode()
+	if err != nil {
+		return err
+	}
 
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		return err
-	}
-
-	// XXX: This callback takes care of closing syncer after the node has
-	// taked. This should be fixed ASAP. This is structured like this because
-	// currently the sequencer is disconnected from Avail consensus struct, but
-	// the introduction of state snapshot distribution requires it to be
-	// shutdown.
-	afterStaked := func() {
-		// Stop P2P blockchain syncing and follow the blockstream only via Avail.
-		d.syncer.Close()
-		d.syncer = nil
 	}
 
 	switch d.nodeType {
@@ -237,43 +222,20 @@ func (d *Avail) Start() error {
 			d.snapshotter, d.snapshotDistributor,
 			d.availClient, d.availAccount, d.availAppID, d.signKey,
 			d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
-			d.blockTime, d.blockProductionIntervalSec,
+			d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
 		)
 		go func() {
-			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}, afterStaked); err != nil {
+			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
 				panic(err)
 			}
 		}()
 	case WatchTower:
-		go d.runWatchTower(activeParticipantsQuerier, account, key, afterStaked)
+		go d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, account, key)
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}
 
 	return nil
-}
-
-func (d *Avail) startSyncing() {
-	if d.syncer == nil {
-		d.logger.Warn("syncer not configured")
-		return
-	}
-
-	// Start the syncer
-	err := d.syncer.Start()
-	if err != nil {
-		panic(fmt.Sprintf("starting blockchain sync failed: %s", err))
-	}
-
-	syncFunc := func(blk *types.FullBlock) bool {
-		d.txpool.ResetWithHeaders(blk.Block.Header)
-		return false
-	}
-
-	err = d.syncer.Sync(syncFunc)
-	if err != nil {
-		panic(fmt.Sprintf("syncing blockchain failed: %s", err))
-	}
 }
 
 // REQUIRED BASE INTERFACE METHODS //
@@ -316,10 +278,5 @@ func (d *Avail) Seal(block *types.Block, ctx context.Context) (*types.Block, err
 
 func (d *Avail) Close() error {
 	close(d.closeCh)
-
-	if d.syncer != nil {
-		d.syncer.Close()
-	}
-
 	return nil
 }

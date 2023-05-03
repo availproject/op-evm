@@ -15,8 +15,9 @@ type Client interface {
 	// BlockStream creates a new Avail block stream, starting from block height
 	// `offset`.
 	BlockStream(offset uint64) BlockStream
-
 	GenesisHash() types.Hash
+	GetLatestHeader() (*types.Header, error)
+	SearchBlock(offset int64, searchFunc SearchFunc) (*types.SignedBlock, error)
 }
 
 type client struct {
@@ -62,6 +63,10 @@ func (c *client) BlockStream(offset uint64) BlockStream {
 
 func (c *client) GenesisHash() types.Hash {
 	return c.genesisHash
+}
+
+func (c *client) GetLatestHeader() (*types.Header, error) {
+	return c.api.RPC.Chain.GetHeaderLatest()
 }
 
 func FindCallIndex(client Client) (types.CallIndex, error) {

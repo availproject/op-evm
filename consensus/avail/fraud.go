@@ -30,12 +30,12 @@ var (
 )
 
 type Fraud struct {
-	logger                  hclog.Logger
-	blockchain              *blockchain.Blockchain
-	executor                *state.Executor
-	txpool                  *txpool.TxPool
-	watchtower              watchtower.WatchTower
-	enableBlockProductionCh chan bool
+	logger                 hclog.Logger
+	blockchain             *blockchain.Blockchain
+	executor               *state.Executor
+	txpool                 *txpool.TxPool
+	watchtower             watchtower.WatchTower
+	blockProductionEnabled *atomic.Bool
 
 	nodeAddr    types.Address
 	nodeSignKey *ecdsa.PrivateKey
@@ -59,9 +59,9 @@ func (f *Fraud) SetChainStatus(status uint32) {
 	atomic.StoreUint32(&f.chainProcessStatus, status)
 
 	if status == ChainProcessingEnabled {
-		f.enableBlockProductionCh <- true
+		f.blockProductionEnabled.Store(true)
 	} else {
-		f.enableBlockProductionCh <- false
+		f.blockProductionEnabled.Store(false)
 	}
 }
 
@@ -212,7 +212,6 @@ func (f *Fraud) IsFraudProofBlock(blk *types.Block) bool {
 }
 
 func (f *Fraud) CheckAndSlash() (bool, error) {
-
 	// There is no block attached from previous sequencer runs and therefore we assume
 	// no fraud should be checked in this moment...
 	if !f.IsReadyToSlash() {
@@ -508,18 +507,18 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 	return blk, nil
 }
 
-func NewFraudResolver(logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, w watchtower.WatchTower, enableBlockProductionCh chan bool, nodeAddr types.Address, nodeSignKey *ecdsa.PrivateKey, availSender avail.Sender, nodeType MechanismType) *Fraud {
+func NewFraudResolver(logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool, w watchtower.WatchTower, blockProductionEnabled *atomic.Bool, nodeAddr types.Address, nodeSignKey *ecdsa.PrivateKey, availSender avail.Sender, nodeType MechanismType) *Fraud {
 	return &Fraud{
-		logger:                  logger,
-		blockchain:              b,
-		executor:                e,
-		txpool:                  txp,
-		watchtower:              w,
-		nodeAddr:                nodeAddr,
-		nodeType:                nodeType,
-		nodeSignKey:             nodeSignKey,
-		availSender:             availSender,
-		chainProcessStatus:      ChainProcessingEnabled,
-		enableBlockProductionCh: enableBlockProductionCh,
+		logger:                 logger,
+		blockchain:             b,
+		executor:               e,
+		txpool:                 txp,
+		watchtower:             w,
+		nodeAddr:               nodeAddr,
+		nodeType:               nodeType,
+		nodeSignKey:            nodeSignKey,
+		availSender:            availSender,
+		chainProcessStatus:     ChainProcessingEnabled,
+		blockProductionEnabled: blockProductionEnabled,
 	}
 }

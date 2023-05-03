@@ -1,6 +1,6 @@
 resource "aws_vpc" "devnet" {
-  cidr_block       = var.devnet_vpc_block
-  instance_tenancy = "default"
+  cidr_block           = var.devnet_vpc_block
+  instance_tenancy     = "default"
   enable_dns_hostnames = true
 
   tags = {
@@ -59,3 +59,36 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.devnet_public.id
 }
 
+resource "aws_eip" "bootnode" {
+  instance = aws_instance.bootnode.id
+  vpc      = true
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+}
+
+resource "aws_eip" "avail" {
+  instance = aws_instance.avail.id
+  vpc      = true
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+}
+
+resource "aws_eip" "node" {
+  count    = length(aws_instance.node)
+  instance = element(aws_instance.node, count.index).id
+  vpc      = true
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+}
+
+resource "aws_eip" "watchtower" {
+  count    = length(aws_instance.watchtower)
+  instance = element(aws_instance.watchtower, count.index).id
+  vpc      = true
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+}

@@ -62,6 +62,7 @@ func main() {
 		AvailSender:  availSender,
 		Bootnode:     bootnode,
 		NodeType:     config.NodeType,
+		AvailAppID:   appID,
 	}
 
 	serverInstance, err := server.NewServer(config.Config, cfg)

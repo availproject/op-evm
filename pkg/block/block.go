@@ -72,7 +72,7 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 			return nil, err
 		}
 
-		logger.Info("Received new edge block from avail.", "hash", blk.Header.Hash, "parent_hash", blk.Header.ParentHash)
+		logger.Info("Received new edge block from avail.", "hash", blk.Header.Hash, "parent_hash", blk.Header.ParentHash, "avail_block_number", blk.Header.Number)
 
 		toReturn = append(toReturn, &blk)
 	}

@@ -1,0 +1,45 @@
+name: Releaser
+on:
+  push:
+    branches:
+      - prototype
+      - master
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+jobs:
+  build_and_publish_linux_arm64:
+    permissions: write-all
+    name: Build and publish for linux arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Trigger submodule update
+        env:
+          SSH_KEY_FOR_SUBMODULE: ${{secrets.AVAIL_SETTLEMENT_SECRET_KEY}}
+        run: |
+          mkdir $HOME/.ssh && echo "$SSH_KEY_FOR_SUBMODULE" > $HOME/.ssh/id_rsa && chmod 600 $HOME/.ssh/id_rsa && git submodule update --init --recursive
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: Build all go binaries
+        run: make build-all GOOS=linux GOARCH=arm64
+      - name: Add binaries to tar archive
+        run: tar czf avail-settlement-linux-arm64.tar.gz --transform='s,.*/,,g' avail-settlement tools/accounts/accounts tools/e2e/e2e tools/staking/staking
+      - name: Prepare tag name
+        id: prepare
+        run: |
+            TAG=${GITHUB_REF_NAME}
+            echo ::set-output name=tag_name::${TAG}
+      - name: publish binary
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: avail-settlement-linux-arm64.tar.gz
+          release_name: ${{ steps.prepare.outputs.tag_name }}
+          tag: ${{ steps.prepare.outputs.tag_name }}
+          overwrite: true
+          file_glob: true

@@ -66,26 +66,27 @@ build-e2e:
 	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
 
 build-fraud: build-fraud-contract
-	cd tools/fraud && go build -o fraud
+	cd tools/fraud && GOOS=${GOOS} GOARCH=${GOARCH} go build -o fraud
 
 build-staking:
-	cd tools/staking && go build -o staking
+	cd tools/staking && GOOS=${GOOS} GOARCH=${GOARCH} go build -o staking
 
 build-contract:
 	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
 
-build-edge:
-	cd third_party/polygon-edge && make build
-
 tools-wallet:
-	cd tools/wallet && go build
+	cd tools/wallet && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
 tools-account:
 	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
+build-tools: tools-account build-staking build-e2e
+
 build: build-server build-client
+
+build-all: build build-tools
 
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
@@ -110,7 +111,6 @@ start-fraud: build-fraud
 
 start-staking: build-staking 
 	./tools/staking/staking
-
 
 create-bootstrap-sequencer-account: tools-account
 	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer

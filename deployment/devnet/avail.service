@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/ubuntu/data-avail-linux-aarch64 --dev --ws-external --rpc-external --rpc-cors all
+ExecStart=/home/ubuntu/workspace/data-avail-linux-aarch64 --dev --ws-external --rpc-external --rpc-cors all
 
 [Install]
 WantedBy=multi-user.target

@@ -50,6 +50,7 @@ type SequencerWorker struct {
 	closeCh                    chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
+  blockProductionEnabled     *atomic.Bool
 
 	// availBlockNumWhenStaked is a used to fence the sequencing logic until
 	// this node is staked and there is a start of a fresh new Avail block window.
@@ -66,12 +67,11 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	randomSeedFn := func() int64 {
 		return t.Load() / availBlockWindowLen
 	}
-	activeSequencersQuerier := staking.NewRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
+	activeSequencersQuerier := staking.NewCachingRandomizedActiveSequencersQuerier(randomSeedFn, sw.apq)
 	validator := validator.New(sw.blockchain, sw.nodeAddr, sw.logger)
 	watchTower := watchtower.New(sw.blockchain, sw.executor, sw.txpool, sw.logger, types.Address(account.Address), key.PrivateKey)
 
-	enableBlockProductionCh := make(chan bool)
-	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, enableBlockProductionCh, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
+	fraudResolver := NewFraudResolver(sw.logger, sw.blockchain, sw.executor, sw.txpool, watchTower, sw.blockProductionEnabled, sw.nodeAddr, sw.nodeSignKey, sw.availSender, sw.nodeType)
 
 	callIdx, err := avail.FindCallIndex(sw.availClient)
 	if err != nil {
@@ -85,7 +85,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
 
 	// Write blocks to the local blockchain and avail in intervals uless block production is stopped.
-	go sw.runWriteBlocksLoop(enableBlockProductionCh, activeSequencersQuerier, fraudResolver, account, key)
+	go sw.runWriteBlocksLoop(activeSequencersQuerier, fraudResolver, account, key)
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
 	// the stream is out-of-sync.
@@ -159,6 +159,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 							"edge_block_hash", edgeBlk.Hash(),
 							"error", err,
 						)
+					} else {
+						// Clear out the executed transactions from the TxPool after the block
+						// has been written.
+						sw.txpool.ResetWithHeaders(edgeBlk.Header)
 					}
 				} else {
 					sw.logger.Warn(
@@ -222,16 +226,16 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// When availBlockNum is 0, 1, 2 ... (availBlockWindowLen - 1), enable the block production.
 			if availBlockNum%availBlockWindowLen < availBlockWindowLen-1 {
 				sw.logger.Debug("it's my turn; enable block producing", "t", availBlockNum)
-				enableBlockProductionCh <- true
+				sw.blockProductionEnabled.Store(true)
 			} else {
 				// This is the last block of `availBlockWindowLen` -> stop block production to allow nodes to synchronize.
 				sw.logger.Debug("it's my turn; last block on availBlockWindowLen. disabling block production", "t", availBlockNum)
-				enableBlockProductionCh <- false
+				sw.blockProductionEnabled.Store(false)
 			}
 		} else {
 			// Under no circumstances, blocks should be produced when the node is not an active sequencer.
 			sw.logger.Debug("it's not my turn; disable block producing", "t", availBlockNum)
-			enableBlockProductionCh <- false
+			sw.blockProductionEnabled.Store(false)
 		}
 	}
 }
@@ -247,16 +251,14 @@ func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.Activ
 }
 
 // runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
-func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool, activeSequencersQuerier staking.ActiveSequencers, fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) {
+func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.ActiveSequencers, fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) {
 	t := time.NewTicker(time.Duration(sw.blockProductionIntervalSec) * time.Second)
 	defer t.Stop()
-
-	shouldProduce := false
 
 	for {
 		select {
 		case <-t.C:
-			if !shouldProduce {
+			if !sw.blockProductionEnabled.Load() {
 				continue
 			}
 
@@ -284,9 +286,6 @@ func (sw *SequencerWorker) runWriteBlocksLoop(enableBlockProductionCh chan bool,
 			if err := sw.writeBlock(myAccount, signKey); err != nil {
 				sw.logger.Error("failed to mine block", "error", err)
 			}
-		case e := <-enableBlockProductionCh:
-			sw.logger.Debug("sequencer block producing status", "should_produce", e)
-			shouldProduce = e
 
 		case <-sw.closeCh:
 			sw.logger.Debug("received stop signal")
@@ -491,5 +490,6 @@ func NewSequencer(
 		availSender:                availSender,
 		blockTime:                  blockTime,
 		blockProductionIntervalSec: blockProductionIntervalSec,
+		blockProductionEnabled:     new(atomic.Bool),
 	}, nil
 }

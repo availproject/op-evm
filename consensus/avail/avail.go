@@ -209,11 +209,6 @@ func (d *Avail) Start() error {
 		return err
 	}
 
-	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
-	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
-		return err
-	}
-
 	switch d.nodeType {
 	case Sequencer, BootstrapSequencer:
 		sequencerWorker, _ := NewSequencer(
@@ -224,12 +219,24 @@ func (d *Avail) Start() error {
 			d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
 		)
 		go func() {
+			d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+			if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+				panic(err)
+			}
+
 			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
 				panic(err)
 			}
 		}()
 	case WatchTower:
-		go d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, account, key)
+		go func() {
+			d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+			if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+				panic(err)
+			}
+
+			d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, account, key)
+		}()
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}

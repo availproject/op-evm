@@ -76,6 +76,9 @@ build-contract:
 	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
 	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
 
+build-assm:
+	cd assm && GOOS=${GOOS} GOARCH=${GOARCH} go build
+
 tools-wallet:
 	cd tools/wallet && GOOS=${GOOS} GOARCH=${GOARCH} go build
 

@@ -340,6 +340,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		}
 	}
 
+	fmt.Printf("\n\n\n\n\n\n\n######################### Starting TxPool() !\n\n\n\n\n\n\n\n\n")
 	m.txpool.Start()
 
 	return m, nil

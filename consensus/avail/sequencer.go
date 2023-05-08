@@ -80,6 +80,24 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		return fmt.Errorf("failed to discover avail call index: %s", err)
 	}
 
+	// XXX: Remove this when Avail balance can be sustained reasonably.
+	go func() {
+		for {
+			select {
+			case <-sw.closeCh:
+				return
+			default:
+			}
+
+			err := sw.ensureEnoughAvailBalance()
+			if err != nil {
+				sw.logger.Error("error while ensuring Avail account balance", "error", err)
+			}
+
+			time.Sleep(30 * time.Second)
+		}
+	}()
+
 	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
 	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
 
@@ -249,6 +267,28 @@ func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.Activ
 	}
 
 	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
+}
+
+func (sw *SequencerWorker) ensureEnoughAvailBalance() error {
+	balance, err := avail.GetBalance(sw.availClient, sw.availAccount)
+	if err != nil {
+		return err
+	}
+
+	// If balance is less than 5 AVL, deposit more.
+	if balance.Uint64() < 5 {
+		maxUint64 := uint64(^uint64(0) >> 1)
+		sw.logger.Info("account balance for Avail account has dropped below 5 AVL; depositing more tokens", "balance", float64(balance.Uint64()/avail.AVL), "deposit", float64(maxUint64/avail.AVL))
+
+		err := avail.DepositBalance(sw.availClient, sw.availAccount, maxUint64, 0)
+		if err != nil {
+			return err
+		}
+	} else {
+		sw.logger.Info("account balance for Avail account healthy", "balance", balance.Uint64())
+	}
+
+	return nil
 }
 
 // runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option

@@ -119,12 +119,12 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// Processed below in the for-loop's main body.
 
 		case ss := <-sw.snapshotDistributor.Receive():
-			sw.logger.Info("received snapshot from peer", "block_number", ss.BlockNumber)
+			sw.logger.Debug("received snapshot from peer", "block_number", ss.BlockNumber)
 
 			// Verify that the snapshot is immediate continuation to current local blockchain.
 			head := sw.blockchain.Header()
 			if head.Number+1 != ss.BlockNumber {
-				sw.logger.Warn("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
+				sw.logger.Debug("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
 				continue
 			}
 
@@ -132,7 +132,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			if err != nil {
 				sw.logger.Error("failed to apply state diff snapshot", "error", err)
 			} else {
-				sw.logger.Info("{{{{{{{{{{{{ wrote snapshot to local storages }}}}}}}}}}}}}", "block_number", ss.BlockNumber)
+				sw.logger.Debug("wrote snapshot to local storages", "block_number", ss.BlockNumber)
 			}
 
 			// Refresh the internal HEAD block in `blockchain`.
@@ -212,7 +212,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						// Clear out the executed transactions from the TxPool after the block
 						// has been written.
 						sw.txpool.ResetWithHeaders(edgeBlk.Header)
-						sw.logger.Info("[[[[[[[[[[[[[[[[ wrote block to blockchain from Avail ]]]]]]]]]]]]]]]]", "block_number", edgeBlk.Header.Number)
+						sw.logger.Debug("wrote block to blockchain from Avail", "block_number", edgeBlk.Header.Number)
 					}
 				} else {
 					sw.logger.Warn(

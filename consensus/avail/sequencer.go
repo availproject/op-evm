@@ -136,7 +136,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			}
 
 			// Refresh the internal HEAD block in `blockchain`.
-			sw.blockchain.ComputeGenesis()
+			err = sw.blockchain.ComputeGenesis()
+			if err != nil {
+				return err
+			}
 
 			// refresh head after snapshot application.
 			head = sw.blockchain.Header()
@@ -510,7 +513,11 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	snapshot.StateRoot = blk.Header.StateRoot
 
 	// Distribute snapshot to other sequencers over P2P.
-	sw.snapshotDistributor.Send(snapshot)
+	err = sw.snapshotDistributor.Send(snapshot)
+	if err != nil {
+		return err
+	}
+
 	sw.logger.Debug("state snapshot sent over P2P")
 
 	return nil

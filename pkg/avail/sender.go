@@ -43,6 +43,7 @@ type sender struct {
 	appID          types.UCompact
 	client         Client
 	signingKeyPair signature.KeyringPair
+	nextNonce      uint64
 }
 
 // NewSender constructs an Avail block data sender.
@@ -54,9 +55,88 @@ func NewSender(client Client, appID types.UCompact, signingKeyPair signature.Key
 	}
 }
 
-// Send submits data to Avail.
+// Send submits data to Avail without waiting for any status response.
 func (s *sender) Send(blk *edgetypes.Block) error {
-	return s.SendAndWaitForStatus(blk, types.ExtrinsicStatus{IsFinalized: true})
+	api, err := instance(s.client)
+	if err != nil {
+		return err
+	}
+
+	meta, err := api.RPC.State.GetMetadataLatest()
+	if err != nil {
+		return err
+	}
+
+	blob := Blob{
+		Magic: BlobMagic,
+		Data:  blk.MarshalRLP(),
+	}
+
+	var call types.Call
+	{
+		// XXX: This encoding process is an inefficient hack to workaround
+		// problem in the encoding pipeline from client code to Avail server.
+		// `Blob` implements `scale.Encodeable` interface, but it it's passed
+		// directly to `types.NewCall()`, the server will return an error. This
+		// requires further investigation to fix.
+		encodedBytes, err := codec.Encode(blob)
+		if err != nil {
+			return err
+		}
+
+		call, err = types.NewCall(meta, CallSubmitData, encodedBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	ext := types.NewExtrinsic(call)
+
+	rv, err := api.RPC.State.GetRuntimeVersionLatest()
+	if err != nil {
+		return err
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Account", s.signingKeyPair.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	var accountInfo types.AccountInfo
+	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
+	if err != nil || !ok {
+		return fmt.Errorf("couldn't fetch latest account storage info")
+	}
+
+	nonce := uint64(accountInfo.Nonce)
+	if s.nextNonce > nonce {
+		nonce = s.nextNonce
+	}
+	s.nextNonce = nonce + 1
+	o := types.SignatureOptions{
+		// This transaction is Immortal (https://wiki.polkadot.network/docs/build-protocol-info#transaction-mortality)
+		// Hence BlockHash: Genesis Hash.
+		BlockHash:          s.client.GenesisHash(),
+		Era:                types.ExtrinsicEra{IsMortalEra: false},
+		GenesisHash:        s.client.GenesisHash(),
+		Nonce:              types.NewUCompactFromUInt(nonce),
+		SpecVersion:        rv.SpecVersion,
+		Tip:                types.NewUCompactFromUInt(100),
+		AppID:              s.appID,
+		TransactionVersion: rv.TransactionVersion,
+	}
+
+	err = ext.Sign(s.signingKeyPair, o)
+	if err != nil {
+		return err
+	}
+
+	_, err = api.RPC.Author.SubmitExtrinsic(ext)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SendAndWaitForStatus submits data to Avail and does not wait for the future blocks

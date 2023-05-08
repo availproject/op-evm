@@ -131,7 +131,6 @@ func (s *sender) Send(blk *edgetypes.Block) error {
 		return err
 	}
 
-	fmt.Printf("========<{ Sending extrinsic with nonce %d (accountInfo.Nonce: %d, accountInfo.Data.Free: %d, accountInfo.Data.Reserved: %d, accountInfo.Data.FreeFrozen: %d, accountInfo.Data.MiscFrozen: %d }>\n", nonce, accountInfo.Nonce, accountInfo.Data.Free, accountInfo.Data.Reserved, accountInfo.Data.FreeFrozen, accountInfo.Data.MiscFrozen)
 	_, err = api.RPC.Author.SubmitExtrinsic(ext)
 	if err != nil {
 		return err

@@ -474,7 +474,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		"block_parent_hash", blk.ParentHash(),
 	)
 
-	// err = sw.availSender.SendAndWaitForStatus(blk, avail_types.ExtrinsicStatus{IsInBlock: true})
+	// Submit block without waiting for status.
 	err = sw.availSender.Send(blk)
 	if err != nil {
 		sw.logger.Error("Error while submitting data to avail", "error", err)

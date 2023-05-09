@@ -119,38 +119,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// Processed below in the for-loop's main body.
 
 		case ss := <-sw.snapshotDistributor.Receive():
-			sw.logger.Debug("received snapshot from peer", "block_number", ss.BlockNumber)
-
-			// Verify that the snapshot is immediate continuation to current local blockchain.
-			head := sw.blockchain.Header()
-			if head.Number+1 != ss.BlockNumber {
-				sw.logger.Debug("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
-				continue
-			}
-
-			err := sw.snapshotter.Apply(ss)
-			if err != nil {
-				sw.logger.Error("failed to apply state diff snapshot", "error", err)
-			} else {
-				sw.logger.Debug("wrote snapshot to local storages", "block_number", ss.BlockNumber)
-			}
-
-			// Refresh the internal HEAD block in `blockchain`.
-			err = sw.blockchain.ComputeGenesis()
+			err = sw.processStorageSnapshot(ss)
 			if err != nil {
 				return err
 			}
-
-			// refresh head after snapshot application.
-			head = sw.blockchain.Header()
-
-			if head.Number != ss.BlockNumber {
-				sw.logger.Error("blockchain HEAD block number doesn't match snapshot block number", "expected", ss.BlockNumber, "got", head.Number)
-			}
-			if head.Hash != ss.BlockHash {
-				sw.logger.Error("blockchain HEAD block hash doesn't match snapshot block hash", "expected", ss.BlockHash.String(), "got", head.Hash.String())
-			}
-			// TODO: Does StateRoot provide any added security here?
 
 			continue
 
@@ -301,6 +273,43 @@ func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.Activ
 	}
 
 	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
+}
+
+func (sw *SequencerWorker) processStorageSnapshot(ss *snapshot.Snapshot) error {
+	sw.logger.Debug("received snapshot from peer", "block_number", ss.BlockNumber)
+
+	// Verify that the snapshot is immediate continuation to current local blockchain.
+	head := sw.blockchain.Header()
+	if head.Number+1 != ss.BlockNumber {
+		sw.logger.Debug("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
+		return nil
+	}
+
+	err := sw.snapshotter.Apply(ss)
+	if err != nil {
+		sw.logger.Error("failed to apply state diff snapshot", "error", err)
+	} else {
+		sw.logger.Debug("wrote snapshot to local storages", "block_number", ss.BlockNumber)
+	}
+
+	// Refresh the internal HEAD block in `blockchain`.
+	err = sw.blockchain.ComputeGenesis()
+	if err != nil {
+		return err
+	}
+
+	// refresh head after snapshot application.
+	head = sw.blockchain.Header()
+
+	if head.Number != ss.BlockNumber {
+		sw.logger.Error("blockchain HEAD block number doesn't match snapshot block number", "expected", ss.BlockNumber, "got", head.Number)
+	}
+	if head.Hash != ss.BlockHash {
+		sw.logger.Error("blockchain HEAD block hash doesn't match snapshot block hash", "expected", ss.BlockHash.String(), "got", head.Hash.String())
+	}
+	// TODO: Does StateRoot provide any added security here?
+
+	return nil
 }
 
 func (sw *SequencerWorker) ensureEnoughAvailBalance() error {

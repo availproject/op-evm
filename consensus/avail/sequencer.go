@@ -173,7 +173,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
 			//   trigger failures when writing down block due to already existing tx in the store.
 			_, blkAlreadyKnown := sw.blockchain.GetHeaderByHash(edgeBlk.Header.Hash)
-			if blkAlreadyKnown || !fraudResolver.IsFraudProofBlock(edgeBlk) {
+			if !blkAlreadyKnown || !fraudResolver.IsFraudProofBlock(edgeBlk) {
 				if err := validator.Check(edgeBlk); err == nil {
 					if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
 						sw.logger.Warn(

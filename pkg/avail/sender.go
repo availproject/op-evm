@@ -67,6 +67,7 @@ func (s *sender) Send(blk *edgetypes.Block) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = api.RPC.Author.SubmitExtrinsic(ext)
 	if err != nil {
 		return err

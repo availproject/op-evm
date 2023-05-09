@@ -5,27 +5,31 @@ import (
 
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/vedhavyas/go-subkey/scale"
 )
 
 // codePrefix is the code prefix for leveldb
 var codePrefix = []byte("code")
 
-type StateStorageSnapshot interface {
-	Diff() map[string][]byte
+type StateStorageSnapshot struct {
+	Keys   [][]byte
+	Values [][]byte
 }
 
-type stateStorageSnapshot map[string][]byte
+func (ss *StateStorageSnapshot) Encode(e scale.Encoder) error {
+	return e.Encode(ss)
+}
 
-func (sss stateStorageSnapshot) Diff() map[string][]byte {
-	return sss
+func (ss *StateStorageSnapshot) Decode(d scale.Decoder) error {
+	return d.Decode(ss)
 }
 
 type StateStorageSnapshotter interface {
 	itrie.Storage
 
 	Begin()
-	End() StateStorageSnapshot
-	Apply(snapshot StateStorageSnapshot) error
+	End() *StateStorageSnapshot
+	Apply(snapshot *StateStorageSnapshot) error
 }
 
 type StateStorage struct {
@@ -50,22 +54,33 @@ func (ss *StateStorage) Begin() {
 	ss.changes = make(map[string][]byte)
 }
 
-func (ss *StateStorage) End() StateStorageSnapshot {
+func (ss *StateStorage) End() *StateStorageSnapshot {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
-	ret := stateStorageSnapshot(ss.changes)
+	ret := &StateStorageSnapshot{
+		Keys:   make([][]byte, len(ss.changes)),
+		Values: make([][]byte, len(ss.changes)),
+	}
+
+	i := 0
+	for k, v := range ss.changes {
+		ret.Keys[i] = []byte(k)
+		ret.Values[i] = v
+		i++
+	}
+
 	ss.changes = nil
 
 	return ret
 }
 
-func (ss *StateStorage) Apply(snapshot StateStorageSnapshot) error {
+func (ss *StateStorage) Apply(snapshot *StateStorageSnapshot) error {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
-	for k, v := range snapshot.Diff() {
-		ss.underlying.Put([]byte(k), v)
+	for i := 0; i < len(snapshot.Keys); i++ {
+		ss.underlying.Put([]byte(snapshot.Keys[i]), snapshot.Values[i])
 	}
 
 	return nil

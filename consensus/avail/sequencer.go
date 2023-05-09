@@ -116,11 +116,15 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 
 		select {
 		case blk = <-availBlockStream.Chan():
-			// Process below.
+			// Processed below in the for-loop's main body.
 
-		// nolint:gosimple
-		case _ = <-sw.snapshotDistributor.Receive():
-			// TODO: Process the state snapshot.
+		case ss := <-sw.snapshotDistributor.Receive():
+			err = sw.processStorageSnapshot(ss)
+			if err != nil {
+				return err
+			}
+
+			continue
 
 		case <-sw.closeCh:
 			if err := sw.stakingNode.UnStake(sw.nodeSignKey); err != nil {
@@ -168,7 +172,8 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// - Watchtower has syncer disabled and when writing block, next block can come in rejecting this block.
 			// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
 			//   trigger failures when writing down block due to already existing tx in the store.
-			if !fraudResolver.IsFraudProofBlock(edgeBlk) {
+			_, blkAlreadyKnown := sw.blockchain.GetHeaderByHash(edgeBlk.Header.Hash)
+			if !blkAlreadyKnown || !fraudResolver.IsFraudProofBlock(edgeBlk) {
 				if err := validator.Check(edgeBlk); err == nil {
 					if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
 						sw.logger.Warn(
@@ -180,6 +185,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 						// Clear out the executed transactions from the TxPool after the block
 						// has been written.
 						sw.txpool.ResetWithHeaders(edgeBlk.Header)
+						sw.logger.Debug("wrote block to blockchain from Avail", "block_number", edgeBlk.Header.Number)
 					}
 				} else {
 					sw.logger.Warn(
@@ -267,6 +273,43 @@ func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.Activ
 	}
 
 	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
+}
+
+func (sw *SequencerWorker) processStorageSnapshot(ss *snapshot.Snapshot) error {
+	sw.logger.Debug("received snapshot from peer", "block_number", ss.BlockNumber)
+
+	// Verify that the snapshot is immediate continuation to current local blockchain.
+	head := sw.blockchain.Header()
+	if head.Number+1 != ss.BlockNumber {
+		sw.logger.Debug("snapshot does not provide immediate continuation to local blockchain; skipping", "head.Number", head.Number, "snapshot.BlockNumber", ss.BlockNumber)
+		return nil
+	}
+
+	err := sw.snapshotter.Apply(ss)
+	if err != nil {
+		sw.logger.Error("failed to apply state diff snapshot", "error", err)
+	} else {
+		sw.logger.Debug("wrote snapshot to local storages", "block_number", ss.BlockNumber)
+	}
+
+	// Refresh the internal HEAD block in `blockchain`.
+	err = sw.blockchain.ComputeGenesis()
+	if err != nil {
+		return err
+	}
+
+	// refresh head after snapshot application.
+	head = sw.blockchain.Header()
+
+	if head.Number != ss.BlockNumber {
+		sw.logger.Error("blockchain HEAD block number doesn't match snapshot block number", "expected", ss.BlockNumber, "got", head.Number)
+	}
+	if head.Hash != ss.BlockHash {
+		sw.logger.Error("blockchain HEAD block hash doesn't match snapshot block hash", "expected", ss.BlockHash.String(), "got", head.Hash.String())
+	}
+	// TODO: Does StateRoot provide any added security here?
+
+	return nil
 }
 
 func (sw *SequencerWorker) ensureEnoughAvailBalance() error {
@@ -373,6 +416,13 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
+	// Begin snapshot for P2P state distribution.
+	sw.snapshotter.Begin()
+
+	// Ensure that snapshotter is not gathering changes in case an error occurs
+	// during block generation.
+	defer func() { sw.snapshotter.End() }()
+
 	transition, err := sw.executor.BeginTxn(parent.StateRoot, header, types.StringToAddress(myAccount.Address.Hex()))
 	if err != nil {
 		return err
@@ -433,7 +483,8 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		"block_parent_hash", blk.ParentHash(),
 	)
 
-	err = sw.availSender.SendAndWaitForStatus(blk, avail_types.ExtrinsicStatus{IsInBlock: true})
+	// Submit block without waiting for status.
+	err = sw.availSender.Send(blk)
 	if err != nil {
 		sw.logger.Error("Error while submitting data to avail", "error", err)
 		return err
@@ -462,6 +513,22 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	// After the block has been written we reset the txpool to remove stale transactions.
 	sw.txpool.ResetWithHeaders(blk.Header)
+
+	// Gather changes from EVM and blockchain storages.
+	snapshot := sw.snapshotter.End()
+
+	// Augment the snapshot with block metadata.
+	snapshot.BlockNumber = blk.Header.Number
+	snapshot.BlockHash = blk.Header.Hash
+	snapshot.StateRoot = blk.Header.StateRoot
+
+	// Distribute snapshot to other sequencers over P2P.
+	err = sw.snapshotDistributor.Send(snapshot)
+	if err != nil {
+		return err
+	}
+
+	sw.logger.Debug("state snapshot sent over P2P")
 
 	return nil
 }

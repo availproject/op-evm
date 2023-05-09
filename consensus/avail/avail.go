@@ -123,6 +123,7 @@ func New(config Config) (consensus.Consensus, error) {
 		closeCh:                    make(chan struct{}),
 		blockchain:                 config.Blockchain,
 		executor:                   config.Executor,
+		snapshotter:                config.Snapshotter,
 		verifier:                   staking.NewVerifier(asq, logger.Named("verifier")),
 		txpool:                     config.TxPool,
 		secretsManager:             config.SecretsManager,
@@ -140,7 +141,7 @@ func New(config Config) (consensus.Consensus, error) {
 	}
 
 	if config.Network != nil {
-		d.snapshotDistributor, err = snapshot.NewDistributor(d.network)
+		d.snapshotDistributor, err = snapshot.NewDistributor(d.logger, d.network)
 		if err != nil {
 			return nil, err
 		}

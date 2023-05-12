@@ -61,11 +61,6 @@ func main() {
 		}
 	}
 
-	err = avail.DepositBalance(availClient, availAccount, balance*AVL, 0)
-	if err != nil {
-		panic(err)
-	}
-
 	log.Printf("Successfully deposited '%d' AVL to '%s'", balance, availAccount.Address)
 
 	if err := os.WriteFile(path, []byte(availAccount.URI), 0o644); err != nil {

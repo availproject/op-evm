@@ -137,6 +137,10 @@ func (h *handler) handle(ctx context.Context, nodeReq *NodeInfo) (*Response, err
 				len(nodes), nodeReq.NodeName, h.totalNodes),
 		}, nil
 	}
+	if ok, _ := h.storage.Exists(ctx, genesisJsonKey); ok {
+		return &Response{Message: "Genesis file already exists; skipping genesis creation"}, nil
+	}
+
 	for _, node := range nodes {
 		ssm, err := h.ssmFactory(node.NodeName)
 		if err != nil {
@@ -244,4 +248,17 @@ func (a *Storage) Get(ctx context.Context, key string, v interface{}) error {
 	}
 
 	return json.NewDecoder(s3Object.Body).Decode(v)
+}
+
+func (a *Storage) Exists(ctx context.Context, key string) (bool, error) {
+	objects, err := a.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &a.bucketName, Prefix: &key})
+	if err != nil {
+		return false, err
+	}
+	for _, obj := range objects.Contents {
+		if *obj.Key == key {
+			return true, nil
+		}
+	}
+	return false, nil
 }

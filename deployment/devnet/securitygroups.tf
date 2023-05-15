@@ -20,38 +20,6 @@ resource "aws_default_security_group" "default" {
   }
 }
 
-# Avail
-
-resource "aws_security_group" "avail" {
-  name        = "allow-avail-all-${var.deployment_name}"
-  description = "Allow all rpc, ws traffic"
-  vpc_id      = aws_vpc.devnet.id
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-resource "aws_security_group_rule" "allow_rpc_avail" {
-  type              = "ingress"
-  from_port         = "9933"
-  to_port           = "9933"
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.avail.id
-}
-resource "aws_security_group_rule" "allow_ws_avail" {
-  type              = "ingress"
-  from_port         = "9944"
-  to_port           = "9944"
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.avail.id
-}
-
-resource "aws_network_interface_sg_attachment" "sg_avail_attachment_rpc" {
-  security_group_id    = aws_security_group.avail.id
-  network_interface_id = aws_instance.avail.primary_network_interface_id
-}
-
 # Watchtower
 
 resource "aws_security_group" "watchtower" {

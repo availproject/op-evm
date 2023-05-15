@@ -86,13 +86,10 @@ chmod 400 ./configs/id_rsa
 all_instances=$(terraform output --json all_instances)
 
 instance_ids=()
-avail_instance_id=""
 while read -r i; do
   node_type=$(echo "$i" | jq -r .tags.NodeType)
   instance_id=$(echo "$i" | jq -r .id)
-  if [ "$node_type" = "avail" ]; then
-        avail_instance_id=$instance_id
-  else
+  if [ "$node_type" != "avail" ]; then
     instance_ids+=("$instance_id")
   fi
 done < <(echo "$all_instances" | jq -c '.[]')
@@ -132,14 +129,6 @@ do
   genesis=$(echo "$genesis" | jq ".genesis.alloc[\"${addr}\"] = {\"balance\": \"0x3635c9adc5dea00000\"}")
 done
 echo "$genesis" > ./configs/genesis.json
-
-remote_exec "$avail_instance_id" "sudo systemctl stop avail"
-remote_exec "$avail_instance_id" "rm -rf /home/ubuntu/workspace/data"
-remote_copy "$avail_instance_id" "./run-avail.sh" "/home/ubuntu/workspace"
-remote_copy "$avail_instance_id" "./avail.service" "/home/ubuntu/workspace"
-remote_exec "$avail_instance_id" "./workspace/run-avail.sh"
-
-sleep 10
 
 for instance_id in "${instance_ids[@]}"
 do

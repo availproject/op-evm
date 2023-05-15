@@ -72,7 +72,10 @@ module "alb" {
   deployment_name   = var.deployment_name
   public_subnets_id = [for subnet in aws_subnet.devnet_public : subnet.id]
   vpc_id            = aws_vpc.devnet.id
-  nodes             = [for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) : {id: node.id, p2p_port: node.tags.P2PPort, node_type: node.tags.NodeType}]
+  nodes             = [
+    for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) :
+    { id : node.id, p2p_port : node.tags.P2PPort, node_type : node.tags.NodeType }
+  ]
   grpc_port         = var.grpc_port
   jsonrpc_port      = var.jsonrpc_port
 }

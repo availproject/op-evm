@@ -229,7 +229,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// their active sequencer list on a start of the new block window, they gain
 			// coherent view into who is the next "leader" (i.e. the active sequencer
 			// allowed to produce a block).
-			if (*sw.availBlockNumWhenStaked / availBlockWindowLen) == (t.Load() / availBlockWindowLen) {
+			if sw.nodeType != BootstrapSequencer && (*sw.availBlockNumWhenStaked/availBlockWindowLen) == (t.Load()/availBlockWindowLen) {
 				sw.logger.Debug("sequencer account staked, but waiting for a fresh Avail block window after joining the network")
 				continue
 			} else {

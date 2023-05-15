@@ -27,6 +27,45 @@ provider "aws" {
   }
 }
 
+provider "github" {
+  token = var.github_token
+}
+
+data "github_release" "get_release" {
+  repository  = var.github_repository
+  owner       = var.github_owner
+  retrieve_by = "tag"
+  release_tag = var.release
+}
+
+locals {
+  artifact_url                     = {for v in data.github_release.get_release.assets : v.name => v.url}
+  github_token_ssm_parameter_path  = "/${var.deployment_name}/github_token"
+  nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
+}
+
+module "lambda" {
+  source = "./modules/lambda"
+
+  deployment_name                  = var.deployment_name
+  assm_artifact_url                = local.artifact_url[var.assm_artifact_name]
+  genesis_bucket_prefix            = var.genesis_bucket_prefix
+  github_token                     = var.github_token
+  iam_role_arn                     = module.security.iam_role_lambda_arn
+  nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
+  total_nodes                      = var.node_count + var.watchtower_count + 1
+}
+
+module "security" {
+  source = "./modules/security"
+
+  deployment_name                  = var.deployment_name
+  genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
+  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
+  github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
+  nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
+}
+
 resource "tls_private_key" "pk" {
   algorithm = "RSA"
   rsa_bits  = 4096

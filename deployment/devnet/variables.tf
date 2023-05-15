@@ -1,3 +1,45 @@
+variable "nodes_secrets_ssm_parameter_id" {
+  description = "AWS System manager parameter id for creating the path to store the secrets"
+  type        = string
+  default     = "nodes_secrets"
+}
+
+variable "github_owner" {
+  description = "Github repository owner or organisation to download the artifacts from"
+  type        = string
+  default     = "availproject"
+}
+
+variable "github_repository" {
+  description = "Github repository name to download the artifacts from"
+  type        = string
+  default     = "avail-settlement"
+}
+
+variable "genesis_bucket_prefix" {
+  description = "The prefix for the bucket to store the genesis.json file"
+  type        = string
+  default     = "genesis"
+}
+
+variable "release" {
+  description = "The avail settlement release (will match a tag from the github.com/availproject/avail-settlement repository)"
+  type        = string
+  default     = "v0.0.0-test1"
+}
+
+variable "github_token" {
+  description = "The github token needed for downloading the private artifacts"
+  type        = string
+  sensitive   = true
+}
+
+variable "assm_artifact_name" {
+  description = "The artifact name for `assm` binary"
+  type        = string
+  default     = "assm-linux-amd64.zip"
+}
+
 variable "deployment_name" {
   description = "The unique name for this particular deployment"
   type        = string

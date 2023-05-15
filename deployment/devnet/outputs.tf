@@ -2,8 +2,14 @@ output "all_instances" {
   value = local.all_instances
 }
 
-output "all_eips" {
-  value = concat([aws_eip.avail], [aws_eip.bootnode], aws_eip.node, aws_eip.watchtower)
+output "dns_name" {
+  value       = module.alb.dns_name
+  description = "The load balancer dns name"
+}
+
+output "avail_addr" {
+  value       = aws_eip.avail.public_dns
+  description = "Avail address"
 }
 
 output "ssh_pk" {

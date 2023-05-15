@@ -66,8 +66,8 @@ resource "aws_security_group" "watchtower" {
 resource "aws_security_group_rule" "watchtower_grpc" {
   count             = length(aws_instance.watchtower)
   type              = "ingress"
-  from_port         = element(aws_instance.watchtower, count.index).tags.GRPCPort
-  to_port           = element(aws_instance.watchtower, count.index).tags.GRPCPort
+  from_port         = var.grpc_port
+  to_port           = var.grpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = element(aws_security_group.watchtower, count.index).id
@@ -75,8 +75,8 @@ resource "aws_security_group_rule" "watchtower_grpc" {
 resource "aws_security_group_rule" "watchtower_jsonrpc" {
   count             = length(aws_instance.watchtower)
   type              = "ingress"
-  from_port         = element(aws_instance.watchtower, count.index).tags.JsonRPCPort
-  to_port           = element(aws_instance.watchtower, count.index).tags.JsonRPCPort
+  from_port         = var.jsonrpc_port
+  to_port           = var.jsonrpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = element(aws_security_group.watchtower, count.index).id
@@ -109,16 +109,16 @@ resource "aws_security_group" "bootnode" {
 }
 resource "aws_security_group_rule" "bootnode_grpc" {
   type              = "ingress"
-  from_port         = aws_instance.bootnode.tags.GRPCPort
-  to_port           = aws_instance.bootnode.tags.GRPCPort
+  from_port         = var.grpc_port
+  to_port           = var.grpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.bootnode.id
 }
 resource "aws_security_group_rule" "bootnode_jsonrpc" {
   type              = "ingress"
-  from_port         = aws_instance.bootnode.tags.JsonRPCPort
-  to_port           = aws_instance.bootnode.tags.JsonRPCPort
+  from_port         = var.jsonrpc_port
+  to_port           = var.jsonrpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.bootnode.id
@@ -151,8 +151,8 @@ resource "aws_security_group" "node" {
 resource "aws_security_group_rule" "node_grpc" {
   count             = length(aws_instance.node)
   type              = "ingress"
-  from_port         = element(aws_instance.node, count.index).tags.GRPCPort
-  to_port           = element(aws_instance.node, count.index).tags.GRPCPort
+  from_port         = var.grpc_port
+  to_port           = var.grpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = element(aws_security_group.node, count.index).id
@@ -160,8 +160,8 @@ resource "aws_security_group_rule" "node_grpc" {
 resource "aws_security_group_rule" "node_jsonrpc" {
   count             = length(aws_instance.node)
   type              = "ingress"
-  from_port         = element(aws_instance.node, count.index).tags.JsonRPCPort
-  to_port           = element(aws_instance.node, count.index).tags.JsonRPCPort
+  from_port         = var.jsonrpc_port
+  to_port           = var.jsonrpc_port
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = element(aws_security_group.node, count.index).id

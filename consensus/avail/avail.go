@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -23,6 +26,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	common_defs "github.com/maticnetwork/avail-settlement/pkg/common"
+	"github.com/maticnetwork/avail-settlement/pkg/faucet"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
@@ -44,6 +49,10 @@ const (
 	StakingPollPeersIntervalMs = 200
 )
 
+// minBalance is the minimum number of tokens that miner address must have, in
+// order to being able to run this node.
+var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
+
 type Config struct {
 	AccountFilePath string
 	AvailAccount    signature.KeyringPair
@@ -52,6 +61,7 @@ type Config struct {
 	Blockchain      *blockchain.Blockchain
 	BlockTime       uint64
 	Bootnode        bool
+	Chain           *chain.Chain
 	Context         context.Context
 	Config          *consensus.Config
 	Executor        *state.Executor
@@ -80,6 +90,7 @@ type Avail struct {
 	interval uint64
 	txpool   *txpool.TxPool
 
+	chain               *chain.Chain
 	blockchain          *blockchain.Blockchain
 	executor            *state.Executor
 	snapshotter         snapshot.Snapshotter
@@ -120,6 +131,7 @@ func New(config Config) (consensus.Consensus, error) {
 	d := &Avail{
 		logger:                     logger,
 		notifyCh:                   make(chan struct{}),
+		chain:                      config.Chain,
 		closeCh:                    make(chan struct{}),
 		blockchain:                 config.Blockchain,
 		executor:                   config.Executor,
@@ -188,61 +200,263 @@ func New(config Config) (consensus.Consensus, error) {
 
 // Initialize initializes the consensus
 func (d *Avail) Initialize() error {
+	balance, err := d.GetAccountBalance(d.minerAddr)
+	if err != nil && strings.HasPrefix(err.Error(), "state not found") {
+		// On accounts that don't have balance / don't exist
+		// -> a `state not found at hash ...` error is returned.
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	if balance.Cmp(minBalance) < 0 {
+		_, err := faucet.FindAccount(d.chain)
+		if err == faucet.ErrAccountNotFound {
+			return fmt.Errorf("not enough balance on account - cannot continue")
+		}
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Start starts the consensus mechanism
 // TODO: GRPC interface and listener, validator sequence and initialization as well P2P networking
 func (d *Avail) Start() error {
-	var (
-		activeParticipantsQuerier = staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
-		account                   = accounts.Account{Address: common.Address(d.minerAddr)}
-		key                       = &keystore.Key{PrivateKey: d.signKey}
-	)
-
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
 
-	// Start P2P syncing.
-	var err error
-	d.currentNodeSyncIndex, err = d.syncNode()
-	if err != nil {
-		return err
-	}
-
 	switch d.nodeType {
-	case Sequencer, BootstrapSequencer:
-		sequencerWorker, _ := NewSequencer(
-			d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
-			d.snapshotter, d.snapshotDistributor,
-			d.availClient, d.availAccount, d.availAppID, d.signKey,
-			d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
-			d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
-		)
-		go func() {
-			d.logger.Info("About to process node staking...", "node_type", d.nodeType)
-			if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
-				panic(err)
-			}
+	case BootstrapSequencer:
+		go d.startBootstrapSequencer()
 
-			if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
-				panic(err)
-			}
-		}()
+	case Sequencer:
+		go d.startSequencer()
+
 	case WatchTower:
-		go func() {
-			d.logger.Info("About to process node staking...", "node_type", d.nodeType)
-			if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
-				panic(err)
-			}
+		go d.startWatchTower()
 
-			d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, account, key)
-		}()
 	default:
 		return fmt.Errorf("invalid node type: %q", d.nodeType)
 	}
 
 	return nil
+}
+
+func (d *Avail) startBootstrapSequencer() {
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+
+	sequencerWorker, _ := NewSequencer(
+		d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
+		d.snapshotter, d.snapshotDistributor,
+		d.availClient, d.availAccount, d.availAppID, d.signKey,
+		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
+		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+	)
+
+	// Sync the node from Avail.
+	var err error
+	d.currentNodeSyncIndex, err = d.syncNode()
+	if err != nil {
+		panic(err)
+	}
+
+	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+		panic(err)
+	}
+
+	if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
+		panic(err)
+	}
+}
+
+func (d *Avail) startSequencer() {
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+
+	sequencerWorker, _ := NewSequencer(
+		d.logger.Named(d.nodeType.LogString()), d.blockchain, d.executor, d.txpool,
+		d.snapshotter, d.snapshotDistributor,
+		d.availClient, d.availAccount, d.availAppID, d.signKey,
+		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
+		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+	)
+
+	// Sync the node from Avail.
+	// Ensure we have enough balance on our account.
+	err := d.ensureAccountBalance()
+	if err != nil {
+		panic(err)
+	}
+
+	/*
+		XXX:
+		There's some kind of a race between the above `ensureAccountBalance()` and
+		the one below in the `syncConditionFn` - if one of them are removed,
+		the sequencer doesn't get balance deposit and therefore won't boot. If
+		they are both enabled, there are errors about "already known tx" from
+		the TxPool, which is completely understandable.
+
+		The question is: Where is that race? What causes it and how can there be
+		a correct synchronization between the bootstrap sequencer and a new ordinary
+		sequencer node, booting online?
+	*/
+
+	// Node sync condition. The node's miner account must have at least
+	// `minBalance` tokens deposited and the syncer must have reached the Avail
+	// HEAD.
+	syncConditionFn := func(blk *avail_types.SignedBlock) bool {
+		accountBalance, err := d.GetAccountBalance(d.minerAddr)
+		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
+			// No need to log this.
+			return false
+		} else if err != nil {
+			d.logger.Error("failed to query miner account balance", "error", err)
+			return false
+		}
+
+		// Sync until our deposit tx is through.
+		if accountBalance.Cmp(minBalance) < 0 {
+			err = d.ensureAccountBalance()
+			if err != nil {
+				d.logger.Error("failed to ensure account balance", "error", err)
+			}
+			return false
+		}
+
+		hdr, err := d.availClient.GetLatestHeader()
+		if err != nil {
+			d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
+			return false
+		}
+
+		if hdr.Number == blk.Block.Header.Number {
+			// Our miner account has enough funds to operate and we have reached Avail
+			// HEAD. Sync complete.
+			return true
+		}
+
+		return false
+	}
+
+	d.currentNodeSyncIndex, err = d.syncNodeUntil(syncConditionFn)
+	if err != nil {
+		panic(err)
+	}
+
+	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+		panic(err)
+	}
+
+	if err := sequencerWorker.Run(accounts.Account{Address: common.Address(d.minerAddr)}, &keystore.Key{PrivateKey: d.signKey}); err != nil {
+		panic(err)
+	}
+}
+
+func (d *Avail) startWatchTower() {
+	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
+	key := &keystore.Key{PrivateKey: d.signKey}
+
+	// Sync the node from Avail.
+	var err error
+	d.currentNodeSyncIndex, err = d.syncNode()
+	if err != nil {
+		panic(err)
+	}
+
+	// Ensure we have enough balance on our account.
+	err = d.ensureAccountBalance()
+	if err != nil {
+		panic(err)
+	}
+
+	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
+	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
+		panic(err)
+	}
+
+	acc := accounts.Account{Address: common.Address(d.minerAddr)}
+	d.runWatchTower(activeParticipantsQuerier, d.currentNodeSyncIndex, acc, key)
+}
+
+func (d *Avail) ensureAccountBalance() error {
+	// We need to have at least one node available to be able successfully push tx
+	// to the neighborhood peers.
+	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
+		time.Sleep(1 * time.Second)
+	}
+
+	faucetSignKey, err := faucet.FindAccount(d.chain)
+	if err != nil {
+		return err
+	}
+
+	// Query the current balance of the miner account.
+	currentBalance, err := d.GetAccountBalance(d.minerAddr)
+
+	// 'state not found' means that the account doesn't exist yet.
+	if err != nil && strings.HasPrefix(err.Error(), "state not found") {
+		currentBalance = big.NewInt(0)
+	} else if err != nil {
+		return err
+	}
+
+	// Necessary amount of tokens to be deposited to miner account.
+	amount := big.NewInt(0).Sub(minBalance, currentBalance)
+
+	var txn *state.Transition
+	{
+		hdr := d.blockchain.Header()
+		if hdr == nil {
+			return fmt.Errorf("blockchain returned nil header")
+		}
+
+		txn, err = d.executor.BeginTxn(hdr.StateRoot, hdr, d.minerAddr)
+		if err != nil {
+			return err
+		}
+	}
+
+	faucetAddr := crypto.PubKeyToAddress(&faucetSignKey.PublicKey)
+
+	tx := &types.Transaction{
+		From:     faucetAddr,
+		To:       &d.minerAddr,
+		Value:    amount,
+		GasPrice: big.NewInt(5000),
+		Gas:      1_000_000,
+		Nonce:    txn.GetNonce(faucetAddr),
+	}
+
+	txSigner := &crypto.FrontierSigner{}
+	tx, err = txSigner.SignTx(tx, faucetSignKey)
+	if err != nil {
+		return err
+	}
+
+	err = d.txpool.AddTx(tx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Avail) GetAccountBalance(addr types.Address) (*big.Int, error) {
+	hdr := d.blockchain.Header()
+	if hdr == nil {
+		return nil, fmt.Errorf("blockchain returned nil header")
+	}
+
+	txn, err := d.executor.BeginTxn(hdr.StateRoot, hdr, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return txn.GetBalance(addr), nil
 }
 
 // REQUIRED BASE INTERFACE METHODS //

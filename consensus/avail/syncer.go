@@ -30,13 +30,22 @@ func (d *Avail) getNextAvailBlockNumber() uint64 {
 }
 
 func (d *Avail) syncNode() (uint64, error) {
-	availNextBlockNumber := d.getNextAvailBlockNumber()
-
 	hdr, err := d.availClient.GetLatestHeader()
 	if err != nil {
-		d.logger.Error("couldn't fetch latest block hash", "error", err)
-		return 0, nil
+		d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
+		return 0, err
 	}
+
+	fn := func(blk *avail_types.SignedBlock) bool {
+		// Stop the syncing when we are up to date with latest header.
+		return hdr.Number == blk.Block.Header.Number
+	}
+
+	return d.syncNodeUntil(fn)
+}
+
+func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock) bool) (uint64, error) {
+	availNextBlockNumber := d.getNextAvailBlockNumber()
 
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
@@ -102,8 +111,8 @@ func (d *Avail) syncNode() (uint64, error) {
 
 		availNextBlockNumber = uint64(blk.Block.Header.Number)
 
-		// Stop the loop if we are synced with latest header
-		if hdr.Number == blk.Block.Header.Number {
+		// Stop syncing when stopCondition is met.
+		if stopConditionFn(blk) {
 			break
 		}
 	}

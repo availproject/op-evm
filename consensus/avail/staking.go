@@ -133,14 +133,10 @@ func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 }
 
 func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) (bool, error) {
-	// We need to have at least one node available to be able successfully push tx to the neighborhood peers
-	for {
-		if d.network == nil || d.network.GetBootnodeConnCount() > 0 {
-			break
-		}
-
+	// We need to have at least one node available to be able successfully push tx
+	// to the neighborhood peers.
+	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
 		time.Sleep(1 * time.Second)
-		continue
 	}
 
 	// XXX: This is a workaround for now.

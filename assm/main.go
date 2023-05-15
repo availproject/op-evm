@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -88,6 +89,7 @@ func main() {
 
 type NodeInfo struct {
 	NodeIP   string `json:"node_ip"`
+	NodeDNS  string `json:"node_dns"`
 	NodeName string `json:"node_name"`
 	NodePort string `json:"node_port"`
 	NodeType string `json:"node_type"`
@@ -106,8 +108,14 @@ type handler struct {
 }
 
 func (h *handler) handle(ctx context.Context, nodeReq *NodeInfo) (*Response, error) {
-	if nodeReq.NodeIP == "" {
-		return nil, fmt.Errorf("node_ip is required but wasn't provided")
+	nodeReq.NodeIP = strings.Trim(nodeReq.NodeIP, " ")
+	nodeReq.NodeDNS = strings.Trim(nodeReq.NodeDNS, " ")
+	nodeReq.NodeName = strings.Trim(nodeReq.NodeName, " ")
+	nodeReq.NodePort = strings.Trim(nodeReq.NodePort, " ")
+	nodeReq.NodeType = strings.Trim(nodeReq.NodeType, " ")
+
+	if nodeReq.NodeIP == "" && nodeReq.NodeDNS == "" {
+		return nil, fmt.Errorf("node_ip or node_dns is required but wasn't provided")
 	}
 	if nodeReq.NodeName == "" {
 		return nil, fmt.Errorf("node_name is required but wasn't provided")
@@ -166,8 +174,13 @@ func (h *handler) handle(ctx context.Context, nodeReq *NodeInfo) (*Response, err
 			Balance: big.NewInt(0).Mul(big.NewInt(h.balance), ETH),
 		}
 		if node.NodeType == "bootstrap-sequencer" || node.NodeType == "sequencer" {
-			h.chainDefaults.Bootnodes = append(h.chainDefaults.Bootnodes,
-				fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", node.NodeIP, node.NodePort, nodeID))
+			if node.NodeIP != "" {
+				h.chainDefaults.Bootnodes = append(h.chainDefaults.Bootnodes,
+					fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", node.NodeIP, node.NodePort, nodeID))
+			} else if node.NodeDNS != "" {
+				h.chainDefaults.Bootnodes = append(h.chainDefaults.Bootnodes,
+					fmt.Sprintf("/dns/%s/tcp/%s/p2p/%s", node.NodeDNS, node.NodePort, nodeID))
+			}
 		}
 		if err := h.storage.Set(ctx, genesisJsonKey, h.chainDefaults); err != nil {
 			return nil, fmt.Errorf("unable to write genesis file to the bucket err=%w", err)

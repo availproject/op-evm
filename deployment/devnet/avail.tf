@@ -4,7 +4,7 @@
 resource "aws_instance" "avail" {
   ami                  = var.base_ami
   instance_type        = var.base_instance_type
-  subnet_id            = aws_subnet.devnet_public[0].id
+  subnet_id            = module.networking.private_subnets_by_zone[local.zones[0]]
   user_data            = file("${path.module}/cloud-init-avail.sh")
   iam_instance_profile = module.security.iam_node_profile_id
   key_name             = aws_key_pair.devnet.key_name
@@ -27,14 +27,14 @@ resource "aws_eip" "avail" {
   instance   = aws_instance.avail.id
   vpc        = true
   depends_on = [
-    aws_internet_gateway.igw
+    module.networking.igw_id
   ]
 }
 
 resource "aws_security_group" "avail" {
   name        = "allow-avail-all-${var.deployment_name}"
   description = "Allow all rpc and ws traffic"
-  vpc_id      = aws_vpc.devnet.id
+  vpc_id      = module.networking.vpc_id
 }
 
 resource "aws_security_group_rule" "allow_rpc_avail" {

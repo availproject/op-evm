@@ -6,6 +6,7 @@
 - Build the accounts tool for linux (since it's going to be run on the remote machine) `make tools-account GOOS=linux`
 - Build the staking contract `make build-staking-contract`
 - Install aws cli tool and run `aws configure`, copy your Access Key ID and Secret Access Key from the aws console.
+- Install session manager plugin for AWS CLI
 - Install terraform and run `terraform login`.
 - `jq` tool has to be present on your machine
 

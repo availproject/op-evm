@@ -41,8 +41,6 @@ resource "aws_instance" "bootnode" {
   tags = {
     Name        = format("bootnode-%s", var.deployment_name)
     Hostname    = format("bootnode-%s", var.deployment_name)
-    GRPCPort    = "30001"
-    JsonRPCPort = "31001"
     P2PPort     = "32001"
     NodeType    = "bootstrap-sequencer"
     Provisioner = data.aws_caller_identity.provisioner.account_id
@@ -69,8 +67,6 @@ resource "aws_instance" "node" {
   tags = {
     Name        = format("node-%s-%02d", var.deployment_name, count.index + 1)
     Hostname    = format("node-%s-%02d", var.deployment_name, count.index + 1)
-    GRPCPort    = format("40%03d", count.index + 1)
-    JsonRPCPort = format("41%03d", count.index + 1)
     P2PPort     = format("42%03d", count.index + 1)
     NodeType    = "sequencer"
     Provisioner = data.aws_caller_identity.provisioner.account_id
@@ -97,8 +93,6 @@ resource "aws_instance" "watchtower" {
   tags = {
     Name        = format("watchtower-%s-%02d", var.deployment_name, count.index + 1)
     Hostname    = format("watchtower-%s-%02d", var.deployment_name, count.index + 1)
-    GRPCPort    = format("50%03d", count.index + 1)
-    JsonRPCPort = format("51%03d", count.index + 1)
     P2PPort     = format("52%03d", count.index + 1)
     NodeType    = "watchtower"
     Provisioner = data.aws_caller_identity.provisioner.account_id

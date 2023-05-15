@@ -1,3 +1,15 @@
+variable "grpc_port" {
+  description = "GRPC port for the bootstrap sequencer and sequencer to listen on"
+  type        = number
+  default     = 20001
+}
+
+variable "jsonrpc_port" {
+  description = "JSON RPC port for the bootstrap sequencer and sequencer to listen on"
+  type        = number
+  default     = 20002
+}
+
 variable "nodes_secrets_ssm_parameter_id" {
   description = "AWS System manager parameter id for creating the path to store the secrets"
   type        = string

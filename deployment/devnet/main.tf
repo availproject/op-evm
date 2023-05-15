@@ -66,6 +66,17 @@ module "security" {
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
 }
 
+module "alb" {
+  source = "./modules/alb"
+
+  deployment_name   = var.deployment_name
+  public_subnets_id = [for subnet in aws_subnet.devnet_public : subnet.id]
+  vpc_id            = aws_vpc.devnet.id
+  nodes             = [for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) : {id: node.id, p2p_port: node.tags.P2PPort, node_type: node.tags.NodeType}]
+  grpc_port         = var.grpc_port
+  jsonrpc_port      = var.jsonrpc_port
+}
+
 resource "tls_private_key" "pk" {
   algorithm = "RSA"
   rsa_bits  = 4096

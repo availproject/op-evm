@@ -7,37 +7,37 @@ function cleanup {
   popd || exit
 }
 trap cleanup EXIT
+dns_name=$(terraform output --raw dns_name)
+avail_addr=$(terraform output --raw avail_addr)
+
 #TODO make sure the needed binaries exist before running this script!
 
 function remote_copy {
-  scp -oStrictHostKeyChecking=no -i ./configs/id_rsa -r "$2" "ubuntu@$1:$3"
+  scp -oStrictHostKeyChecking=no -oProxyCommand="sh -c \"aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'\"" -i ./configs/id_rsa -r "$2" "ubuntu@$1:$3"
 }
 
 function remote_exec {
-  ssh -oStrictHostKeyChecking=no -i ./configs/id_rsa "ubuntu@$1" "$2"
+  ssh -oStrictHostKeyChecking=no -oProxyCommand="sh -c \"aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'\"" -i ./configs/id_rsa "ubuntu@$1" "$2"
 }
 
 function generate_config {
-    grpc_port=$1
-    jsonrpc_port=$2
     p2p_port=$3
     node_type=$4
-    nat_addr=$5
 
     cat <<EOF
 chain_config: /home/ubuntu/workspace/genesis.json
 secrets_config: ""
 data_dir: /home/ubuntu/workspace/data
 block_gas_target: "0x0"
-grpc_addr: :${grpc_port}
-jsonrpc_addr: :${jsonrpc_port}
+grpc_addr: :20001
+jsonrpc_addr: :20002
 telemetry:
     prometheus_addr: ""
 network:
     no_discover: false
     libp2p_addr: 0.0.0.0:${p2p_port}
-    nat_addr: ${nat_addr}
-    dns_addr: ""
+    nat_addr: ""
+    dns_addr: "dns/${dns_name}"
     max_peers: 40
     max_outbound_peers: 8
     max_inbound_peers: 32
@@ -62,7 +62,6 @@ EOF
 }
 
 function generate_service {
-    avail_addr=$1
     node_type=$2
     cat <<EOF
 [Unit]
@@ -85,18 +84,16 @@ terraform output --raw ssh_pk > ./configs/id_rsa
 chmod 400 ./configs/id_rsa
 
 all_instances=$(terraform output --json all_instances)
-all_eips=$(terraform output --json all_eips)
 
-avail_addr=
-nodes_addr=()
+instance_ids=()
+avail_instance_id=""
 while read -r i; do
   node_type=$(echo "$i" | jq -r .tags.NodeType)
   instance_id=$(echo "$i" | jq -r .id)
-  node_addr=$(echo "$all_eips" | jq -r ".[] | select(.instance == \"$instance_id\") | .public_dns")
   if [ "$node_type" = "avail" ]; then
-        avail_addr=$node_addr
+        avail_instance_id=$instance_id
   else
-    nodes_addr+=("$node_addr")
+    instance_ids+=("$instance_id")
   fi
 done < <(echo "$all_instances" | jq -c '.[]')
 
@@ -105,27 +102,22 @@ addresses=()
 while read -r i; do
     node_type=$(echo "$i" | jq -r .tags.NodeType)
     instance_id=$(echo "$i" | jq -r .id)
-    ip_and_dns_for_instance=$(echo "$all_eips" | jq -r ".[] | select(.instance == \"$instance_id\") | {public_ip, public_dns}")
-    public_ip=$(echo "$ip_and_dns_for_instance" | jq -r .public_ip)
-    node_addr=$(echo "$ip_and_dns_for_instance" | jq -r .public_dns)
     p2p_port=$(echo "$i" | jq -r .tags_all.P2PPort)
-    grpc_port=$(echo "$i" | jq -r .tags_all.GRPCPort)
-    jsonrpc_port=$(echo "$i" | jq -r .tags_all.JsonRPCPort)
 
     if [ "$node_type" = "avail" ]; then
       continue
     fi
 
-    mkdir -p "configs/${node_addr}"
-    secrets_json=$(polygon-edge secrets init --data-dir "./configs/${node_addr}/data" --json --insecure)
+    mkdir -p "configs/${instance_id}"
+    secrets_json=$(polygon-edge secrets init --data-dir "./configs/${instance_id}/data" --json --insecure)
 
     addresses+=("$(echo "$secrets_json" | jq -r .[0].address)")
     if [ "$node_type" = "bootstrap-sequencer"  ] || [ "$node_type" = "sequencer"  ]; then
-      bootnodes+=("/ip4/$public_ip/tcp/$p2p_port/p2p/$(echo "$secrets_json" | jq -r .[0].node_id)")
+      bootnodes+=("/dns/$dns_name/tcp/$p2p_port/p2p/$(echo "$secrets_json" | jq -r .[0].node_id)")
     fi
 
-    generate_config "$grpc_port" "$jsonrpc_port" "$p2p_port" "$node_type" "$public_ip" > "./configs/$node_addr/config.yaml"
-    generate_service "$avail_addr" "$node_type" > "./configs/$node_addr/node.service"
+    generate_config "$p2p_port" "$node_type" > "./configs/$instance_id/config.yaml"
+    generate_service "$node_type" > "./configs/$instance_id/node.service"
 
 done < <(echo "$all_instances" | jq -c '.[]')
 
@@ -141,22 +133,22 @@ do
 done
 echo "$genesis" > ./configs/genesis.json
 
-remote_exec "$avail_addr" "sudo systemctl stop avail"
-remote_exec "$avail_addr" "rm -rf /home/ubuntu/workspace/data"
-remote_copy "$avail_addr" "./run-avail.sh" "/home/ubuntu/workspace"
-remote_copy "$avail_addr" "./avail.service" "/home/ubuntu/workspace"
-remote_exec "$avail_addr" "./workspace/run-avail.sh"
+remote_exec "$avail_instance_id" "sudo systemctl stop avail"
+remote_exec "$avail_instance_id" "rm -rf /home/ubuntu/workspace/data"
+remote_copy "$avail_instance_id" "./run-avail.sh" "/home/ubuntu/workspace"
+remote_copy "$avail_instance_id" "./avail.service" "/home/ubuntu/workspace"
+remote_exec "$avail_instance_id" "./workspace/run-avail.sh"
 
 sleep 10
 
-for node_addr in "${nodes_addr[@]}"
+for instance_id in "${instance_ids[@]}"
 do
-  remote_exec "$node_addr" "sudo systemctl stop node"
-  remote_exec "$node_addr" "rm -rf /home/ubuntu/workspace/data"
-  remote_copy "$node_addr" "./configs/$node_addr/." "/home/ubuntu/workspace"
-  remote_copy "$node_addr" "./configs/genesis.json" "/home/ubuntu/workspace"
-  remote_copy "$node_addr" "../../avail-settlement" "/home/ubuntu/workspace"
-  remote_copy "$node_addr" "../../tools/accounts/accounts" "/home/ubuntu/workspace"
-  remote_copy "$node_addr" "./run-node.sh" "/home/ubuntu/workspace"
-  remote_exec "$node_addr" "./workspace/run-node.sh $avail_addr"
+  remote_exec "$instance_id" "sudo systemctl stop node"
+  remote_exec "$instance_id" "rm -rf /home/ubuntu/workspace/data"
+  remote_copy "$instance_id" "./configs/$instance_id/." "/home/ubuntu/workspace"
+  remote_copy "$instance_id" "./configs/genesis.json" "/home/ubuntu/workspace"
+  remote_copy "$instance_id" "../../avail-settlement" "/home/ubuntu/workspace"
+  remote_copy "$instance_id" "../../tools/accounts/accounts" "/home/ubuntu/workspace"
+  remote_copy "$instance_id" "./run-node.sh" "/home/ubuntu/workspace"
+  remote_exec "$instance_id" "./workspace/run-node.sh $avail_addr"
 done

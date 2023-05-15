@@ -1,0 +1,26 @@
+---
+#deployment_name: "{{ clean_deploy_title }}"
+#lb_dns: "{{ clean_deploy_title }}.dataavailability.link"
+#node_name: "{{ hostvars[inventory_hostname].tags.Name }}"
+#avail_domain: "{{ lb_dns }}"
+
+#global_rpc: "https://{{ avail_domain }}/rpc"
+#global_ws: "wss://{{ avail_domain }}/ws"
+
+avail_release: v1.4.0-rc4
+
+# depending on how we load balance this might need to be moved to the host level
+node_port: 30333
+node_ws_port: 9944
+node_rpc_port: 9933
+node_base_path: /var/avail
+node_network_mode: default
+node_in_peers: 50
+node_out_peers: 50
+node_ws_max_connections: 1000
+explorer_http_port: 8080
+data_avail_base_path: /da
+
+prometheus:
+  port: 9615
+  endpoint: "metrics"

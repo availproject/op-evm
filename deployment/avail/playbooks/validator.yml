@@ -1,0 +1,67 @@
+- hosts: bootnodes
+  gather_facts: true
+  become: true
+  become_user: admin
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.cargo/bin:/da/bin:{{ ansible_env.PATH }}"
+  pre_tasks:
+    - name: Update system (apt) repositories
+      apt: update_cache=yes
+      become_user: root
+      changed_when: false
+  tasks:
+  - name: Gathering node global variables
+    include_vars:
+      file: node.yml
+      name: node_config
+
+  - name: Gathering validator node global variables
+    include_vars:
+      file: validator.yml
+      name: node_type_config
+
+  #- name: Creating avail base path
+  #  file:
+  #    path: "{{ node_config.node_base_path }}"
+  #    state: directory
+  #  become_user: root
+
+  #- name: Creating folder for chainspecs
+  #  file:
+  #    path: "{{ node_config.node_base_path }}/genesis"
+  #    state: directory
+  #  become_user: root
+
+  #- name: Creating folder for keystore
+  #  file:
+  #    path: "{{ node_config.node_base_path }}/keystore"
+  #    state: directory
+  #  become_user: root
+
+  #- name: Creating folder for state
+  #  file:
+  #    path: "{{ node_config.node_base_path }}/state"
+  #    state: directory
+  #  become_user: root
+
+  - name: Creating entrypoint
+    tags:
+      - templates
+    template:
+      src: "../templates/secrets/da.sh"
+      dest: "{{ node_config.node_base_path }}/da.sh"
+      mode: 755
+    become_user: root
+
+  - name: create secret.txt
+    template:
+      src: "../templates/secrets/secret.txt"
+      dest: "{{ node_config.node_base_path }}/secret.txt"
+      mode: 755
+    become_user: root
+
+  - name: Dropping new lines from secret
+    ansible.builtin.replace:
+      path: "{{ node_config.node_base_path }}/secret.txt"
+      regexp: '[\n\r]'
+      replace: ''

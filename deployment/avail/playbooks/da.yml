@@ -1,0 +1,67 @@
+- hosts: bootnodes
+  gather_facts: true
+  become: true
+  become_user: admin
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.cargo/bin:/da/bin:{{ ansible_env.PATH }}"
+  pre_tasks:
+    - name: Update system (apt) repositories
+      apt: update_cache=yes
+      become_user: root
+      changed_when: false
+  tasks:
+  - name: Gathering node global variables
+    include_vars:
+      file: node.yml
+      name: node_config
+
+  - name: Creating data availability base path
+    file:
+      path: "{{ node_config.data_avail_base_path }}"
+      state: directory
+    become_user: root
+
+  - name: Creating data availability genesis path
+    file:
+      path: "{{ node_config.data_avail_base_path }}/genesis"
+      state: directory
+    become_user: root
+
+  - name: Creating data availability bin path
+    file:
+      path: "{{ node_config.data_avail_base_path }}/bin"
+      state: directory
+    become_user: root
+
+  - name: Creating data availability keystore path
+    file:
+      path: "{{ node_config.data_avail_base_path }}/keystore"
+      state: directory
+    become_user: root
+
+  - name: Creating data availability state path
+    file:
+      path: "{{ node_config.data_avail_base_path }}/state"
+      state: directory
+    become_user: root
+
+  - name: Checkout avail from the official repo
+    ansible.builtin.git:
+      repo: 'https://github.com/maticnetwork/avail.git'
+      dest: "{{ ansible_env.HOME }}/avail"
+      version: "{{ node_config.avail_release }}"
+
+  - name: Check if data availability binary is already installed
+    shell: command -v data-avail
+    register: data_avail_exists
+    ignore_errors: true
+
+  - name: Building avail release and moving genesis and avail binary to the corect location
+    when: data_avail_exists is failed
+    shell: |
+      cd "{{ ansible_env.HOME }}/avail"
+      # cargo build --release -p data-avail
+      #mv target/release/data-avail "{{ node_config.data_avail_base_path }}/bin"
+      cp -r misc/genesis /da/
+    ignore_errors: false
+    become_user: root

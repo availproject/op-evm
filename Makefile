@@ -120,13 +120,13 @@ start-staking: build-staking
 	./tools/staking/staking
 
 create-bootstrap-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-bootstrap-sequencer
+	./tools/accounts/accounts -balance 5 -path ./configs/account-bootstrap-sequencer
 	
 create-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-sequencer
+	./tools/accounts/accounts -balance 5 -path ./configs/account-sequencer
 
 create-watchtower-account: tools-account
-	./tools/accounts/accounts -balance 1000 -path ./configs/account-watchtower
+	./tools/accounts/accounts -balance 5 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

@@ -46,6 +46,24 @@ variable "github_token" {
   sensitive   = true
 }
 
+variable "polygon_edge_artifact_url" {
+  description = "The artifact url for `polygon-edge` binary"
+  type        = string
+  default     = "https://github.com/0xPolygon/polygon-edge/releases/download/v0.8.1/polygon-edge_0.8.1_linux_arm64.tar.gz"
+}
+
+variable "avail_settlement_artifact_name" {
+  description = "The artifact name for `avail-settlement` binary"
+  type        = string
+  default     = "avail-settlement-linux-arm64.zip"
+}
+
+variable "accounts_artifact_name" {
+  description = "The artifact name for `accounts` binary"
+  type        = string
+  default     = "accounts-linux-arm64.zip"
+}
+
 variable "assm_artifact_name" {
   description = "The artifact name for `assm` binary"
   type        = string

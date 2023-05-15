@@ -48,6 +48,26 @@ variable "base_ami" {
   type        = string
 }
 
+variable "polygon_edge_artifact_url" {
+  description = "The artifact url for `polygon-edge` binary"
+  type        = string
+}
+
+variable "avail_settlement_artifact_url" {
+  description = "The artifact url for `avail-settlement` binary"
+  type        = string
+}
+
+variable "accounts_artifact_url" {
+  description = "The artifact url for `accounts` binary"
+  type        = string
+}
+
+variable "avail_addr" {
+  description = "Avail address"
+  type = string
+}
+
 variable "genesis_init_lambda_name" {
   description = "The name of the lambda function to initialize genesis.json"
   type = string

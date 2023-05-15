@@ -2,6 +2,7 @@ resource "aws_instance" "avail" {
   ami                         = var.base_ami
   instance_type               = var.base_instance_type
   key_name                    = aws_key_pair.devnet.key_name
+  iam_instance_profile        = module.security.iam_node_profile_id
   subnet_id                   = aws_subnet.devnet_public[0].id
   availability_zone           = aws_subnet.devnet_public[0].availability_zone
   associate_public_ip_address = false
@@ -25,6 +26,7 @@ resource "aws_instance" "bootnode" {
   ami                         = var.base_ami
   instance_type               = var.base_instance_type
   key_name                    = aws_key_pair.devnet.key_name
+  iam_instance_profile        = module.security.iam_node_profile_id
   subnet_id                   = aws_subnet.devnet_public[0].id
   availability_zone           = aws_subnet.devnet_public[0].availability_zone
   associate_public_ip_address = false
@@ -52,6 +54,7 @@ resource "aws_instance" "node" {
   instance_type               = var.base_instance_type
   count                       = var.node_count
   key_name                    = aws_key_pair.devnet.key_name
+  iam_instance_profile        = module.security.iam_node_profile_id
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
   availability_zone           = element(aws_subnet.devnet_public, count.index).availability_zone
   associate_public_ip_address = false
@@ -79,6 +82,7 @@ resource "aws_instance" "watchtower" {
   instance_type               = var.base_instance_type
   count                       = var.watchtower_count
   key_name                    = aws_key_pair.devnet.key_name
+  iam_instance_profile        = module.security.iam_node_profile_id
   subnet_id                   = element(aws_subnet.devnet_public, count.index).id
   availability_zone           = element(aws_subnet.devnet_public, count.index).availability_zone
   associate_public_ip_address = false

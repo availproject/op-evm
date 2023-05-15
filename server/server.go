@@ -478,6 +478,7 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	// Fill-in server dependencies.
 	consensusCfg.Blockchain = s.blockchain
 	consensusCfg.BlockTime = s.config.BlockTime
+	consensusCfg.Chain = s.config.Chain
 	consensusCfg.Config = config
 	consensusCfg.Context = context.Background()
 	consensusCfg.Executor = s.executor

@@ -77,10 +77,10 @@ variable "devnet_key_name" {
   default     = "2023-02-21-avail-settlement-devnet"
 }
 
-variable "zones" {
+variable "zone_names" {
   description = "The zones for deployment"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  default     = ["a", "b", "c"]
 }
 
 variable "devnet_vpc_block" {
@@ -93,6 +93,12 @@ variable "devnet_public_subnet" {
   description = "The cidr block for the public subnet in our VPC"
   type        = list(string)
   default     = ["10.0.2.0/23", "10.0.4.0/23", "10.0.6.0/23"]
+}
+
+variable "devnet_private_subnet" {
+  description = "The cidr block for the private subnet in our VPC"
+  type        = list(string)
+  default     = ["10.0.128.0/23", "10.0.130.0/23", "10.0.132.0/23"]
 }
 
 variable "node_count" {

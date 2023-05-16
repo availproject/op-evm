@@ -31,6 +31,8 @@ provider "github" {
   token = var.github_token
 }
 
+data "aws_region" "current" {}
+
 data "github_release" "get_release" {
   repository  = var.github_repository
   owner       = var.github_owner
@@ -42,6 +44,8 @@ locals {
   artifact_url                     = {for v in data.github_release.get_release.assets : v.name => v.url}
   github_token_ssm_parameter_path  = "/${var.deployment_name}/github_token"
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
+
+  zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
 }
 
 module "lambda" {
@@ -54,6 +58,16 @@ module "lambda" {
   iam_role_arn                     = module.security.iam_role_lambda_arn
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
   total_nodes                      = var.node_count + var.watchtower_count + 1
+}
+
+module "networking" {
+  source = "./modules/networking"
+
+  deployment_name       = var.deployment_name
+  devnet_private_subnet = var.devnet_private_subnet
+  devnet_public_subnet  = var.devnet_public_subnet
+  devnet_vpc_block      = var.devnet_vpc_block
+  zones                 = local.zones
 }
 
 module "security" {
@@ -70,8 +84,8 @@ module "alb" {
   source = "./modules/alb"
 
   deployment_name   = var.deployment_name
-  public_subnets_id = [for subnet in aws_subnet.devnet_public : subnet.id]
-  vpc_id            = aws_vpc.devnet.id
+  public_subnets_id = values(module.networking.public_subnets_by_zone)
+  vpc_id            = module.networking.vpc_id
   nodes             = [
     for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) :
     { id : node.id, p2p_port : node.tags.P2PPort, node_type : node.tags.NodeType }

@@ -1,27 +1,3 @@
-resource "aws_instance" "avail" {
-  ami                         = var.base_ami
-  instance_type               = var.base_instance_type
-  key_name                    = aws_key_pair.devnet.key_name
-  iam_instance_profile        = module.security.iam_node_profile_id
-  subnet_id                   = aws_subnet.devnet_public[0].id
-  availability_zone           = aws_subnet.devnet_public[0].availability_zone
-  associate_public_ip_address = false
-  user_data                   = file("${path.module}/ebs-mount.sh")
-
-  root_block_device {
-    delete_on_termination = true
-    volume_size           = 10
-    volume_type           = "gp2"
-  }
-
-  tags = {
-    Name        = "avail-${var.deployment_name}"
-    Hostname    = "avail-${var.deployment_name}"
-    NodeType    = "avail"
-    Provisioner = data.aws_caller_identity.provisioner.account_id
-  }
-}
-
 resource "aws_instance" "bootnode" {
   ami                         = var.base_ami
   instance_type               = var.base_instance_type
@@ -99,11 +75,6 @@ resource "aws_instance" "watchtower" {
   }
 }
 
-resource "aws_ebs_volume" "avail" {
-  availability_zone = aws_subnet.devnet_public[0].availability_zone
-  size              = 30
-}
-
 resource "aws_ebs_volume" "bootnode" {
   availability_zone = aws_subnet.devnet_public[0].availability_zone
   size              = 30
@@ -119,12 +90,6 @@ resource "aws_ebs_volume" "watchtower" {
   count             = var.watchtower_count
   availability_zone = element(aws_subnet.devnet_public, count.index).availability_zone
   size              = 30
-}
-
-resource "aws_volume_attachment" "avail" {
-  device_name = "/dev/sdh"
-  volume_id   = aws_ebs_volume.avail.id
-  instance_id = aws_instance.avail.id
 }
 
 resource "aws_volume_attachment" "bootnode" {

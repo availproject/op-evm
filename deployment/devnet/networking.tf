@@ -58,11 +58,3 @@ resource "aws_route_table_association" "public" {
   subnet_id      = element(aws_subnet.devnet_public, count.index).id
   route_table_id = aws_route_table.devnet_public.id
 }
-
-resource "aws_eip" "avail" {
-  instance = aws_instance.avail.id
-  vpc      = true
-  depends_on = [
-    aws_internet_gateway.igw
-  ]
-}

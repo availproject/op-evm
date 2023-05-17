@@ -46,7 +46,7 @@ locals {
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
 
   zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
-  all_nodes = [for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) : {id: node.id, p2p_port: node.tags.P2PPort, node_type: node.tags.NodeType, primary_network_interface_id: node.primary_network_interface_id}]
+  all_nodes = flatten([for v in module.nodes : v.instances])
 }
 
 module "lambda" {
@@ -92,6 +92,33 @@ module "alb" {
   jsonrpc_port      = var.jsonrpc_port
 }
 
+module "nodes" {
+  source = "./modules/nodes"
+
+  for_each = {
+    "bootstrap-sequencer" = { node_count = 1, port_prefix = 31 }
+    "sequencer"           = { node_count = var.node_count, port_prefix = 32 }
+    "watchtower"          = { node_count = var.watchtower_count, port_prefix = 33 }
+  }
+  node_type                        = each.key
+  node_count                       = each.value.node_count
+  p2p_port_prefix                  = each.value.port_prefix
+  deployment_name                  = var.deployment_name
+  base_ami                         = var.base_ami
+  base_instance_type               = var.base_instance_type
+  github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
+  grpc_port                        = var.grpc_port
+  jsonrpc_port                     = var.jsonrpc_port
+  nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
+  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
+  subnets_by_zone                  = module.networking.private_subnets_by_zone
+  genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
+  iam_profile_id                   = module.security.iam_node_profile_id
+  lb_dns_name                      = module.alb.dns_name
+  zones                            = local.zones
+  key_name                         = aws_key_pair.devnet.key_name
+}
+
 resource "tls_private_key" "pk" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -103,7 +130,3 @@ resource "aws_key_pair" "devnet" {
 }
 
 data "aws_caller_identity" "provisioner" {}
-
-locals {
-  all_instances = concat([aws_instance.avail], [aws_instance.bootnode], aws_instance.node, aws_instance.watchtower)
-}

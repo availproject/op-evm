@@ -46,6 +46,7 @@ locals {
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
 
   zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
+  all_nodes = [for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) : {id: node.id, p2p_port: node.tags.P2PPort, node_type: node.tags.NodeType, primary_network_interface_id: node.primary_network_interface_id}]
 }
 
 module "lambda" {
@@ -86,10 +87,7 @@ module "alb" {
   deployment_name   = var.deployment_name
   public_subnets_id = values(module.networking.public_subnets_by_zone)
   vpc_id            = module.networking.vpc_id
-  nodes             = [
-    for node in concat([aws_instance.bootnode], aws_instance.node, aws_instance.watchtower) :
-    { id : node.id, p2p_port : node.tags.P2PPort, node_type : node.tags.NodeType }
-  ]
+  nodes             = local.all_nodes
   grpc_port         = var.grpc_port
   jsonrpc_port      = var.jsonrpc_port
 }

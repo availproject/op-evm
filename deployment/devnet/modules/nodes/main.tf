@@ -9,8 +9,8 @@ resource "aws_instance" "node" {
   instance_type               = var.base_instance_type
   key_name                    = var.key_name
   iam_instance_profile        = var.iam_profile_id
-  subnet_id                   = var.subnets_by_zone[var.zones[count.index]]
-  availability_zone           = var.zones[count.index]
+  subnet_id                   = var.subnets_by_zone[element(var.zones, count.index)]
+  availability_zone           = element(var.zones, count.index)
   user_data_replace_on_change = true
   ebs_optimized               = true
 
@@ -24,8 +24,11 @@ resource "aws_instance" "node" {
 
 resource "aws_ebs_volume" "node_ebs" {
   count             = var.node_count
-  availability_zone = var.zones[count.index]
+  availability_zone = element(var.zones, count.index)
   size              = 30
+  tags              = {
+    Name = "${var.node_type}-${count.index + 1}-${var.deployment_name}"
+  }
 }
 
 resource "aws_volume_attachment" "node_ebs_attach" {

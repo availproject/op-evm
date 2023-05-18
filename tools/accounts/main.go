@@ -80,14 +80,14 @@ func deposit(availClient avail.Client, availAccount signature.KeyringPair, balan
 		if amount.IsUint64() {
 			err = avail.DepositBalance(availClient, availAccount, amount.Uint64(), 0)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			break
 		} else {
 			err = avail.DepositBalance(availClient, availAccount, maxUint64, 0)
 			if err != nil {
-				panic(err)
+				return err
 			}
 
 			amount = big.NewInt(0).Sub(amount, big.NewInt(0).SetUint64(maxUint64))

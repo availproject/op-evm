@@ -291,57 +291,8 @@ func (d *Avail) startSequencer() {
 		panic(err)
 	}
 
-	/*
-		XXX:
-		There's some kind of a race between the above `ensureAccountBalance()` and
-		the one below in the `syncConditionFn` - if one of them are removed,
-		the sequencer doesn't get balance deposit and therefore won't boot. If
-		they are both enabled, there are errors about "already known tx" from
-		the TxPool, which is completely understandable.
-
-		The question is: Where is that race? What causes it and how can there be
-		a correct synchronization between the bootstrap sequencer and a new ordinary
-		sequencer node, booting online?
-	*/
-
-	// Node sync condition. The node's miner account must have at least
-	// `minBalance` tokens deposited and the syncer must have reached the Avail
-	// HEAD.
-	syncConditionFn := func(blk *avail_types.SignedBlock) bool {
-		accountBalance, err := d.GetAccountBalance(d.minerAddr)
-		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
-			// No need to log this.
-			return false
-		} else if err != nil {
-			d.logger.Error("failed to query miner account balance", "error", err)
-			return false
-		}
-
-		// Sync until our deposit tx is through.
-		if accountBalance.Cmp(minBalance) < 0 {
-			err = d.ensureAccountBalance()
-			if err != nil {
-				d.logger.Error("failed to ensure account balance", "error", err)
-			}
-			return false
-		}
-
-		hdr, err := d.availClient.GetLatestHeader()
-		if err != nil {
-			d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
-			return false
-		}
-
-		if hdr.Number == blk.Block.Header.Number {
-			// Our miner account has enough funds to operate and we have reached Avail
-			// HEAD. Sync complete.
-			return true
-		}
-
-		return false
-	}
-
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(syncConditionFn)
+	faucet := FaucetHelper{d}
+	d.currentNodeSyncIndex, err = d.syncNodeUntil(faucet.SyncConditionFn)
 	if err != nil {
 		panic(err)
 	}
@@ -360,15 +311,15 @@ func (d *Avail) startWatchTower() {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	key := &keystore.Key{PrivateKey: d.signKey}
 
-	// Sync the node from Avail.
-	var err error
-	d.currentNodeSyncIndex, err = d.syncNode()
+	// Ensure we have enough balance on our account.
+	err := d.ensureAccountBalance()
 	if err != nil {
 		panic(err)
 	}
 
-	// Ensure we have enough balance on our account.
-	err = d.ensureAccountBalance()
+	// Sync the node from Avail.
+	faucet := FaucetHelper{d}
+	d.currentNodeSyncIndex, err = d.syncNodeUntil(faucet.SyncConditionFn)
 	if err != nil {
 		panic(err)
 	}

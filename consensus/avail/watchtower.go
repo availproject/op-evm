@@ -2,7 +2,6 @@ package avail
 
 import (
 	"strings"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -24,23 +23,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 	callIdx, err := avail.FindCallIndex(d.availClient)
 	if err != nil {
 		panic(err)
-	}
-
-	for {
-		watchtowerStaked, sequencerError := activeParticipantsQuerier.Contains(d.minerAddr, staking.WatchTower)
-		if sequencerError != nil {
-			d.logger.Error("failed to check if my account is among active staked watchtowers. Retrying in few seconds...", "error", sequencerError)
-			time.Sleep(3 * time.Second)
-			continue
-		}
-
-		if !watchtowerStaked {
-			d.logger.Warn("my account is not among active staked watchtower. Retrying in few seconds...", "address", d.minerAddr.String())
-			time.Sleep(3 * time.Second)
-			continue
-		}
-
-		break
 	}
 
 	logger.Info("watchtower started")

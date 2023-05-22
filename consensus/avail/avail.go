@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -30,7 +31,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/faucet"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/matryer/resync"
 )
 
 const (
@@ -56,7 +56,7 @@ var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
 
 // Used to sync initial balance (if needed) only once to remove attempts to insert
 // same tx multiple times.
-var balanceOnce resync.Once
+var balanceOnce sync.Once
 
 type Config struct {
 	AccountFilePath string
@@ -233,6 +233,27 @@ func (d *Avail) Start() error {
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
 
+	if d.nodeType != BootstrapSequencer {
+		// When node starts, txpool is started but because peer count is not yet updated and
+		// there is no nodes to push transactions towards, we should first wait for at least
+		// 1 bootnode to be available prior we continue syncing.
+		// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
+		// usually fails due to txpool not having any peers to send tx towards.
+		// This results in local tx being applied and node goes into corrupted mode.
+		// Following for functionality is here as well to ensure we do not unecessary sleeps
+		// in server.go when txpool and network is starting.
+		for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
+			time.Sleep(2 * time.Second)
+		}
+
+		// Sync the node from Avail.
+		var err error
+		d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
+		if err != nil {
+			panic(fmt.Sprintf("failure to sync node: %s", err))
+		}
+	}
+
 	switch d.nodeType {
 	case BootstrapSequencer:
 		go d.startBootstrapSequencer()
@@ -289,24 +310,6 @@ func (d *Avail) startSequencer() {
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
 	)
 
-	// When node starts, txpool is started but because peer count is not yet updated and
-	// there is no nodes to push transactions towards, we should first wait for at least
-	// 1 bootnode to be available prior we continue syncing.
-	// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
-	// usually fails due to txpull not having any peers to send tx towards.
-	// This results in local tx being applied and node goes into corrupted mode.
-	// Following for functionality is here as well to ensure we do not unecessary sleeps
-	// in server.go when txpool and network is starting.
-	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
-		time.Sleep(2 * time.Second)
-	}
-
-	var err error
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
-	if err != nil {
-		panic(err)
-	}
-
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		panic(err)
@@ -321,25 +324,6 @@ func (d *Avail) startWatchTower() {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	key := &keystore.Key{PrivateKey: d.signKey}
 
-	// When node starts, txpool is started but because peer count is not yet updated and
-	// there is no nodes to push transactions towards, we should first wait for at least
-	// 1 bootnode to be available prior we continue syncing.
-	// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
-	// usually fails due to txpull not having any peers to send tx towards.
-	// This results in local tx being applied and node goes into corrupted mode.
-	// Following for functionality is here as well to ensure we do not unecessary sleeps
-	// in server.go when txpool and network is starting.
-	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
-		time.Sleep(2 * time.Second)
-	}
-
-	// Sync the node from Avail.
-	var err error
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
-	if err != nil {
-		panic(err)
-	}
-
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		panic(err)
@@ -350,12 +334,6 @@ func (d *Avail) startWatchTower() {
 }
 
 func (d *Avail) ensureAccountBalance() error {
-	// We need to have at least one node available to be able successfully push tx
-	// to the neighborhood peers.
-	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
-		time.Sleep(1 * time.Second)
-	}
-
 	faucetSignKey, err := faucet.FindAccount(d.chain)
 	if err != nil {
 		return err
@@ -456,9 +434,7 @@ func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
 			balanceOnce.Do(func() {
 				if err := d.ensureAccountBalance(); err != nil {
 					d.logger.Error("failed to ensure account balance", "error", err)
-					// As we are doing it only once, we should reset sync in case it's failed.
-					// Otherwise faucet will never be applied.
-					balanceOnce.Reset()
+					panic(fmt.Sprintf("failure to apply faucet balance to the txpool: %s", err))
 				}
 			})
 

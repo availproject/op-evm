@@ -404,6 +404,11 @@ func (d *Avail) ensureAccountBalance() error {
 		return err
 	}
 
+	if currentBalance.Cmp(minBalance) >= 0 {
+		// No need to top up the account balance.
+		return nil
+	}
+
 	// Necessary amount of tokens to be deposited to miner account.
 	amount := big.NewInt(0).Sub(minBalance, currentBalance)
 

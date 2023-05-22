@@ -1,5 +1,5 @@
 output "all_instances" {
-  value = local.all_instances
+  value = local.all_nodes
 }
 
 output "dns_name" {

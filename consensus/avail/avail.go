@@ -30,6 +30,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/faucet"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/matryer/resync"
 )
 
 const (
@@ -52,6 +53,10 @@ const (
 // minBalance is the minimum number of tokens that miner address must have, in
 // order to being able to run this node.
 var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
+
+// Used to sync initial balance (if needed) only once to remove attempts to insert
+// same tx multiple times.
+var balanceOnce resync.Once
 
 type Config struct {
 	AccountFilePath string
@@ -448,10 +453,15 @@ func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
 
 		// Sync until our deposit tx is through.
 		if accountBalance.Cmp(minBalance) < 0 {
-			err = d.ensureAccountBalance()
-			if err != nil {
-				d.logger.Error("failed to ensure account balance", "error", err)
-			}
+			balanceOnce.Do(func() {
+				if err := d.ensureAccountBalance(); err != nil {
+					d.logger.Error("failed to ensure account balance", "error", err)
+					// As we are doing it only once, we should reset sync in case it's failed.
+					// Otherwise faucet will never be applied.
+					balanceOnce.Reset()
+				}
+			})
+
 			return false
 		}
 

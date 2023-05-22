@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -52,6 +53,10 @@ const (
 // minBalance is the minimum number of tokens that miner address must have, in
 // order to being able to run this node.
 var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
+
+// Used to sync initial balance (if needed) only once to remove attempts to insert
+// same tx multiple times.
+var balanceOnce sync.Once
 
 type Config struct {
 	AccountFilePath string
@@ -228,6 +233,27 @@ func (d *Avail) Start() error {
 	// Enable P2P gossiping.
 	d.txpool.SetSealing(true)
 
+	if d.nodeType != BootstrapSequencer {
+		// When node starts, txpool is started but because peer count is not yet updated and
+		// there is no nodes to push transactions towards, we should first wait for at least
+		// 1 bootnode to be available prior we continue syncing.
+		// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
+		// usually fails due to txpool not having any peers to send tx towards.
+		// This results in local tx being applied and node goes into corrupted mode.
+		// Following for functionality is here as well to ensure we do not unecessary sleeps
+		// in server.go when txpool and network is starting.
+		for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
+			time.Sleep(2 * time.Second)
+		}
+
+		// Sync the node from Avail.
+		var err error
+		d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
+		if err != nil {
+			panic(fmt.Sprintf("failure to sync node: %s", err))
+		}
+	}
+
 	switch d.nodeType {
 	case BootstrapSequencer:
 		go d.startBootstrapSequencer()
@@ -284,68 +310,6 @@ func (d *Avail) startSequencer() {
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
 	)
 
-	// Sync the node from Avail.
-	// Ensure we have enough balance on our account.
-	err := d.ensureAccountBalance()
-	if err != nil {
-		panic(err)
-	}
-
-	/*
-		XXX:
-		There's some kind of a race between the above `ensureAccountBalance()` and
-		the one below in the `syncConditionFn` - if one of them are removed,
-		the sequencer doesn't get balance deposit and therefore won't boot. If
-		they are both enabled, there are errors about "already known tx" from
-		the TxPool, which is completely understandable.
-
-		The question is: Where is that race? What causes it and how can there be
-		a correct synchronization between the bootstrap sequencer and a new ordinary
-		sequencer node, booting online?
-	*/
-
-	// Node sync condition. The node's miner account must have at least
-	// `minBalance` tokens deposited and the syncer must have reached the Avail
-	// HEAD.
-	syncConditionFn := func(blk *avail_types.SignedBlock) bool {
-		accountBalance, err := d.GetAccountBalance(d.minerAddr)
-		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
-			// No need to log this.
-			return false
-		} else if err != nil {
-			d.logger.Error("failed to query miner account balance", "error", err)
-			return false
-		}
-
-		// Sync until our deposit tx is through.
-		if accountBalance.Cmp(minBalance) < 0 {
-			err = d.ensureAccountBalance()
-			if err != nil {
-				d.logger.Error("failed to ensure account balance", "error", err)
-			}
-			return false
-		}
-
-		hdr, err := d.availClient.GetLatestHeader()
-		if err != nil {
-			d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
-			return false
-		}
-
-		if hdr.Number == blk.Block.Header.Number {
-			// Our miner account has enough funds to operate and we have reached Avail
-			// HEAD. Sync complete.
-			return true
-		}
-
-		return false
-	}
-
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(syncConditionFn)
-	if err != nil {
-		panic(err)
-	}
-
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		panic(err)
@@ -360,19 +324,6 @@ func (d *Avail) startWatchTower() {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	key := &keystore.Key{PrivateKey: d.signKey}
 
-	// Sync the node from Avail.
-	var err error
-	d.currentNodeSyncIndex, err = d.syncNode()
-	if err != nil {
-		panic(err)
-	}
-
-	// Ensure we have enough balance on our account.
-	err = d.ensureAccountBalance()
-	if err != nil {
-		panic(err)
-	}
-
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
 	if err := d.ensureStaked(nil, activeParticipantsQuerier); err != nil {
 		panic(err)
@@ -383,12 +334,6 @@ func (d *Avail) startWatchTower() {
 }
 
 func (d *Avail) ensureAccountBalance() error {
-	// We need to have at least one node available to be able successfully push tx
-	// to the neighborhood peers.
-	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
-		time.Sleep(1 * time.Second)
-	}
-
 	faucetSignKey, err := faucet.FindAccount(d.chain)
 	if err != nil {
 		return err
@@ -462,6 +407,46 @@ func (d *Avail) GetAccountBalance(addr types.Address) (*big.Int, error) {
 	}
 
 	return txn.GetBalance(addr), nil
+}
+
+// Node sync condition. The node's miner account must have at least
+// `minBalance` tokens deposited and the syncer must have reached the Avail
+// HEAD.
+func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
+	hdr, err := d.availClient.GetLatestHeader()
+	if err != nil {
+		d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
+		return false
+	}
+
+	if hdr.Number == blk.Block.Header.Number {
+		accountBalance, err := d.GetAccountBalance(d.minerAddr)
+		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
+			// No need to log this.
+			return false
+		} else if err != nil {
+			d.logger.Error("failed to query miner account balance", "error", err)
+			return false
+		}
+
+		// Sync until our deposit tx is through.
+		if accountBalance.Cmp(minBalance) < 0 {
+			balanceOnce.Do(func() {
+				if err := d.ensureAccountBalance(); err != nil {
+					d.logger.Error("failed to ensure account balance", "error", err)
+					panic(fmt.Sprintf("failure to apply faucet balance to the txpool: %s", err))
+				}
+			})
+
+			return false
+		}
+
+		// Our miner account has enough funds to operate and we have reached Avail
+		// HEAD. Sync complete.
+		return true
+	}
+
+	return false
 }
 
 // REQUIRED BASE INTERFACE METHODS //

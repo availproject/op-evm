@@ -318,6 +318,13 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		return nil, err
 	}
 
+	// TxPool Start() is only listener method that notifies specific function targets
+	// if channel information is met. It should be started prior JSONRPC as new tx
+	// can be applied in between (edge case) and result in tx hitting blackhole.
+	// When network starts, txpool should already be started so if any tx is pushed from any node
+	// we know that at that time, txpool is already ready and will receive the tx properly.
+	m.txpool.Start()
+
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
@@ -327,8 +334,6 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 	if err := m.restoreChain(); err != nil {
 		return nil, err
 	}
-
-	m.txpool.Start()
 
 	// start relayer
 	if config.Relayer {

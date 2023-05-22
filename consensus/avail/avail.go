@@ -291,8 +291,7 @@ func (d *Avail) startSequencer() {
 		panic(err)
 	}
 
-	faucet := FaucetHelper{d}
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(faucet.SyncConditionFn)
+	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
 	if err != nil {
 		panic(err)
 	}
@@ -318,8 +317,7 @@ func (d *Avail) startWatchTower() {
 	}
 
 	// Sync the node from Avail.
-	faucet := FaucetHelper{d}
-	d.currentNodeSyncIndex, err = d.syncNodeUntil(faucet.SyncConditionFn)
+	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
 	if err != nil {
 		panic(err)
 	}
@@ -408,6 +406,43 @@ func (d *Avail) GetAccountBalance(addr types.Address) (*big.Int, error) {
 	}
 
 	return txn.GetBalance(addr), nil
+}
+
+// Node sync condition. The node's miner account must have at least
+// `minBalance` tokens deposited and the syncer must have reached the Avail
+// HEAD.
+func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
+	hdr, err := d.availClient.GetLatestHeader()
+	if err != nil {
+		d.logger.Error("couldn't fetch latest block hash from Avail", "error", err)
+		return false
+	}
+
+	if hdr.Number == blk.Block.Header.Number {
+		accountBalance, err := d.GetAccountBalance(d.minerAddr)
+		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
+			// No need to log this.
+			return false
+		} else if err != nil {
+			d.logger.Error("failed to query miner account balance", "error", err)
+			return false
+		}
+
+		// Sync until our deposit tx is through.
+		if accountBalance.Cmp(minBalance) < 0 {
+			err = d.ensureAccountBalance()
+			if err != nil {
+				d.logger.Error("failed to ensure account balance", "error", err)
+			}
+			return false
+		}
+
+		// Our miner account has enough funds to operate and we have reached Avail
+		// HEAD. Sync complete.
+		return true
+	}
+
+	return false
 }
 
 // REQUIRED BASE INTERFACE METHODS //

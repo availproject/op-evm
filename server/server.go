@@ -328,10 +328,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		return nil, err
 	}
 
-	// start consensus
-	if err := m.consensus.Start(); err != nil {
-		return nil, err
-	}
+	m.txpool.Start()
 
 	// start relayer
 	if config.Relayer {
@@ -340,7 +337,10 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		}
 	}
 
-	m.txpool.Start()
+	// start consensus
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
 
 	return m, nil
 }

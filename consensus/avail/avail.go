@@ -284,13 +284,19 @@ func (d *Avail) startSequencer() {
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
 	)
 
-	// Sync the node from Avail.
-	// Ensure we have enough balance on our account.
-	err := d.ensureAccountBalance()
-	if err != nil {
-		panic(err)
+	// When node starts, txpool is started but because peer count is not yet updated and
+	// there is no nodes to push transactions towards, we should first wait for at least
+	// 1 bootnode to be available prior we continue syncing.
+	// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
+	// usually fails due to txpull not having any peers to send tx towards.
+	// This results in local tx being applied and node goes into corrupted mode.
+	// Following for functionality is here as well to ensure we do not unecessary sleeps
+	// in server.go when txpool and network is starting.
+	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
+		time.Sleep(2 * time.Second)
 	}
 
+	var err error
 	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
 	if err != nil {
 		panic(err)
@@ -310,13 +316,20 @@ func (d *Avail) startWatchTower() {
 	activeParticipantsQuerier := staking.NewActiveParticipantsQuerier(d.blockchain, d.executor, d.logger)
 	key := &keystore.Key{PrivateKey: d.signKey}
 
-	// Ensure we have enough balance on our account.
-	err := d.ensureAccountBalance()
-	if err != nil {
-		panic(err)
+	// When node starts, txpool is started but because peer count is not yet updated and
+	// there is no nodes to push transactions towards, we should first wait for at least
+	// 1 bootnode to be available prior we continue syncing.
+	// Syncing will at the last step attempt to top up the faucet balance if needed which may fail and
+	// usually fails due to txpull not having any peers to send tx towards.
+	// This results in local tx being applied and node goes into corrupted mode.
+	// Following for functionality is here as well to ensure we do not unecessary sleeps
+	// in server.go when txpool and network is starting.
+	for d.network == nil || d.network.GetBootnodeConnCount() < 1 {
+		time.Sleep(2 * time.Second)
 	}
 
 	// Sync the node from Avail.
+	var err error
 	d.currentNodeSyncIndex, err = d.syncNodeUntil(d.syncConditionFn)
 	if err != nil {
 		panic(err)

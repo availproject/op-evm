@@ -1,4 +1,4 @@
-package main
+package availaccount
 
 import (
 	"flag"
@@ -20,7 +20,7 @@ const (
 	maxUint64 = ^uint64(0)
 )
 
-func main() {
+func Main() {
 	var balance uint64
 	var availAddr, path string
 	var retry bool

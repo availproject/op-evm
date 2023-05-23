@@ -27,10 +27,10 @@ bootstrap-config:
 	sed -i 's/log_level: INFO/log_level: DEBUG/g' configs/edge-config.yaml
 	sed -i 's/data_dir: ""/data_dir: ".\/data\/avail-chain-1"/g' configs/edge-config.yaml
 
-bootstrap-secrets:
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-bootnode-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-2
+bootstrap-secrets: build-server
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-bootnode-1
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-node-1
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-node-2
 
 bootstrap-genesis:
 	rm $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json || true

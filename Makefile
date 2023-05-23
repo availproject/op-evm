@@ -61,7 +61,7 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement ./cmd/server/...
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
 build-client:
 	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
@@ -86,10 +86,7 @@ build-assm:
 tools-wallet:
 	cd tools/wallet && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-tools-account:
-	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
-
-build-tools: tools-account build-staking build-e2e
+build-tools: build-staking build-e2e
 
 build: build-server build-client
 
@@ -121,14 +118,14 @@ start-staking: build-staking
 
 create-accounts: create-bootstrap-sequencer-account create-sequencer-account create-watchtower-account
 
-create-bootstrap-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-bootstrap-sequencer
+create-bootstrap-sequencer-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-bootstrap-sequencer
 	
-create-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-sequencer
+create-sequencer-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-sequencer
 
-create-watchtower-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-watchtower
+create-watchtower-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

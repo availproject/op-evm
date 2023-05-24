@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/maticnetwork/avail-settlement/cmd/availaccount"
-	"github.com/maticnetwork/avail-settlement/cmd/keypair"
 	"github.com/maticnetwork/avail-settlement/cmd/server"
 )
 
@@ -18,8 +18,8 @@ func main() {
 			fn = server.Main
 		case "availaccount":
 			fn = availaccount.Main
-		case "keypair":
-			fn = keypair.Main
+		case "secrets":
+			fn = polygonSecretsCmd
 		default:
 			fmt.Fprintf(os.Stderr, "unknown command: %q\n", os.Args[1])
 			return
@@ -30,4 +30,11 @@ func main() {
 	}
 
 	fn()
+}
+
+func polygonSecretsCmd() {
+	cmd := secrets.GetCommand()
+
+	// Error is ignored on purpose. It's logged already so nothing to do here.
+	_ = cmd.Execute()
 }

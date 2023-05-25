@@ -28,5 +28,5 @@ headers:
 log_to: ""
 json_rpc_batch_request_limit: 20
 json_rpc_block_range_limit: 1000
-node_type: "${node_type}"
+node_type: "sequencer"
 json_log_format: false

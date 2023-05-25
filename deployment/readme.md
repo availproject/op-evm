@@ -27,7 +27,7 @@ ___
 
 Get the private key from terraform
 ___
-- `terraform output --raw pk > key.pem`
+- `terraform output --raw ssh_pk > key.pem`
 - `chmod 400 key.pem`
 
 Configure aws proxy options and connect using ssh
@@ -39,7 +39,7 @@ ___
   ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
   ```
 - `chmod 600 ~/.ssh/config`
-- `ssh -i key.pem ec2-user@[INSTANCE-ID]`
+- `ssh -i key.pem ubuntu@[INSTANCE-ID]`
 
 For more info check:
 - https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html

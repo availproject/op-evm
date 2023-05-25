@@ -16,8 +16,8 @@ resource "aws_instance" "avail" {
   }
 
   tags = {
-    Name        = "avail-${var.deployment_name}"
-    Hostname    = "avail-${var.deployment_name}"
+    Name        = "avl-${var.deployment_name}"
+    Hostname    = "avl-${var.deployment_name}"
     NodeType    = "avail"
     Provisioner = data.aws_caller_identity.provisioner.account_id
   }
@@ -32,7 +32,7 @@ resource "aws_eip" "avail" {
 }
 
 resource "aws_security_group" "avail" {
-  name        = "allow-avail-all-${var.deployment_name}"
+  name        = "allow-avl-all-${var.deployment_name}"
   description = "Allow all rpc and ws traffic"
   vpc_id      = module.networking.vpc_id
 }

@@ -10,6 +10,12 @@ variable "jsonrpc_port" {
   default     = 20002
 }
 
+variable "p2p_port" {
+  description = "P2P port for the bootstrap sequencer and sequencer to listen on"
+  type        = number
+  default     = 20021
+}
+
 variable "nodes_secrets_ssm_parameter_id" {
   description = "AWS System manager parameter id for creating the path to store the secrets"
   type        = string
@@ -93,6 +99,12 @@ variable "devnet_key_name" {
   description = "The name that we want to use for the ssh key pair"
   type        = string
   default     = "2023-02-21-avail-settlement-devnet"
+}
+
+variable "region" {
+  description = "The AWS region"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "zone_names" {

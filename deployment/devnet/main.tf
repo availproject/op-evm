@@ -21,11 +21,11 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
   default_tags {
     tags = {
       Environment    = "devnet"
-      Network        = "avail-settlement"
+      Network        = "${var.deployment_name}-net"
       DeploymentName = var.deployment_name
     }
   }
@@ -57,7 +57,7 @@ locals {
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
 
   zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
-  all_nodes = flatten([for v in module.nodes : v.instances])
+  all_nodes = flatten(concat([module.bootnode.instance], [for v in module.nodes : v.instances]))
 }
 
 module "lambda" {
@@ -103,11 +103,35 @@ module "alb" {
   jsonrpc_port      = var.jsonrpc_port
 }
 
+module "bootnode" {
+  source = "./modules/bootnode"
+
+  p2p_port                         = var.p2p_port
+  deployment_name                  = var.deployment_name
+  accounts_artifact_url            = local.artifact_url[var.accounts_artifact_name]
+  avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
+  base_ami                         = var.base_ami
+  base_instance_type               = var.base_instance_type
+  github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
+  grpc_port                        = var.grpc_port
+  jsonrpc_port                     = var.jsonrpc_port
+  nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
+  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
+  subnets_by_zone                  = module.networking.private_subnets_by_zone
+  avail_addr                       = aws_eip.avail.public_dns
+  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
+  genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
+  iam_profile_id                   = module.security.iam_node_profile_id
+  lb_dns_name                      = module.alb.dns_name
+  availability_zone                = local.zones[0]
+  key_name                         = aws_key_pair.devnet.key_name
+}
+
+
 module "nodes" {
   source = "./modules/nodes"
 
   for_each = {
-    "bootstrap-sequencer" = { node_count = 1, port_prefix = 31 }
     "sequencer"           = { node_count = var.node_count, port_prefix = 32 }
     "watchtower"          = { node_count = var.watchtower_count, port_prefix = 33 }
   }

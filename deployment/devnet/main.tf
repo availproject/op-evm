@@ -57,7 +57,7 @@ locals {
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
 
   zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
-  all_nodes = flatten(concat([module.bootnode.instance], [for v in module.nodes : v.instances]))
+  all_nodes = flatten([for v in module.nodes : v.instances])
 }
 
 module "lambda" {
@@ -124,6 +124,7 @@ module "bootnode" {
   iam_profile_id                   = module.security.iam_node_profile_id
   lb_dns_name                      = module.alb.dns_name
   availability_zone                = local.zones[0]
+  vpc_id                           = module.networking.vpc_id
   key_name                         = aws_key_pair.devnet.key_name
 }
 

@@ -1,3 +1,13 @@
+variable "availability_zone" {
+  description = "The availability zone for this particular deployment"
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC id"
+  type        = string
+}
+
 variable "deployment_name" {
   description = "The unique name for this particular deployment"
   type        = string
@@ -9,7 +19,12 @@ variable "grpc_port" {
 }
 
 variable "jsonrpc_port" {
-  description = "JSON RPC port for the bootstrap sequencer and sequencer to listen on"
+  description = "JSON RPC port for the bootstrap sequencer to listen on"
+  type        = number
+}
+
+variable "p2p_port" {
+  description = "P2P port for the bootstrap sequencer to listen on"
   type        = number
 }
 
@@ -25,16 +40,6 @@ variable "nodes_secrets_ssm_parameter_path" {
 
 variable "github_token_ssm_parameter_path" {
   description = "AWS System manager parameter path accessing the github token"
-  type        = string
-}
-
-variable "node_count" {
-  description = "The number of sequencer nodes that we're going to deploy"
-  type        = number
-}
-
-variable "node_type" {
-  description = "The node types, can be watchtower, sequencer or bootstrap-sequencer"
   type        = string
 }
 
@@ -83,19 +88,9 @@ variable "lb_dns_name" {
   type = string
 }
 
-variable "zones" {
-  description = "The zones for deployment"
-  type        = list(string)
-}
-
 variable "subnets_by_zone" {
   description = "A mapping of zone and it's corresponding subnet"
   type        = map(string)
-}
-
-variable "p2p_port_prefix" {
-  description = "P2P port prefix, must be unique across all the instances that use the same load balancer"
-  type = number
 }
 
 variable "key_name" {

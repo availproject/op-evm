@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
-func main() {
+func Main() {
 	var bootnode bool
 	var availAddr, path, accountPath string
 	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")

@@ -10,6 +10,12 @@ variable "jsonrpc_port" {
   default     = 20002
 }
 
+variable "p2p_port" {
+  description = "P2P port for the bootstrap sequencer and sequencer to listen on"
+  type        = number
+  default     = 20021
+}
+
 variable "nodes_secrets_ssm_parameter_id" {
   description = "AWS System manager parameter id for creating the path to store the secrets"
   type        = string
@@ -46,6 +52,24 @@ variable "github_token" {
   sensitive   = true
 }
 
+variable "polygon_edge_artifact_url" {
+  description = "The artifact url for `polygon-edge` binary"
+  type        = string
+  default     = "https://github.com/0xPolygon/polygon-edge/releases/download/v0.8.1/polygon-edge_0.8.1_linux_arm64.tar.gz"
+}
+
+variable "avail_settlement_artifact_name" {
+  description = "The artifact name for `avail-settlement` binary"
+  type        = string
+  default     = "avail-settlement-linux-arm64.zip"
+}
+
+variable "accounts_artifact_name" {
+  description = "The artifact name for `accounts` binary"
+  type        = string
+  default     = "accounts-linux-arm64.zip"
+}
+
 variable "assm_artifact_name" {
   description = "The artifact name for `assm` binary"
   type        = string
@@ -75,6 +99,12 @@ variable "devnet_key_name" {
   description = "The name that we want to use for the ssh key pair"
   type        = string
   default     = "2023-02-21-avail-settlement-devnet"
+}
+
+variable "region" {
+  description = "The AWS region"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "zone_names" {

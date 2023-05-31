@@ -236,7 +236,7 @@ func (a *Storage) Set(ctx context.Context, key string, data interface{}) error {
 	_, err := a.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: &a.bucketName,
 		Key:    &key,
-		Body:   buff,
+		Body:   bytes.NewBuffer(buff.Bytes()), //TODO weird aws sdk problem
 	})
 	if err != nil {
 		return fmt.Errorf("could not put object to S3 err=%w", err)

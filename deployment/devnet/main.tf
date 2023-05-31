@@ -11,17 +11,21 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 4.19.0"
     }
+    github = {
+      source  = "integrations/github"
+      version = "~> 5.0"
+    }
   }
 
   required_version = ">= 1.3.9"
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
   default_tags {
     tags = {
       Environment    = "devnet"
-      Network        = "avail-settlement"
+      Network        = "${var.deployment_name}-net"
       DeploymentName = var.deployment_name
     }
   }
@@ -38,6 +42,13 @@ data "github_release" "get_release" {
   owner       = var.github_owner
   retrieve_by = "tag"
   release_tag = var.release
+}
+
+resource "aws_ssm_parameter" "github_token" {
+  name        = local.github_token_ssm_parameter_path
+  description = "Github token (needed for downloading private artifacts from github)"
+  type        = "SecureString"
+  value       = var.github_token
 }
 
 locals {
@@ -92,11 +103,36 @@ module "alb" {
   jsonrpc_port      = var.jsonrpc_port
 }
 
+module "bootnode" {
+  source = "./modules/bootnode"
+
+  p2p_port                         = var.p2p_port
+  deployment_name                  = var.deployment_name
+  accounts_artifact_url            = local.artifact_url[var.accounts_artifact_name]
+  avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
+  base_ami                         = var.base_ami
+  base_instance_type               = var.base_instance_type
+  github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
+  grpc_port                        = var.grpc_port
+  jsonrpc_port                     = var.jsonrpc_port
+  nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
+  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
+  subnets_by_zone                  = module.networking.private_subnets_by_zone
+  avail_addr                       = aws_eip.avail.public_dns
+  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
+  genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
+  iam_profile_id                   = module.security.iam_node_profile_id
+  lb_dns_name                      = module.alb.dns_name
+  availability_zone                = local.zones[0]
+  vpc_id                           = module.networking.vpc_id
+  key_name                         = aws_key_pair.devnet.key_name
+}
+
+
 module "nodes" {
   source = "./modules/nodes"
 
   for_each = {
-    "bootstrap-sequencer" = { node_count = 1, port_prefix = 31 }
     "sequencer"           = { node_count = var.node_count, port_prefix = 32 }
     "watchtower"          = { node_count = var.watchtower_count, port_prefix = 33 }
   }
@@ -104,14 +140,18 @@ module "nodes" {
   node_count                       = each.value.node_count
   p2p_port_prefix                  = each.value.port_prefix
   deployment_name                  = var.deployment_name
+  accounts_artifact_url            = local.artifact_url[var.accounts_artifact_name]
+  avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
   base_ami                         = var.base_ami
   base_instance_type               = var.base_instance_type
   github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
   grpc_port                        = var.grpc_port
   jsonrpc_port                     = var.jsonrpc_port
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
+  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
   subnets_by_zone                  = module.networking.private_subnets_by_zone
+  avail_addr                       = aws_eip.avail.public_dns
+  s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
   iam_profile_id                   = module.security.iam_node_profile_id
   lb_dns_name                      = module.alb.dns_name

@@ -27,10 +27,10 @@ bootstrap-config:
 	sed -i 's/log_level: INFO/log_level: DEBUG/g' configs/edge-config.yaml
 	sed -i 's/data_dir: ""/data_dir: ".\/data\/avail-chain-1"/g' configs/edge-config.yaml
 
-bootstrap-secrets:
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-bootnode-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-1
-	$(POLYGON_EDGE_BIN) secrets init --data-dir ./data/avail-node-2
+bootstrap-secrets: build-server
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-bootnode-1
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-node-1
+	./avail-settlement secrets init --insecure --data-dir ./data/avail-node-2
 
 bootstrap-genesis:
 	rm $(POLYGON_EDGE_CONFIGS_DIR)/genesis2.json || true
@@ -61,7 +61,7 @@ build-fraud-contract:
 	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
 
 build-server:
-	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement ./cmd/server/...
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
 build-client:
 	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
@@ -121,14 +121,14 @@ start-staking: build-staking
 
 create-accounts: create-bootstrap-sequencer-account create-sequencer-account create-watchtower-account
 
-create-bootstrap-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-bootstrap-sequencer
+create-bootstrap-sequencer-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-bootstrap-sequencer
 	
-create-sequencer-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-sequencer
+create-sequencer-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-sequencer
 
-create-watchtower-account: tools-account
-	./tools/accounts/accounts -balance 6 -path ./configs/account-watchtower
+create-watchtower-account: build-server
+	./avail-settlement availaccount -balance 6 -path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

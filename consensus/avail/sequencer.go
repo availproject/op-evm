@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -97,9 +98,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			time.Sleep(30 * time.Second)
 		}
 	}()
-
-	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
-	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
 
 	// Write blocks to the local blockchain and avail in intervals uless block production is stopped.
 	go sw.runWriteBlocksLoop(activeSequencersQuerier, fraudResolver, account, key)
@@ -367,7 +365,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.Ac
 
 			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)
 
-			if err := sw.writeBlock(myAccount, signKey); err != nil {
+			if err := sw.writeBlock(fraudResolver, myAccount, signKey); err != nil {
 				sw.logger.Error("failed to mine block", "error", err)
 			}
 
@@ -380,7 +378,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.Ac
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
-func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key) error {
+func (sw *SequencerWorker) writeBlock(fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) error {
 	parent := sw.blockchain.Header()
 
 	header := &types.Header{
@@ -428,25 +426,25 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	txns := sw.writeTransactions(gasLimit, transition)
+	txns := sw.writeTransactions(fraudResolver, gasLimit, transition)
 
-	/* 	// TRIGGER SEQUENCER SLASHING
-	   	maliciousBlockWritten := false
-	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
-	   		if header.Number == 4 || header.Number == 5 {
-	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
-	   			tx.Nonce = 1
-	   			txSigner := &crypto.FrontierSigner{}
-	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
-	   			if err != nil {
-	   				sw.logger.Error("failed to sign fraud transaction", "error", err)
-	   				return err
-	   			}
+	// TRIGGER SEQUENCER SLASHING
+	maliciousBlockWritten := false
+	if sw.nodeType != Sequencer && !maliciousBlockWritten {
+		if header.Number%10 == 0 {
+			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+			tx.Nonce = 3
+			txSigner := &crypto.FrontierSigner{}
+			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+			if err != nil {
+				sw.logger.Error("failed to sign fraud transaction", "error", err)
+				return err
+			}
 
-	   			txns = append(txns, dtx)
-	   			maliciousBlockWritten = true
-	   		}
-	   	} */
+			txns = append(txns, dtx)
+			maliciousBlockWritten = true
+		}
+	}
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -484,7 +482,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	)
 
 	// Submit block without waiting for status.
-	err = sw.availSender.Send(blk)
+	err = sw.availSender.SendAndWaitForStatus(blk, avail_types.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		sw.logger.Error("Error while submitting data to avail", "error", err)
 		return err
@@ -533,7 +531,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	return nil
 }
 
-func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (sw *SequencerWorker) writeTransactions(fraudResolver *Fraud, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
 	sw.txpool.Prepare()
@@ -541,6 +539,10 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 	for {
 		tx := sw.txpool.Peek()
 		if tx == nil {
+			break
+		}
+
+		if fraudResolver.IsChainDisabled() {
 			break
 		}
 

@@ -87,11 +87,6 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 		for _, edgeBlk := range edgeBlks {
 			if !fraudResolver.IsFraudProofBlock(edgeBlk) {
 				if err := validator.Check(edgeBlk); err == nil {
-
-					if len(edgeBlk.Transactions) > 0 {
-						d.logger.Warn("WE HAVE TRANSACTIONS INSIDE")
-					}
-
 					if err := d.blockchain.WriteBlock(edgeBlk, d.nodeType.String()); err != nil {
 						d.logger.Warn(
 							"failed to write edge block received from avail",

@@ -5,9 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -25,8 +23,9 @@ import (
 var (
 	ErrTxPoolHashNotFound = errors.New("hash not found in the txpool")
 
-	ChainProcessingDisabled uint32 = 0
-	ChainProcessingEnabled  uint32 = 1
+	ChainProcessingDisabled        uint32 = 0
+	ChainProcessingFraudInProgress uint32 = 1
+	ChainProcessingEnabled         uint32 = 2
 )
 
 type Fraud struct {
@@ -42,9 +41,8 @@ type Fraud struct {
 	availSender avail.Sender
 	nodeType    MechanismType
 
-	fraudBlock          *types.Block
-	lastFraudDisputedTx *types.Transaction
-	chainProcessStatus  uint32
+	fraudBlock         *types.Block
+	chainProcessStatus uint32
 }
 
 func (f *Fraud) SetBlock(b *types.Block) {
@@ -85,6 +83,7 @@ func (f *Fraud) CheckAndSetFraudBlock(blocks []*types.Block) bool {
 				"probation_block_hash", fraudProofBlockHash,
 				"watchtower_fraud_block_hash", blk.Hash(),
 			)
+			f.SetChainStatus(ChainProcessingDisabled)
 			f.SetBlock(blk)
 			return true
 		}
@@ -104,75 +103,6 @@ func (f *Fraud) IsDisputeResolutionEnded(blk *types.Header) bool {
 func (f *Fraud) EndDisputeResolution() {
 	f.SetBlock(nil)
 	f.SetChainStatus(ChainProcessingEnabled)
-}
-
-func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.ActiveParticipants) {
-	for {
-		// We've already received begin dispute resolution transaction. Now it's time to wait for
-		// processing prior we check tx pool again...
-		if f.IsChainDisabled() {
-			time.Sleep(200 * time.Millisecond) // Just a bit of the delay...
-			continue
-		}
-
-		f.txpool.Prepare()
-
-	innerLoop:
-		for {
-
-			tx := f.txpool.Peek()
-			if tx == nil {
-				break innerLoop
-			}
-
-			isWatchtower, err := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
-			if err != nil {
-				f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
-				continue
-			}
-
-			isBeginDisputeResolutionTx, err := staking.IsBeginDisputeResolutionTx(tx)
-			if err != nil {
-				f.logger.Debug("failure while checking if tx is type of begin dispute resolution", "error", err)
-				continue
-			}
-
-			f.logger.Debug(
-				"New tx pool transaction discovered",
-				"hash", tx.Hash,
-				"value", tx.Value,
-				"originating_addr", tx.From.String(),
-				"recipient_addr", tx.To.String(),
-				"submitted_via_watchtower", isWatchtower,
-				"staking_contract_addr", staking.AddrStakingContract.String(),
-				"submitted_towards_contract", bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()),
-				"tx_type_of_begin_dispute_resolution", isBeginDisputeResolutionTx,
-			)
-
-			if isWatchtower && bytes.Equal(tx.To.Bytes(), staking.AddrStakingContract.Bytes()) && isBeginDisputeResolutionTx {
-				// It happens that in time to time, due to multiple push (one tx pool one next block) of the begin dispute resolution txs
-				// it can get node into the disputed mode even if dispute mode is already resolved for that specific transaction.
-				// This check makes sure we bypass that situation.
-				if f.lastFraudDisputedTx != nil && bytes.Equal(tx.Hash.Bytes(), f.lastFraudDisputedTx.Hash.Bytes()) {
-					continue
-				}
-
-				f.logger.Warn(
-					"Discovered valid begin dispute resolution transaction. Chain is entering fraud dispute mode...",
-					"originating_watchtower_addr", tx.From,
-					"dispute_resolution_tx_hash", tx.Hash,
-				)
-
-				// We have proper transaction and therefore we are going to stop processing blocks in the chain
-				f.SetChainStatus(ChainProcessingDisabled)
-				f.lastFraudDisputedTx = tx
-				break innerLoop
-			}
-		}
-
-		// Just a bit of the time to not break the CPU...
-		time.Sleep(100 * time.Millisecond)
-	}
 }
 
 func (f *Fraud) DiscoverDisputeResolutionTx(hash types.Hash) (*types.Transaction, error) {
@@ -201,9 +131,21 @@ func (f *Fraud) DiscoverDisputeResolutionTx(hash types.Hash) (*types.Transaction
 	return nil, ErrTxPoolHashNotFound
 }
 
-func (f *Fraud) GetBeginDisputeResolutionTxHash() types.Hash {
-	hash, _ := block.GetExtraDataBeginDisputeResolutionTarget(f.fraudBlock.Header)
-	return hash
+func (f *Fraud) buildBeginDisputeResolutionTx(maliciousHeader *types.Header) (*types.Transaction, error) {
+	bdrTx, err := staking.BeginDisputeResolutionTx(f.nodeAddr, types.BytesToAddress(maliciousHeader.Miner), maliciousHeader.GasLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	transition, err := f.executor.BeginTxn(maliciousHeader.StateRoot, maliciousHeader, f.nodeAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	bdrTx.Nonce = transition.GetNonce(f.nodeAddr)
+
+	txSigner := &crypto.FrontierSigner{}
+	return txSigner.SignTx(bdrTx, f.nodeSignKey)
 }
 
 func (f *Fraud) IsFraudProofBlock(blk *types.Block) bool {
@@ -228,13 +170,13 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 		// therefore we are going to log this problem and panic as this should *NEVER EVER HAPPEN*
 		// Block should not be set if it's not fraud block via `CheckAndSetFraudBlock` in the first place.
 		panic(fmt.Sprintf(
-			"failed to extract fraud proof targed from the fraud block hash `%s`",
+			"failed to extract fraud proof target from the fraud block hash `%s`",
 			f.fraudBlock.Hash(),
 		))
 	}
 
 	f.logger.Info(
-		"Discovered fraud proof block hash targed",
+		"Discovered fraud proof block hash target",
 		"targeted_block_hash", fraudBlockTargetHash,
 		"watchtower_block_hash", f.fraudBlock.Hash(),
 	)
@@ -333,17 +275,12 @@ func (f *Fraud) CheckAndSlash() (bool, error) {
 func (f *Fraud) slashNode(maliciousAddr types.Address, maliciousHeader *types.Header, nodeType MechanismType) error {
 	blockBuilderFactory := block.NewBlockBuilderFactory(f.blockchain, f.executor, f.logger)
 
+	// Set chain status in progress so we don't have duplicated attempts to process fraud again
+	f.SetChainStatus(ChainProcessingFraudInProgress)
+
 	disputeBlk, err := f.produceBeginDisputeResolutionBlock(blockBuilderFactory, maliciousAddr, maliciousHeader, nodeType)
 	if err != nil {
 		return err
-	}
-
-	// TODO: Fix this function and remove this warning.
-	{
-		_, file, ln, ok := runtime.Caller(0)
-		if ok {
-			f.logger.Warn(fmt.Sprintf("%s:%d: TODO: Make {begin, end} dispute resolution process transactions atomic.", file, ln))
-		}
 	}
 
 	_, err = f.produceSlashBlock(blockBuilderFactory, disputeBlk, maliciousAddr, maliciousHeader, nodeType)
@@ -365,6 +302,8 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 	switch nodeType {
 	case Sequencer:
 		bb, err = blockBuilderFactory.FromParentHash(maliciousHeader.ParentHash)
+		bb.SetBlockNumber(f.blockchain.Header().Number + 1)
+		bb.SetDifficulty(0) // Don't do reorgs
 	case WatchTower:
 		bb, err = blockBuilderFactory.FromBlockchainHead()
 	default:
@@ -379,9 +318,7 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 	bb.SignWith(f.nodeSignKey)
 
 	// Append begin disputed resolution txn
-	disputeTxHash := f.GetBeginDisputeResolutionTxHash()
-	f.logger.Info("Dispute resolution tx hash from fraud block", "hash", disputeTxHash.String())
-	disputeBeginTx, err := f.DiscoverDisputeResolutionTx(disputeTxHash)
+	disputeBeginTx, err := f.buildBeginDisputeResolutionTx(maliciousHeader)
 	if err != nil {
 		f.logger.Error(
 			"failed to discover begin dispute resoultion transaction for the block",
@@ -405,12 +342,6 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 		"parent_block_hash", maliciousHeader.ParentHash,
 	)
 
-	err = f.availSender.SendAndWaitForStatus(blk, stypes.ExtrinsicStatus{IsInBlock: true})
-	if err != nil {
-		f.logger.Error("error while submitting begin dispute resolution block to avail", "error", err)
-		return nil, err
-	}
-
 	err = f.blockchain.WriteBlock(blk, f.nodeType.String())
 	if err != nil {
 		f.logger.Error("failed to write begin dispute resolution block to the blockchain", "error", err)
@@ -419,6 +350,13 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 
 	// After the block has been written we reset the txpool to remove stale transactions.
 	f.txpool.ResetWithHeaders(blk.Header)
+
+	toSendBlk, _ := f.blockchain.GetBlock(blk.Hash(), blk.Number(), true)
+	err = f.availSender.SendAndWaitForStatus(toSendBlk, stypes.ExtrinsicStatus{IsInBlock: true})
+	if err != nil {
+		f.logger.Error("error while submitting begin dispute resolution block to avail", "error", err)
+		return nil, err
+	}
 
 	f.logger.Info(
 		"Successfully sent and wrote begin dispute resolution block to the blockchain...",
@@ -441,22 +379,33 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 	slashBlk.SetCoinbaseAddress(f.nodeAddr)
 	slashBlk.SignWith(f.nodeSignKey)
 
-	disputeResolutionTx, err := staking.SlashStakerTx(f.nodeAddr, maliciousAddr, 1_000_000)
+	slashStakerTx, err := staking.SlashStakerTx(f.nodeAddr, maliciousAddr, 1_000_000)
 	if err != nil {
 		f.logger.Error("failed to end new fraud dispute resolution", "error", err)
 		return nil, err
 	}
 
-	hdr, _ := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
+	/* 	hdr, found := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
+	   	if !found {
+	   		f.logger.Error("failed to get dispute block by hash",
+	   			"block_number", disputeBlk.Number(),
+	   			"block_hash", disputeBlk.Hash(),
+	   			"error", err,
+	   		)
+	   		return nil, fmt.Errorf("failed to discover dispute block by hash: %s", disputeBlk.Hash())
+	   	}
+	*/
+
+	hdr := f.blockchain.Header()
 	transition, err := f.executor.BeginTxn(hdr.StateRoot, hdr, f.nodeAddr)
 	if err != nil {
 		f.logger.Error("failed to begin the transition for the end dispute resolution", "error", err)
 		return nil, err
 	}
-	disputeResolutionTx.Nonce = transition.GetNonce(disputeResolutionTx.From)
+	slashStakerTx.Nonce = transition.GetNonce(slashStakerTx.From)
 
 	txSigner := &crypto.FrontierSigner{}
-	dtx, err := txSigner.SignTx(disputeResolutionTx, f.nodeSignKey)
+	dtx, err := txSigner.SignTx(slashStakerTx, f.nodeSignKey)
 	if err != nil {
 		f.logger.Error("failed to sign slashing transaction", "error", err)
 		return nil, err

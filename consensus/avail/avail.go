@@ -420,6 +420,7 @@ func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
 	}
 
 	if hdr.Number == blk.Block.Header.Number {
+
 		accountBalance, err := d.GetAccountBalance(d.minerAddr)
 		if err != nil && strings.HasPrefix(err.Error(), "state not found") {
 			// No need to log this.
@@ -428,7 +429,7 @@ func (d *Avail) syncConditionFn(blk *avail_types.SignedBlock) bool {
 			d.logger.Error("failed to query miner account balance", "error", err)
 			return false
 		}
-
+		_ = accountBalance
 		// Sync until our deposit tx is through.
 		if accountBalance.Cmp(minBalance) < 0 {
 			balanceOnce.Do(func() {

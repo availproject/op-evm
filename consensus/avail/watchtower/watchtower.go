@@ -117,20 +117,6 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 		return nil, err
 	}
 
-	if wt.txpool != nil { // Tests sometimes do not have txpool so we need to do this check.
-		if err := wt.txpool.AddTx(tx); err != nil {
-			wt.logger.Error("failed to add fraud proof txn to the pool", "error", err)
-			return nil, err
-		}
-	}
-
-	wt.logger.Info(
-		"Applied dispute resolution transaction to the txpool",
-		"hash", tx.Hash,
-		"nonce", tx.Nonce,
-		"account_from", tx.From,
-	)
-
 	// Build the block that is going to be sent out to the Avail.
 	blk, err := builder.
 		SetCoinbaseAddress(wt.account).

@@ -385,17 +385,6 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 		return nil, err
 	}
 
-	/* 	hdr, found := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
-	   	if !found {
-	   		f.logger.Error("failed to get dispute block by hash",
-	   			"block_number", disputeBlk.Number(),
-	   			"block_hash", disputeBlk.Hash(),
-	   			"error", err,
-	   		)
-	   		return nil, fmt.Errorf("failed to discover dispute block by hash: %s", disputeBlk.Hash())
-	   	}
-	*/
-
 	hdr := f.blockchain.Header()
 	transition, err := f.executor.BeginTxn(hdr.StateRoot, hdr, f.nodeAddr)
 	if err != nil {

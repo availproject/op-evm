@@ -48,11 +48,6 @@ variable "base_ami" {
   type        = string
 }
 
-variable "polygon_edge_artifact_url" {
-  description = "The artifact url for `polygon-edge` binary"
-  type        = string
-}
-
 variable "avail_settlement_artifact_url" {
   description = "The artifact url for `avail-settlement` binary"
   type        = string

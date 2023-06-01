@@ -17,7 +17,7 @@ echo "${avail_settlement_service_base64}" | base64 -d > "/etc/systemd/system/ava
 aws s3 cp "s3://${s3_bucket_name}/genesis.json" "${workspace}"
 
 # Deposit some tokens in the avail blockchain
-${workspace}/accounts -balance 6 -avail-addr "ws://${avail_addr}:9944/v1/json-rpc" -path "${workspace}/account-mnemonic" --retry
+${workspace}/accounts -balance 6 -avail-addr "ws://${avail_addr}/v1/json-rpc" -path "${workspace}/account-mnemonic" --retry
 
 sudo chown -R ${user}. "${workspace}"
 sudo systemctl start avail-settlement

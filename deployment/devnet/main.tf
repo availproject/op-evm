@@ -57,7 +57,6 @@ locals {
   nodes_secrets_ssm_parameter_path = "/${var.deployment_name}/${var.nodes_secrets_ssm_parameter_id}"
 
   zones     = [for zone_name in var.zone_names : "${data.aws_region.current.name}${zone_name}"]
-  all_nodes = flatten([for v in module.nodes : v.instances])
 }
 
 module "lambda" {
@@ -69,7 +68,7 @@ module "lambda" {
   github_token                     = var.github_token
   iam_role_arn                     = module.security.iam_role_lambda_arn
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  total_nodes                      = var.node_count + var.watchtower_count + 1
+  total_nodes                      = 1
 }
 
 module "networking" {
@@ -95,12 +94,14 @@ module "security" {
 module "alb" {
   source = "./modules/alb"
 
-  deployment_name   = var.deployment_name
-  public_subnets_id = values(module.networking.public_subnets_by_zone)
-  vpc_id            = module.networking.vpc_id
-  nodes             = local.all_nodes
-  grpc_port         = var.grpc_port
-  jsonrpc_port      = var.jsonrpc_port
+  deployment_name      = var.deployment_name
+  public_subnets_id    = values(module.networking.public_subnets_by_zone)
+  vpc_id               = module.networking.vpc_id
+  grpc_port            = var.grpc_port
+  jsonrpc_port         = var.jsonrpc_port
+  p2p_port             = var.p2p_port
+  asg_name             = module.nodes["sequencer"].asg_name
+  bootnode_instance_id = module.bootnode.instance.id
 }
 
 module "bootnode" {
@@ -133,12 +134,12 @@ module "nodes" {
   source = "./modules/nodes"
 
   for_each = {
-    "sequencer"           = { node_count = var.node_count, port_prefix = 32 }
-    "watchtower"          = { node_count = var.watchtower_count, port_prefix = 33 }
+    "sequencer"           = { node_count = var.node_count }
+    "watchtower"          = { node_count = var.watchtower_count }
   }
   node_type                        = each.key
   node_count                       = each.value.node_count
-  p2p_port_prefix                  = each.value.port_prefix
+  p2p_port                         = var.p2p_port
   deployment_name                  = var.deployment_name
   accounts_artifact_url            = local.artifact_url[var.accounts_artifact_name]
   avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
@@ -153,9 +154,10 @@ module "nodes" {
   avail_addr                       = aws_eip.avail.public_dns
   s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
-  iam_profile_id                   = module.security.iam_node_profile_id
+  iam_profile_name                 = module.security.iam_node_profile_name
   lb_dns_name                      = module.alb.dns_name
   zones                            = local.zones
+  vpc_id                           = module.networking.vpc_id
   key_name                         = aws_key_pair.devnet.key_name
 }
 

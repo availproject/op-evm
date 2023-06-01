@@ -1,5 +1,5 @@
 chain_config: "${workspace}/genesis.json"
-secrets_config: "${workspace}/secrets-config.json"
+secrets_config: ""
 data_dir: "${workspace}/data"
 block_gas_target: "0x0"
 grpc_addr: :${grpc_port}

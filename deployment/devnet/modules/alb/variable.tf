@@ -3,13 +3,14 @@ variable "deployment_name" {
   type        = string
 }
 
-variable "nodes" {
-  description = "List of nodes info"
-  type        = list(object({
-    id = string
-    node_type = string
-    p2p_port = number
-  }))
+variable "asg_name" {
+  description = "Name of the ASG"
+  type        = string
+}
+
+variable "bootnode_instance_id" {
+  description = "Instance ID of the bootnode"
+  type        = string
 }
 
 variable "public_subnets_id" {
@@ -29,5 +30,10 @@ variable "grpc_port" {
 
 variable "jsonrpc_port" {
   description = "JSON RPC port for the bootstrap sequencer and sequencer to listen on"
+  type        = number
+}
+
+variable "p2p_port" {
+  description = "P2P port for the bootstrap sequencer to listen on"
   type        = number
 }

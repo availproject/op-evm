@@ -5,3 +5,7 @@ output "iam_role_lambda_arn" {
 output "iam_node_profile_id" {
   value = aws_iam_instance_profile.node.id
 }
+
+output "iam_node_profile_name" {
+  value = aws_iam_instance_profile.node.name
+}

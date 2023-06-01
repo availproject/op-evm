@@ -86,7 +86,10 @@ build-assm:
 tools-wallet:
 	cd tools/wallet && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-build-tools: build-staking build-e2e
+tools-account:
+	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
+
+build-tools: tools-account build-staking build-e2e
 
 build: build-server build-client
 

@@ -1,11 +1,4 @@
 terraform {
-#  cloud {
-#    organization = "avail"
-#
-#    workspaces {
-#      name = "avail-settlement"
-#    }
-#  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"

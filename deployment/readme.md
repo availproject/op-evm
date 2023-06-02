@@ -1,5 +1,11 @@
 # Deploy devnet on aws using terraform
 
+This directory has two subdirectories: `devnet` and `nets`.
+The `devnet` directory is a reusable [Terraform
+module](https://www.terraform.io/language/modules). The `nets` folder
+holds specific configurations for particular devnets. Said another way,
+the `nets` are instances of `devnet`. 
+
 ## Prerequisites
 - Install aws cli tool and run `aws configure`, copy your Access Key ID and Secret Access Key from the aws console.
 - Install session manager plugin for AWS CLI
@@ -21,6 +27,38 @@ Run commands:
 
 You can configure the deployment options using terraform variables like so: `terraform apply -var <key>=<value>` or `terraform apply -var-file="<filename>.tfvars"`
 Check out [variables.tf](./devnet/variables.tf) to see what variables you can provide in order to customize the deployment.
+
+## Deploy your own net
+
+If you want to deploy your own devnet for testing you can create a terraform module in `nets/private` this folder is ignored by git.
+
+Create a file called `main.tf` and use the template below to fill in with your details:
+```terraform
+terraform {
+  backend "s3" {
+    bucket = "availsl-tf-states"
+    key    = "state/avail-settlement/<deployment-name>"
+    region = "<region>"
+  }
+}
+
+module "devnet" {
+  source          = "../../devnet"
+  deployment_name = "<deployment-name>"
+  region          = "<region>"
+  avail_hostname  = "internal-rpc.testnetsl.avail.private",
+  avail_peer      = {
+    route53_zone_private_id = "<route53-zone>"
+    route_table_private_ids = [ 
+      "<route-table-1>",
+      "<route-table-2>",
+      "<route-table-3>",
+    ]
+    vpc_id = "<vpc-id>"
+  }
+  github_token = "<github-token>"
+}
+```
 
 ## Debugging instances
 

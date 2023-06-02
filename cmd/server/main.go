@@ -2,28 +2,37 @@ package server
 
 import (
 	"errors"
-	"flag"
 	"log"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-
 	golog "github.com/ipfs/go-log/v2"
+	"github.com/spf13/cobra"
+
 	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/config"
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
-func Main() {
+func GetCommand() *cobra.Command {
 	var bootnode bool
 	var availAddr, path, accountPath string
-	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
-	flag.StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
-	flag.StringVar(&accountPath, "account-config-file", "./configs/account", "Path to the account mnemonic file")
-	flag.BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
+	cmd := &cobra.Command{
+		Use:   "server",
+		Short: "Run the settlement layer server",
+		Run: func(cmd *cobra.Command, args []string) {
+			Run(availAddr, path, accountPath, bootnode)
+		},
+	}
+	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
+	cmd.Flags().StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
+	cmd.Flags().StringVar(&accountPath, "account-config-file", "./configs/account", "Path to the account mnemonic file")
+	cmd.Flags().BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
+	return cmd
+}
 
-	flag.Parse()
+func Run(availAddr, path, accountPath string, bootnode bool) {
 
 	// Enable LibP2P logging
 	golog.SetAllLoggers(golog.LevelWarn)

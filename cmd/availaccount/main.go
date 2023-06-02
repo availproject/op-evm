@@ -1,7 +1,6 @@
 package availaccount
 
 import (
-	"flag"
 	"log"
 	"math/big"
 	"math/rand"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	"github.com/spf13/cobra"
 
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
@@ -20,17 +20,25 @@ const (
 	maxUint64 = ^uint64(0)
 )
 
-func Main() {
+func GetCommand() *cobra.Command {
 	var balance uint64
 	var availAddr, path string
 	var retry bool
-	flag.StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
-	flag.StringVar(&path, "path", "./configs/account", "Save path for account memonic file")
-	flag.Uint64Var(&balance, "balance", 18, "Number of AVLs to deposit on the account")
-	flag.BoolVar(&retry, "retry", false, "Retry if account deposit fails")
+	cmd := &cobra.Command{
+		Use:   "availaccount",
+		Short: "Create an avail account and deposit the balance",
+		Run: func(cmd *cobra.Command, args []string) {
+			Run(availAddr, path, balance, retry)
+		},
+	}
+	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
+	cmd.Flags().StringVar(&path, "path", "./configs/account", "Save path for account memonic file")
+	cmd.Flags().Uint64Var(&balance, "balance", 18, "Number of AVLs to deposit on the account")
+	cmd.Flags().BoolVar(&retry, "retry", false, "Retry if account deposit fails")
+	return cmd
+}
 
-	flag.Parse()
-
+func Run(availAddr, path string, balance uint64, retry bool) {
 	availClient, err := avail.NewClient(availAddr)
 	if err != nil {
 		panic(err)

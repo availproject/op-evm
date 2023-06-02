@@ -149,6 +149,7 @@ variable "avail_peer" {
     route53_zone_private_id = string
     route_table_private_ids = list(string)
   })
+  default = null
 }
 
 variable "watchtower_count" {

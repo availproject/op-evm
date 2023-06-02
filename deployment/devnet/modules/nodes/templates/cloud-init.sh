@@ -19,7 +19,7 @@ aws s3 cp "s3://${s3_bucket_name}/genesis.json" "${workspace}"
 ${workspace}/avail-settlement secrets init --insecure --data-dir ${workspace}/data
 
 # Deposit some tokens in the avail blockchain
-${workspace}/accounts -balance 6 -avail-addr "ws://${avail_addr}:9944/v1/json-rpc" -path "${workspace}/account-mnemonic" --retry
+${workspace}/accounts -balance 6 -avail-addr "ws://${avail_addr}/v1/json-rpc" -path "${workspace}/account-mnemonic" --retry
 
 sudo chown -R ${user}. "${workspace}"
 sudo systemctl start avail-settlement

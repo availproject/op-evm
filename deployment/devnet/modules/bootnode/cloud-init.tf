@@ -37,7 +37,7 @@ data "cloudinit_config" "cloud_init" {
       }))
       avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/avail-settlement.service", {
         workspace  = local.workspace
-        avail_addr = "${var.avail_addr}:9944"
+        avail_addr = var.avail_addr
         node_type  = "bootstrap-sequencer"
         user       = local.user
       }))

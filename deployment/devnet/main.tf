@@ -79,6 +79,7 @@ module "networking" {
   devnet_public_subnet  = var.devnet_public_subnet
   devnet_vpc_block      = var.devnet_vpc_block
   zones                 = local.zones
+  avail_peer            = var.avail_peer
 }
 
 module "security" {
@@ -117,9 +118,8 @@ module "bootnode" {
   grpc_port                        = var.grpc_port
   jsonrpc_port                     = var.jsonrpc_port
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
   subnets_by_zone                  = module.networking.private_subnets_by_zone
-  avail_addr                       = aws_eip.avail.public_dns
+  avail_addr                       = "${var.avail_hostname}:${var.avail_ws_port}"
   s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
   iam_profile_id                   = module.security.iam_node_profile_id
@@ -149,9 +149,8 @@ module "nodes" {
   grpc_port                        = var.grpc_port
   jsonrpc_port                     = var.jsonrpc_port
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
   subnets_by_zone                  = module.networking.private_subnets_by_zone
-  avail_addr                       = aws_eip.avail.public_dns
+  avail_addr                       = "${var.avail_hostname}:${var.avail_ws_port}"
   s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
   iam_profile_name                 = module.security.iam_node_profile_name

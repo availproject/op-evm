@@ -134,8 +134,8 @@ module "nodes" {
   source = "./modules/nodes"
 
   for_each = {
-    "sequencer"           = { node_count = var.node_count }
-    "watchtower"          = { node_count = var.watchtower_count }
+    "sequencer"           = var.node_count
+    "watchtower"          = var.watchtower_count
   }
   node_type                        = each.key
   node_count                       = each.value.node_count

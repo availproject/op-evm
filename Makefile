@@ -98,17 +98,17 @@ build-all: build build-tools
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
 	rm -rf data/avail-bootnode-1/trie/
-	./avail-settlement -bootstrap -config-file="./configs/bootstrap-sequencer.yaml" -account-config-file="./configs/account-bootstrap-sequencer"
+	./avail-settlement server --bootstrap --config-file="./configs/bootstrap-sequencer.yaml" --account-config-file="./configs/account-bootstrap-sequencer"
 
 start-sequencer: build
 	rm -rf data/avail-node-1/blockchain/
 	rm -rf data/avail-node-1/trie/
-	./avail-settlement -config-file="./configs/sequencer-1.yaml" -account-config-file="./configs/account-sequencer"
+	./avail-settlement server --config-file="./configs/sequencer-1.yaml" --account-config-file="./configs/account-sequencer"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
 	rm -rf data/avail-watchtower-1/trie/
-	./avail-settlement -config-file="./configs/watchtower-1.yaml" -account-config-file="./configs/account-watchtower"
+	./avail-settlement server --config-file="./configs/watchtower-1.yaml" --account-config-file="./configs/account-watchtower"
 
 start-e2e: build-e2e
 	./tools/e2e/e2e
@@ -122,13 +122,13 @@ start-staking: build-staking
 create-accounts: create-bootstrap-sequencer-account create-sequencer-account create-watchtower-account
 
 create-bootstrap-sequencer-account: build-server
-	./avail-settlement availaccount -balance 6 -path ./configs/account-bootstrap-sequencer
+	./avail-settlement availaccount --balance 6 --path ./configs/account-bootstrap-sequencer
 	
 create-sequencer-account: build-server
-	./avail-settlement availaccount -balance 6 -path ./configs/account-sequencer
+	./avail-settlement availaccount --balance 6 --path ./configs/account-sequencer
 
 create-watchtower-account: build-server
-	./avail-settlement availaccount -balance 6 -path ./configs/account-watchtower
+	./avail-settlement availaccount --balance 6 --path ./configs/account-watchtower
 
 deps:
 ifeq (, $(shell which $(POLYGON_EDGE_BIN)))

@@ -43,7 +43,7 @@ variable "genesis_bucket_prefix" {
 variable "release" {
   description = "The avail settlement release (will match a tag from the github.com/availproject/avail-settlement repository)"
   type        = string
-  default     = "v0.0.0-test1"
+  default     = "v0.0.0-test3"
 }
 
 variable "github_token" {

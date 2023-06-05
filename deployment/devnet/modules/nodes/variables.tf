@@ -3,6 +3,11 @@ variable "deployment_name" {
   type        = string
 }
 
+variable "vpc_id" {
+  description = "VPC id"
+  type        = string
+}
+
 variable "grpc_port" {
   description = "GRPC port for the bootstrap sequencer and sequencer to listen on"
   type        = number
@@ -68,8 +73,8 @@ variable "genesis_init_lambda_name" {
   type = string
 }
 
-variable "iam_profile_id" {
-  description = "IAM profile id"
+variable "iam_profile_name" {
+  description = "IAM profile name"
   type = string
 }
 
@@ -88,8 +93,8 @@ variable "subnets_by_zone" {
   type        = map(string)
 }
 
-variable "p2p_port_prefix" {
-  description = "P2P port prefix, must be unique across all the instances that use the same load balancer"
+variable "p2p_port" {
+  description = "P2P port"
   type = number
 }
 

@@ -52,12 +52,6 @@ variable "github_token" {
   sensitive   = true
 }
 
-variable "polygon_edge_artifact_url" {
-  description = "The artifact url for `polygon-edge` binary"
-  type        = string
-  default     = "https://github.com/0xPolygon/polygon-edge/releases/download/v0.8.1/polygon-edge_0.8.1_linux_arm64.tar.gz"
-}
-
 variable "avail_settlement_artifact_name" {
   description = "The artifact name for `avail-settlement` binary"
   type        = string
@@ -135,6 +129,27 @@ variable "node_count" {
   description = "The number of sequencer nodes that we're going to deploy"
   type        = number
   default     = 1
+}
+
+variable "avail_hostname" {
+  description = "Avail hostname is usually a dns name. (if avail is not exposed publicly make sure to configure vpc peering)"
+  type = string
+}
+
+variable "avail_ws_port" {
+  description = "Avail port number"
+  type = number
+  default = 8546
+}
+
+variable "avail_peer" {
+  description = "Avail peering configuration, for peering to work properly we need the peer VPC id, the Route53 zone and a list of peer route tables that we need to configure to point to out VPC. Peering is only supported in the same aws account and region."
+  type = object({
+    vpc_id = string
+    route53_zone_private_id = string
+    route_table_private_ids = list(string)
+  })
+  default = null
 }
 
 variable "watchtower_count" {

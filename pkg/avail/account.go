@@ -124,7 +124,7 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 	var accountInfo types.AccountInfo
 	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
 	if err != nil || !ok {
-		return err
+		return fmt.Errorf("couldn't fetch latest alice account storage info: %w", err)
 	}
 
 	nonce := uint64(accountInfo.Nonce)

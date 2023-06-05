@@ -1,7 +1,13 @@
 package main
 
-import "github.com/maticnetwork/avail-settlement/cmd/availaccount"
+import (
+	"log"
+
+	"github.com/maticnetwork/avail-settlement/cmd/availaccount"
+)
 
 func main() {
-	availaccount.Main()
+	if err := availaccount.GetCommand().Execute(); err != nil {
+		log.Fatal(err)
+	}
 }

@@ -1,11 +1,11 @@
 terraform {
-  cloud {
-    organization = "avail"
-
-    workspaces {
-      name = "avail-settlement"
-    }
-  }
+#  cloud {
+#    organization = "avail"
+#
+#    workspaces {
+#      name = "avail-settlement"
+#    }
+#  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -80,6 +80,7 @@ module "networking" {
   devnet_public_subnet  = var.devnet_public_subnet
   devnet_vpc_block      = var.devnet_vpc_block
   zones                 = local.zones
+  avail_peer            = var.avail_peer
 }
 
 module "security" {
@@ -116,9 +117,8 @@ module "bootnode" {
   grpc_port                        = var.grpc_port
   jsonrpc_port                     = var.jsonrpc_port
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
   subnets_by_zone                  = module.networking.private_subnets_by_zone
-  avail_addr                       = aws_eip.avail.public_dns
+  avail_addr                       = "${var.avail_hostname}:${var.avail_ws_port}"
   s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
   iam_profile_id                   = module.security.iam_node_profile_id
@@ -133,8 +133,8 @@ module "nodes" {
   source = "./modules/nodes"
 
   for_each = {
-    "sequencer"           = { node_count = var.node_count, port_prefix = 32 }
-    "watchtower"          = { node_count = var.watchtower_count, port_prefix = 33 }
+    "sequencer"  = { node_count = var.node_count, port_prefix = 32 }
+    "watchtower" = { node_count = var.watchtower_count, port_prefix = 33 }
   }
   node_type                        = each.key
   node_count                       = each.value.node_count
@@ -148,9 +148,8 @@ module "nodes" {
   grpc_port                        = var.grpc_port
   jsonrpc_port                     = var.jsonrpc_port
   nodes_secrets_ssm_parameter_path = local.nodes_secrets_ssm_parameter_path
-  polygon_edge_artifact_url        = var.polygon_edge_artifact_url
   subnets_by_zone                  = module.networking.private_subnets_by_zone
-  avail_addr                       = aws_eip.avail.public_dns
+  avail_addr                       = "${var.avail_hostname}:${var.avail_ws_port}"
   s3_bucket_genesis_name           = module.lambda.s3_bucket_genesis_name
   genesis_init_lambda_name         = module.lambda.genesis_init_lambda_name
   iam_profile_id                   = module.security.iam_node_profile_id

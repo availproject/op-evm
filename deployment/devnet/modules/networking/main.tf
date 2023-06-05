@@ -4,6 +4,7 @@ resource "aws_vpc" "devnet" {
   cidr_block           = var.devnet_vpc_block
   instance_tenancy     = "default"
   enable_dns_hostnames = true
+  enable_dns_support   = true
 
   tags = {
     Name        = "devnet-${var.deployment_name}"
@@ -90,4 +91,15 @@ resource "aws_route_table_association" "private" {
 
   subnet_id      = aws_subnet.devnet_private[count.index].id
   route_table_id = aws_route_table.devnet_private.id
+}
+
+resource "aws_route53_zone" "private_zone" {
+  name          = "${var.deployment_name}.avail-settlement.private"
+  force_destroy = true
+  vpc {
+    vpc_id = aws_vpc.devnet.id
+  }
+  lifecycle {
+    ignore_changes = [vpc]
+  }
 }

@@ -26,7 +26,11 @@ var genesisCfgPath = flag.String("genesis-config", "../configs/genesis.json", "P
 // nolint:unused
 var accountPath = flag.String("account-config-file", "../configs/account", "Path to the account mnemonic file")
 
-var awsInstancesFlag = flag.String("aws-instances", "", "file containing all the information about the aws instances deployed as json, if provided will be used to connect instead of spawning up own instances")
+// nolint:unused
+var bootnodeAddr = flag.String("bootnode-addr", "", "Remote bootstrap sequencer address")
+
+// nolint:unused
+var nodeAddr = flag.String("node-addr", "", "Remote sequencer address")
 
 func Test_MultipleSequencers(t *testing.T) {
 	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
@@ -38,35 +42,36 @@ func Test_MultipleSequencers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	*genesisCfgPath = filepath.Join(cwd, *genesisCfgPath)
+	var ethClient *ethclient.Client
 
-	var ctx ContextInterface
-	if *awsInstancesFlag == "" {
+	if *bootnodeAddr == "" {
+		*genesisCfgPath = filepath.Join(cwd, *genesisCfgPath)
+
 		t.Log("starting nodes")
 		bindAddr, err := netip.ParseAddr(*bindInterface)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ctx, err = StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Shutdown all nodes once test finishes.
+		t.Cleanup(ctx.StopAll)
+
+		t.Log("nodes started")
+
+		ethClient, err = ctx.GethClient()
 		if err != nil {
 			t.Fatal(err)
 		}
 	} else {
-		ctx, err = NewDevnetContext(*awsInstancesFlag)
+		ethClient, err = ethclient.Dial(*bootnodeAddr)
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-
-	// Shutdown all nodes once test finishes.
-	t.Cleanup(ctx.StopAll)
-
-	t.Log("nodes started")
-
-	ethClient, err := ctx.GethClient()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	waitForPeers(t, ethClient, 3)

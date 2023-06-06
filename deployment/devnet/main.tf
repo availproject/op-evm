@@ -1,11 +1,4 @@
 terraform {
-#  cloud {
-#    organization = "avail"
-#
-#    workspaces {
-#      name = "avail-settlement"
-#    }
-#  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -138,7 +131,7 @@ module "nodes" {
     "watchtower"          = var.watchtower_count
   }
   node_type                        = each.key
-  node_count                       = each.value.node_count
+  node_count                       = each.value
   p2p_port                         = var.p2p_port
   deployment_name                  = var.deployment_name
   accounts_artifact_url            = local.artifact_url[var.accounts_artifact_name]

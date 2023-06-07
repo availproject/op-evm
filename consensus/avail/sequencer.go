@@ -171,34 +171,53 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			// - BeginDisputeTx that is inside of the fraud block was already shipped into txpool and it will
 			//   trigger failures when writing down block due to already existing tx in the store.
 			_, blkAlreadyKnown := sw.blockchain.GetHeaderByHash(edgeBlk.Header.Hash)
-			if !blkAlreadyKnown || !fraudResolver.IsFraudProofBlock(edgeBlk) {
-				if err := validator.Check(edgeBlk); err == nil {
-					if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
-						sw.logger.Warn(
-							"failed to write edge block received from avail",
-							"edge_block_hash", edgeBlk.Hash(),
-							"error", err,
-						)
-					} else {
-						// Clear out the executed transactions from the TxPool after the block
-						// has been written.
-						sw.txpool.ResetWithHeaders(edgeBlk.Header)
-						sw.logger.Debug("wrote block to blockchain from Avail", "block_number", edgeBlk.Header.Number)
-					}
-				} else {
-					sw.logger.Warn(
-						"failed to validate edge block received from avail",
-						"edge_block_hash", edgeBlk.Hash(),
-						"error", err,
+			if blkAlreadyKnown {
+				// Block is already present in blockchain, no need to take action.
+				continue
+			}
+
+			// Check if the block is a fraud proof.
+			if fraudResolver.IsFraudProofBlock(edgeBlk) {
+				if fraudProofBlockHash, exists := block.GetExtraDataFraudProofTarget(edgeBlk.Header); exists {
+					sw.logger.Info(
+						"Fraud proof parent hash block discovered. Continuing with fraud dispute resolution...",
+						"probation_block_hash", fraudProofBlockHash,
+						"watchtower_fraud_block_hash", edgeBlk.Hash(),
 					)
+					fraudResolver.SetChainStatus(ChainProcessingDisabled)
+					fraudResolver.SetBlock(edgeBlk)
 				}
+
+				continue
+			}
+
+			// Validate the block.
+			err := validator.Check(edgeBlk)
+			if err != nil {
+				sw.logger.Warn(
+					"failed to validate edge block received from avail",
+					"edge_block_hash", edgeBlk.Hash(),
+					"error", err,
+				)
+				continue
+			}
+
+			// ...and finally write to the blockchain.
+			if err := sw.blockchain.WriteBlock(edgeBlk, sw.nodeType.String()); err != nil {
+				sw.logger.Warn(
+					"failed to write edge block received from avail",
+					"edge_block_hash", edgeBlk.Hash(),
+					"error", err,
+				)
+			} else {
+				// Clear out the executed transactions from the TxPool after the block
+				// has been written.
+				sw.txpool.ResetWithHeaders(edgeBlk.Header)
+				sw.logger.Debug("wrote block to blockchain from Avail", "block_number", edgeBlk.Header.Number)
 			}
 		}
 
 		sw.logger.Warn("Current header", "number", sw.blockchain.Header().Number)
-
-		// Go through the blocks from avail and make sure to set fraud block in case it was discovered...
-		fraudResolver.CheckAndSetFraudBlock(edgeBlks)
 
 		// Periodically verify that we are staked, before proceeding with sequencer
 		// logic. In the unexpected case of being slashed and dropping below the

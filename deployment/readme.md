@@ -46,7 +46,9 @@ module "devnet" {
   source          = "../../devnet"
   deployment_name = "<deployment-name>"
   region          = "<region>"
-  avail_hostname  = "internal-rpc.testnetsl.avail.private",
+  base_ami        = "<ami>" # Latest ubuntu ami 
+  avail_hostname  = "internal-rpc.testnetsl.avail.private"
+  release         = "v0.0.0-test3" # Use latest release
   avail_peer      = {
     route53_zone_private_id = "<route53-zone>"
     route_table_private_ids = [ 

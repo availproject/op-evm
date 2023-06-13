@@ -13,7 +13,6 @@ import (
 	"time"
 
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/server"
 	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
@@ -35,7 +34,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -221,58 +219,10 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	// custom write genesis hook per consensus engine
-	engineName := m.config.Chain.Params.GetEngine()
-	if factory, exists := genesisCreationFactory[server.ConsensusType(engineName)]; exists {
-		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
-	}
-
-	// apply allow list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-			m.config.Chain.Params.ContractDeployerAllowList)
-	}
-
-	// apply block list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-			m.config.Chain.Params.ContractDeployerBlockList)
-	}
-
-	// apply transactions execution allow list genesis data
-	if m.config.Chain.Params.TransactionsAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-			m.config.Chain.Params.TransactionsAllowList)
-	}
-
-	// apply transactions execution block list genesis data
-	if m.config.Chain.Params.TransactionsBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-			m.config.Chain.Params.TransactionsBlockList)
-	}
-
-	// apply bridge allow list genesis data
-	if m.config.Chain.Params.BridgeAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-			m.config.Chain.Params.BridgeAllowList)
-	}
-
-	// apply bridge block list genesis data
-	if m.config.Chain.Params.BridgeBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-			m.config.Chain.Params.BridgeBlockList)
-	}
-
 	var initialStateRoot = types.ZeroHash
 
 	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := forkmanager.ForkManagerInit(
-		forkManagerFactory[server.ConsensusType(engineName)],
-		config.Chain.Params.Forks); err != nil {
 		return nil, err
 	}
 

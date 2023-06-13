@@ -188,6 +188,9 @@ func NewChain(basepath string) (*chain.Chain, error) {
 					"mechanisms": []string{"sequencer", "validator"},
 				},
 			},
+			BurnContract: map[uint64]string{
+				0: "0x0000000000000000000000000000000000000000",
+			},
 		},
 	}, nil
 }

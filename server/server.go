@@ -174,7 +174,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	// Set up datadog profiler
 	if ddErr := m.enableDataDogProfiler(); err != nil {
-		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
+		m.logger.Error("DataDog profiler setup failed", "error", ddErr.Error())
 	}
 
 	// Set up the secrets manager
@@ -910,22 +910,22 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
-		s.logger.Error("failed to close blockchain", "err", err.Error())
+		s.logger.Error("failed to close blockchain", "error", err.Error())
 	}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
-		s.logger.Error("failed to close networking", "err", err.Error())
+		s.logger.Error("failed to close networking", "error", err.Error())
 	}
 
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.logger.Error("failed to close consensus", "error", err.Error())
 	}
 
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
-		s.logger.Error("failed to close storage for trie", "err", err.Error())
+		s.logger.Error("failed to close storage for trie", "error", err.Error())
 	}
 
 	if s.prometheusServer != nil {
@@ -969,7 +969,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
-				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+				s.logger.Error("Prometheus HTTP server ListenAndServe", "error", err)
 			}
 		}
 	}()

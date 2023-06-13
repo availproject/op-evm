@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   0,
+		BlockTime:   1686644797, // We are not using it as we produce blocks at our own peace.
 		Headers: &config.Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},

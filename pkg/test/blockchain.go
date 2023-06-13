@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
+	edgechain "github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -35,8 +36,15 @@ func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Execut
 
 	chain.Genesis.StateRoot = gr
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chain.Params.Forks.At(0), uint64(chain.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(chain.Params.ChainID),
+		chain.Params.Forks.IsActive(edgechain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(chain.Params.ChainID),
+			chain.Params.Forks.IsActive(edgechain.Homestead, 0),
+		),
+	)
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -68,8 +76,15 @@ func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifie
 
 	chainSpec.Genesis.StateRoot = gr
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chainSpec.Params.Forks.At(0), uint64(chainSpec.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(chainSpec.Params.ChainID),
+		chainSpec.Params.Forks.IsActive(edgechain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(chainSpec.Params.ChainID),
+			chainSpec.Params.Forks.IsActive(edgechain.Homestead, 0),
+		),
+	)
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -166,21 +181,15 @@ func NewChain(basepath string) (*chain.Chain, error) {
 			},
 		},
 		Params: &chain.Params{
-			Forks: &chain.Forks{
-				Homestead:      new(chain.Fork),
-				Byzantium:      new(chain.Fork),
-				Constantinople: new(chain.Fork),
-				Petersburg:     new(chain.Fork),
-				Istanbul:       new(chain.Fork),
-				EIP150:         new(chain.Fork),
-				EIP158:         new(chain.Fork),
-				EIP155:         new(chain.Fork),
-			},
+			Forks:   chain.AllForksEnabled,
 			ChainID: 100,
 			Engine: map[string]interface{}{
 				"avail": map[string]interface{}{
 					"mechanisms": []string{"sequencer", "validator"},
 				},
+			},
+			BurnContract: map[uint64]string{
+				0: "0x0000000000000000000000000000000000000000",
 			},
 		},
 	}, nil

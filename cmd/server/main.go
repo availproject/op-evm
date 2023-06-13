@@ -15,26 +15,39 @@ import (
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
+// GetCommand returns a Cobra command for running the settlement layer server.
+// It takes no arguments and returns a pointer to a cobra.Command.
+// Example usage:
+// cmd := GetCommand()
+//
+//	if err := cmd.Execute(); err != nil {
+//	   log.Fatalf("cmd.Execute error: %v", err)
+//	}
 func GetCommand() *cobra.Command {
 	var bootnode bool
-	var availAddr, path, accountPath string
+	var availAddr, path, accountPath, fraudListenAddr string
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Run the settlement layer server",
 		Run: func(cmd *cobra.Command, args []string) {
-			Run(availAddr, path, accountPath, bootnode)
+			Run(availAddr, path, accountPath, fraudListenAddr, bootnode)
 		},
 	}
 	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
 	cmd.Flags().StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
 	cmd.Flags().StringVar(&accountPath, "account-config-file", "./configs/account", "Path to the account mnemonic file")
 	cmd.Flags().BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
+	cmd.Flags().StringVar(&fraudListenAddr, "fraud-srv-listen-addr", ":9990", "Fraud server listen address")
 	return cmd
 }
 
-func Run(availAddr, path, accountPath string, bootnode bool) {
-
-	// Enable LibP2P logging
+// Run initializes and starts the settlement layer server. It takes the Avail JSON-RPC URL, a file path for
+// the configuration file, a file path for the account mnemonic file, a fraud server listen address and a bootnode
+// flag. It does not return a value.
+// Example usage:
+// Run("ws://127.0.0.1:9944/v1/json-rpc", "./configs/bootnode.yaml", "./configs/account", ":9990", false)
+func Run(availAddr, path, accountPath, fraudListenAddr string, bootnode bool) {
+	// Enable LibP2P logging but only >= warn
 	golog.SetAllLoggers(golog.LevelWarn)
 
 	config, err := config.NewServerConfig(path)
@@ -44,8 +57,6 @@ func Run(availAddr, path, accountPath string, bootnode bool) {
 
 	// Enable TxPool P2P gossiping
 	config.Config.Seal = true
-
-	log.Printf("Server config: %+v", config)
 
 	availAccount, err := avail.AccountFromFile(accountPath)
 	if err != nil {
@@ -64,30 +75,34 @@ func Run(availAddr, path, accountPath string, bootnode bool) {
 
 	availSender := avail.NewSender(availClient, appID, availAccount)
 
-	// Attach the consensus to the server
 	cfg := consensus.Config{
-		AvailAccount: availAccount,
-		AvailClient:  availClient,
-		AvailSender:  availSender,
-		Bootnode:     bootnode,
-		NodeType:     config.NodeType,
-		AvailAppID:   appID,
+		AvailAccount:      availAccount,
+		AvailClient:       availClient,
+		AvailSender:       availSender,
+		Bootnode:          bootnode,
+		FraudListenerAddr: fraudListenAddr,
+		NodeType:          config.NodeType,
+		AvailAppID:        appID,
 	}
-
 	serverInstance, err := server.NewServer(config.Config, cfg)
 	if err != nil {
 		log.Fatalf("failure to start node: %s", err)
 	}
-
-	log.Printf("Server instance %#v", serverInstance)
 
 	if err := HandleSignals(serverInstance.Close); err != nil {
 		log.Fatalf("handle signal error: %s", err)
 	}
 }
 
-// HandleSignals is a helper method for handling signals sent to the console
-// Like stop, error, etc.
+// HandleSignals is a function that handles signals sent to the console. It helps in managing
+// the lifecycle of the server by triggering a shutdown when a termination signal is received.
+// It takes a function to be called when a termination signal is received and returns an error if
+// the server shutdown was not graceful.
+// Example usage (assuming serverInstance is already defined):
+//
+//	if err := HandleSignals(serverInstance.Close); err != nil {
+//	   log.Fatalf("handle signal error: %v", err)
+//	}
 func HandleSignals(closeFn func()) error {
 	signalCh := common.GetTerminationSignalCh()
 	sig := <-signalCh

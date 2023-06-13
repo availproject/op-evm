@@ -55,30 +55,8 @@ bootstrap-staking-contract: build-staking-contract
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
-build-fraud-contract:
-	solc --abi tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
-	solc --bin tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
-	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
-
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
-
-build-client:
-	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
-
-build-e2e:
-	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
-
-build-fraud: build-fraud-contract
-	cd tools/fraud && GOOS=${GOOS} GOARCH=${GOARCH} go build -o fraud
-
-build-staking:
-	cd tools/staking && GOOS=${GOOS} GOARCH=${GOARCH} go build -o staking
-
-build-contract:
-	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
-	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
-	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
 
 build-assm:
 	cd assm && GOOS=${GOOS} GOARCH=${GOARCH} go build
@@ -89,35 +67,26 @@ tools-wallet:
 tools-account:
 	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-build-tools: tools-account build-staking build-e2e
+build-tools: tools-account
 
-build: build-server build-client
+build: build-server
 
 build-all: build build-tools
 
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
 	rm -rf data/avail-bootnode-1/trie/
-	./avail-settlement server --bootstrap --config-file="./configs/bootstrap-sequencer.yaml" --account-config-file="./configs/account-bootstrap-sequencer"
+	./avail-settlement server --bootstrap --config-file="./configs/bootstrap-sequencer.yaml" --account-config-file="./configs/account-bootstrap-sequencer" --fraud-srv-listen-addr ":9990"
 
 start-sequencer: build
 	rm -rf data/avail-node-1/blockchain/
 	rm -rf data/avail-node-1/trie/
-	./avail-settlement server --config-file="./configs/sequencer-1.yaml" --account-config-file="./configs/account-sequencer"
+	./avail-settlement server --config-file="./configs/sequencer-1.yaml" --account-config-file="./configs/account-sequencer" --fraud-srv-listen-addr ":9991"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
 	rm -rf data/avail-watchtower-1/trie/
 	./avail-settlement server --config-file="./configs/watchtower-1.yaml" --account-config-file="./configs/account-watchtower"
-
-start-e2e: build-e2e
-	./tools/e2e/e2e
-
-start-fraud: build-fraud
-	./tools/fraud/fraud
-
-start-staking: build-staking 
-	./tools/staking/staking
 
 create-accounts: create-bootstrap-sequencer-account create-sequencer-account create-watchtower-account
 

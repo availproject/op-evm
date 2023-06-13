@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 /****************************************************************************/
@@ -223,13 +224,23 @@ func (v *validator) verifyBlockParent(childBlk *types.Block) error {
 
 	// Make sure the block numbers are correct
 	if childBlk.Number()-1 != parent.Number {
-		v.logger.Error(
-			"block number sequence not correct",
-			"child_block_number", childBlk.Number(),
-			"parent_block_number", parent.Number,
-		)
+		// Check if one of the transactions is `BeginDisputeResolutionTx`, which can
+		// perform a fork in case the corresponding sequencer made fraud.
+		for _, tx := range childBlk.Transactions {
+			isDisputeResolutionFork, err := staking.IsBeginDisputeResolutionTx(tx)
+			if err != nil {
+				return err
+			}
 
-		return ErrInvalidBlockSequence
+			if !isDisputeResolutionFork {
+				v.logger.Error(
+					"block number sequence not correct",
+					"child_block_number", childBlk.Number(),
+					"parent_block_number", parent.Number,
+				)
+				return ErrInvalidBlockSequence
+			}
+		}
 	}
 
 	// Make sure the gas limit is within correct bounds
@@ -261,7 +272,8 @@ func (v *validator) verifyGasLimit(header *types.Header, parentHeader *types.Hea
 		diff *= -1
 	}
 
-	limit := parentHeader.GasLimit / blockchain.BlockGasTargetDivisor
+	// blockchain.BlockGasTargetDivisor is now private (v0.8.1 -> v1.0.0) so instead using it's value 1024
+	limit := parentHeader.GasLimit / 1024
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",

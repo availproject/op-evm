@@ -60,8 +60,5 @@
         }
     },
     "bootnodes": [
-        "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa",
-        "/ip4/127.0.0.1/tcp/20001/p2p/16Uiu2HAkwyY1aXwC7o7nrUofsBXwUkxYwsj21LtE9jmhmTuei5mw",
-        "/ip4/127.0.0.1/tcp/30001/p2p/16Uiu2HAmLgJKjdhLUjH9wtH6AL8wysr3rYMgYku8tTvhBZ5mctVq"
     ]
 }

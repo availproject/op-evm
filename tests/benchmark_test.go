@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"flag"
-	"log"
 	"math/big"
 	"net/netip"
 	"testing"
@@ -12,8 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/maticnetwork/avail-settlement-contracts/testing/pkg/testtoken"
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/devnet"
 )
 
 const walletsDir = "../data/wallets"
@@ -29,10 +31,10 @@ func Benchmark_SendingTransactions(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	var ethClient, sequencerClient *ethclient.Client
-	if *nodeAddr == "" {
+	var ethClient *ethclient.Client
+	if *bootnodeAddr == "" {
 		b.Log("starting nodes")
-		ctx, err := StartNodes(b, addr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		ctx, err := devnet.StartNodes(hclog.Default(), addr, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -41,24 +43,12 @@ func Benchmark_SendingTransactions(b *testing.B) {
 
 		b.Log("nodes started")
 
-		ethClient, err = ctx.GethClient()
-		if err != nil {
-			b.Fatal(err)
-		}
-		url, err := ctx.FirstRPCURLForNodeType(avail.Sequencer)
-		if err != nil {
-			log.Fatal(err)
-		}
-		sequencerClient, err = ethclient.Dial(url.String())
+		ethClient, err = ctx.GethClient(avail.BootstrapSequencer)
 		if err != nil {
 			b.Fatal(err)
 		}
 	} else {
 		ethClient, err = ethclient.Dial(*bootnodeAddr)
-		if err != nil {
-			b.Fatal(err)
-		}
-		sequencerClient, err = ethclient.Dial(*nodeAddr)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -68,7 +58,7 @@ func Benchmark_SendingTransactions(b *testing.B) {
 
 	accs := ks.Accounts()
 	ownerAccount := accs[0]
-	chainID, err := sequencerClient.ChainID(context.Background())
+	chainID, err := ethClient.ChainID(context.Background())
 	if err != nil {
 		b.Fatal(err)
 	}

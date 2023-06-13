@@ -1,7 +1,9 @@
+// Server package for the blockchain client.
 package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,16 +14,11 @@ import (
 	"time"
 
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
-	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
-	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
-	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server"
 	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 
 	"github.com/0xPolygon/polygon-edge/archive"
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
@@ -29,7 +26,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -38,30 +34,25 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
-type GenesisFactoryHook func(config *chain.Chain, engineName string) func(*state.Transition) error
+// Error definitions.
+var (
+	errBlockTimeMissing = errors.New("block time configuration is missing")
+	errBlockTimeInvalid = errors.New("block time configuration is invalid")
+)
 
-// secretsManagerBackends defines the SecretManager factories for different
-// secret management solutions
-var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
-	secrets.Local:          local.SecretsManagerFactory,
-	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
-	secrets.AWSSSM:         awsssm.SecretsManagerFactory,
-	secrets.GCPSSM:         gcpssm.SecretsManagerFactory,
-}
-
-// Server is the central manager of the blockchain client
+// Server struct defines the central manager of the blockchain client.
 type Server struct {
 	logger       hclog.Logger
 	config       *server.Config
@@ -104,8 +95,8 @@ type Server struct {
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 }
 
-// newFileLogger returns logger instance that writes all logs to a specified file.
-// If log file can't be created, it returns an error
+// newFileLogger creates a logger instance that writes all logs to a specified file.
+// If log file can't be created, it returns an error.
 func newFileLogger(config *server.Config) (hclog.Logger, error) {
 	logFileWriter, err := os.Create(config.LogFilePath)
 	if err != nil {
@@ -120,7 +111,7 @@ func newFileLogger(config *server.Config) (hclog.Logger, error) {
 	}), nil
 }
 
-// newCLILogger returns minimal logger instance that sends all logs to standard output
+// newCLILogger returns a minimal logger instance that sends all logs to standard output.
 func newCLILogger(config *server.Config) hclog.Logger {
 	return hclog.New(&hclog.LoggerOptions{
 		Name:       "polygon",
@@ -129,9 +120,9 @@ func newCLILogger(config *server.Config) hclog.Logger {
 	})
 }
 
-// newLoggerFromConfig creates a new logger which logs to a specified file.
-// If log file is not set it outputs to standard output ( console ).
-// If log file is specified, and it can't be created the server command will error out
+// newLoggerFromConfig creates a logger that logs to a specified file.
+// If log file is not set it outputs to standard output (console).
+// If log file is specified, and it can't be created the server command will error out.
 func newLoggerFromConfig(config *server.Config) (hclog.Logger, error) {
 	if config.LogFilePath != "" {
 		fileLoggerInstance, err := newFileLogger(config)
@@ -145,7 +136,7 @@ func newLoggerFromConfig(config *server.Config) (hclog.Logger, error) {
 	return newCLILogger(config), nil
 }
 
-// NewServer creates a new Minimal server, using the passed in configuration
+// NewServer creates a new minimal server, using the passed in configuration.
 func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Server, error) {
 	logger, err := newLoggerFromConfig(config)
 	if err != nil {
@@ -230,12 +221,6 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	// apply allow list genesis data
-	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-			m.config.Chain.Params.ContractDeployerAllowList)
-	}
-
 	initialStateRoot := types.ZeroHash
 
 	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
@@ -246,11 +231,25 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(m.config.Chain.Params.ChainID),
+		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(m.config.Chain.Params.ChainID),
+			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+		),
+	)
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, blockchainStorage, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(
+		logger,
+		blockchainStorage,
+		config.Chain,
+		nil,
+		m.executor,
+		signer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -263,11 +262,6 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 			Blockchain: m.blockchain,
 		}
 
-		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
-		if err != nil {
-			return nil, err
-		}
-
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
@@ -276,10 +270,9 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 			m.grpcServer,
 			m.network,
 			&txpool.Config{
-				MaxSlots:            m.config.MaxSlots,
-				PriceLimit:          m.config.PriceLimit,
-				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
-				DeploymentWhitelist: deploymentWhitelist,
+				MaxSlots:           m.config.MaxSlots,
+				PriceLimit:         m.config.PriceLimit,
+				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 			},
 		)
 		if err != nil {
@@ -350,6 +343,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 	return m, nil
 }
 
+// unaryInterceptor is a GRPC interceptor that validates requests.
 func unaryInterceptor(
 	ctx context.Context,
 	req interface{},
@@ -364,6 +358,7 @@ func unaryInterceptor(
 	return handler(ctx, req)
 }
 
+// restoreChain restores the blockchain from a backup file.
 func (s *Server) restoreChain() error {
 	if s.config.RestoreFile == nil {
 		return nil
@@ -376,12 +371,14 @@ func (s *Server) restoreChain() error {
 	return nil
 }
 
+// txpoolHub provides an interface between the transaction pool and the blockchain.
 type txpoolHub struct {
 	state state.State
 	*blockchain.Blockchain
 }
 
-// getAccountImpl is used for fetching account state from both TxPool and JSON-RPC
+// getAccountImpl retrieves the account state for a specific address at a given root hash.
+// This is a utility function used in GetNonce and GetBalance methods.
 func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*state.Account, error) {
 	snap, err := state.NewSnapshotAt(root)
 	if err != nil {
@@ -400,6 +397,8 @@ func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*st
 	return account, nil
 }
 
+// GetNonce retrieves the nonce for an account identified by the given address and at the given root hash.
+// Returns 0 if the account state cannot be fetched.
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
 	if err != nil {
@@ -409,6 +408,8 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	return account.Nonce
 }
 
+// GetBalance retrieves the balance for an account identified by the given address and at the given root hash.
+// Returns big.NewInt(0) and potentially an error if the account state cannot be fetched.
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	account, err := getAccountImpl(t.state, root, addr)
 	if err != nil {
@@ -422,7 +423,20 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	return account.Balance, nil
 }
 
-// setupSecretsManager sets up the secrets manager
+// GetBlockByHash retrieves a block identified by the given hash from the blockchain.
+// If 'full' is set to true, then the transactions are populated with all their details, else only their hashes are returned.
+func (t *txpoolHub) GetBlockByHash(h types.Hash, full bool) (*types.Block, bool) {
+	return t.Blockchain.GetBlockByHash(h, full)
+}
+
+// Header retrieves the latest header from the blockchain.
+func (t *txpoolHub) Header() *types.Header {
+	return t.Blockchain.Header()
+}
+
+// setupSecretsManager sets up the secrets manager based on the server's configuration.
+// It supports a local secrets manager which stores secrets in a local directory.
+// If the type of secrets manager specified in the configuration is not found, an error is returned.
 func (s *Server) setupSecretsManager() error {
 	secretsManagerConfig := s.config.SecretsManager
 	if secretsManagerConfig == nil {
@@ -466,12 +480,29 @@ func (s *Server) setupSecretsManager() error {
 	return nil
 }
 
-// setupConsensus sets up the consensus mechanism
+// setupConsensus sets up the consensus mechanism for the server.
+// It reads the consensus engine name from the chain parameters in the server's configuration.
+// If the consensus engine is neither DummyConsensus nor DevConsensus, it also tries to extract the block time from the engine's configuration.
+// After that, it creates the consensus configuration and fills it with all necessary dependencies.
+// Finally, it creates a new consensus mechanism using the created configuration.
+// If the creation of the consensus mechanism fails, it returns an error.
 func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
 	if !ok {
 		engineConfig = map[string]interface{}{}
+	}
+
+	var (
+		blockTime = common.Duration{Duration: 0}
+		err       error
+	)
+
+	if engineName != string(server.DummyConsensus) && engineName != string(server.DevConsensus) {
+		blockTime, err = ExtractBlockTime(engineConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	config := &consensus.Config{
@@ -482,7 +513,7 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 
 	// Fill-in server dependencies.
 	consensusCfg.Blockchain = s.blockchain
-	consensusCfg.BlockTime = s.config.BlockTime
+	consensusCfg.BlockTime = uint64(blockTime.Seconds())
 	consensusCfg.Chain = s.config.Chain
 	consensusCfg.Config = config
 	consensusCfg.Context = context.Background()
@@ -492,6 +523,7 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	consensusCfg.TxPool = s.txpool
 	consensusCfg.SecretsManager = s.secretsManager
 	consensusCfg.Snapshotter = s.snapshotter
+	consensusCfg.NumBlockConfirmations = s.config.NumBlockConfirmations
 
 	consensus, err := avail_consensus.New(consensusCfg)
 	if err != nil {
@@ -503,7 +535,37 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	return nil
 }
 
-// setupRelayer sets up the relayer
+// ExtractBlockTime attempts to extract a blockTime parameter from a given consensus engine configuration map.
+// It returns a Duration type. If blockTime is missing or invalid, it returns an appropriate error.
+func ExtractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
+	blockTimeGeneric, ok := engineConfig["blockTime"]
+	if !ok {
+		return common.Duration{}, errBlockTimeMissing
+	}
+
+	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
+	if err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	var blockTime common.Duration
+
+	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	if blockTime.Seconds() < 1 {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	return blockTime, nil
+}
+
+// setupRelayer initializes the server's relayer component.
+// It first creates a new account from the secret stored in the server's secrets manager.
+// Then it retrieves the PolyBFT configuration from the server's chain configuration.
+// Afterwards, it determines the starting blocks for tracking events for the State Receiver contract.
+// Finally, it creates a new relayer, starts it and in case of any errors, returns them.
 func (s *Server) setupRelayer() error {
 	account, err := wallet.NewAccountFromSecret(s.secretsManager)
 	if err != nil {
@@ -537,6 +599,9 @@ func (s *Server) setupRelayer() error {
 	return nil
 }
 
+// jsonRPCHub represents a hub for handling JSON-RPC requests. It includes the
+// blockchain, transaction pool, executor, network server, consensus, and bridge
+// data provider as embedded types.
 type jsonRPCHub struct {
 	state              state.State
 	restoreProgression *progress.ProgressionWrapper
@@ -549,10 +614,13 @@ type jsonRPCHub struct {
 	consensus.BridgeDataProvider
 }
 
+// GetPeers returns the number of peers connected to the server.
 func (j *jsonRPCHub) GetPeers() int {
 	return len(j.Server.Peers())
 }
 
+// GetAccount retrieves the account with the given address from the given state root.
+// It returns the account in JSON-RPC format, or an error if one occurs.
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.Account, error) {
 	acct, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
@@ -567,11 +635,13 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.A
 	return account, nil
 }
 
-// GetForksInTime returns the active forks at the given block height
+// GetForksInTime retrieves the active forks at the specified block number.
 func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 	return j.Executor.GetForksInTime(blockNumber)
 }
 
+// GetStorage retrieves the storage at the given slot for the specified account address from the given state root.
+// It returns the storage value as a byte slice, or an error if one occurs.
 func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	account, err := getAccountImpl(j.state, stateRoot, addr)
 	if err != nil {
@@ -588,6 +658,8 @@ func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot t
 	return res.Bytes(), nil
 }
 
+// GetCode retrieves the contract code for the account with the given address from the given state root.
+// It returns the code as a byte slice, or an error if one occurs.
 func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
 	account, err := getAccountImpl(j.state, root, addr)
 	if err != nil {
@@ -602,11 +674,15 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 	return code, nil
 }
 
+// ApplyTxn applies a given transaction on the state defined by the provided header.
+// If an override is provided, it is used to update the state before the transaction is applied.
+// The method returns the result of executing the transaction, or an error if one occurs.
 func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
+	override types.StateOverride,
 ) (result *runtime.ExecutionResult, err error) {
-	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
+	blockCreator, err := j.Blockchain.GetConsensus().GetBlockCreator(header)
 	if err != nil {
 		return nil, err
 	}
@@ -616,12 +692,19 @@ func (j *jsonRPCHub) ApplyTxn(
 		return
 	}
 
+	if override != nil {
+		if err = transition.WithStateOverride(override); err != nil {
+			return
+		}
+	}
+
 	result, err = transition.Apply(txn)
 
 	return
 }
 
-// TraceBlock traces all transactions in the given block and returns all results
+// TraceBlock traces all transactions in the given block using the specified tracer and returns the results.
+// An error is returned if the block is a genesis block, the parent header is not found, or an error occurs while applying transactions.
 func (j *jsonRPCHub) TraceBlock(
 	block *types.Block,
 	tracer tracer.Tracer,
@@ -630,12 +713,12 @@ func (j *jsonRPCHub) TraceBlock(
 		return nil, errors.New("genesis block can't have transaction")
 	}
 
-	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	parentHeader, ok := j.Blockchain.GetHeaderByHash(block.ParentHash())
 	if !ok {
 		return nil, errors.New("parent header not found")
 	}
 
-	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	blockCreator, err := j.Blockchain.GetConsensus().GetBlockCreator(block.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +747,8 @@ func (j *jsonRPCHub) TraceBlock(
 	return results, nil
 }
 
-// TraceTxn traces a transaction in the block, associated with the given hash
+// TraceTxn traces a specified transaction in the given block using the provided tracer and returns the result.
+// An error is returned if the block is a genesis block, the parent header or the target transaction is not found, or an error occurs while applying transactions.
 func (j *jsonRPCHub) TraceTxn(
 	block *types.Block,
 	targetTxHash types.Hash,
@@ -717,6 +801,8 @@ func (j *jsonRPCHub) TraceTxn(
 	return tracer.GetResult()
 }
 
+// TraceCall traces a call made by the given transaction on the state defined by the parent header using the provided tracer.
+// It returns the result of the call, or an error if one occurs.
 func (j *jsonRPCHub) TraceCall(
 	tx *types.Transaction,
 	parentHeader *types.Header,
@@ -757,7 +843,13 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 
 // SETUP //
 
-// setupJSONRCP sets up the JSONRPC server, using the set configuration
+// setupJSONRPC initializes the JSONRPC server based on the server's
+// configuration. It uses the server's existing services (like state, blockchain,
+// txpool, executor, and others) to create a new jsonRPCHub. It then constructs
+// a new JSONRPC server and assigns it to the server's jsonrpcServer property.
+//
+// If an error occurs while creating the JSONRPC server, it is returned immediately.
+// Otherwise, the method returns nil.
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
 		state:              s.state,
@@ -791,7 +883,12 @@ func (s *Server) setupJSONRPC() error {
 	return nil
 }
 
-// setupGRPC sets up the grpc server and listens on tcp
+// setupGRPC initializes the gRPC server and begins listening on the TCP address
+// specified in the server's configuration. It registers a systemService instance
+// with the server and starts a goroutine that serves incoming requests indefinitely.
+//
+// If an error occurs while setting up the server, it is returned immediately.
+// Otherwise, the method returns nil.
 func (s *Server) setupGRPC() error {
 	proto.RegisterSystemServer(s.grpcServer, &systemService{server: s})
 
@@ -800,6 +897,7 @@ func (s *Server) setupGRPC() error {
 		return err
 	}
 
+	// Start server with infinite retries
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
@@ -811,17 +909,23 @@ func (s *Server) setupGRPC() error {
 	return nil
 }
 
-// Chain returns the chain object of the client
+// Chain retrieves the server's Chain instance. Chain represents the blockchain
+// associated with this server.
 func (s *Server) Chain() *chain.Chain {
 	return s.chain
 }
 
-// JoinPeer attempts to add a new peer to the networking server
+// JoinPeer attempts to add a new peer to the server's network. The peer is
+// identified by the provided multiaddress. If an error occurs while joining the
+// peer, it is returned immediately.
 func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 	return s.network.JoinPeer(rawPeerMultiaddr)
 }
 
-// Close closes the Minimal server (blockchain, networking, consensus)
+// Close shuts down all components of the server, including the blockchain,
+// networking layer, consensus layer, and state storage. If a Prometheus server
+// is running, it is also shut down. Errors during shutdown are logged but not
+// returned, as the method always succeeds.
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
@@ -861,12 +965,22 @@ func (s *Server) Close() {
 	s.closeDataDogProfiler()
 }
 
-// Entry is a consensus configuration entry
+// Entry represents a configuration entry for a consensus protocol. It includes
+// an Enabled field that indicates whether the entry is in use, and a Config
+// field that holds the entry's configuration data. The Config field is a map
+// of string keys to values of any type.
 type Entry struct {
 	Enabled bool
 	Config  map[string]interface{}
 }
 
+// startPrometheusServer creates and starts a new Prometheus server that listens
+// on the provided TCP address. The server uses the default Prometheus registerer
+// and gatherer, and has a read header timeout of 60 seconds. A log message is
+// written when the server starts. If an error occurs while the server is running,
+// it is logged and the server is shut down.
+//
+// The method returns the created *http.Server instance.
 func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	srv := &http.Server{
 		Addr: listenAddr.String(),
@@ -879,11 +993,13 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go func() {
-		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("Prometheus HTTP server ListenAndServe", "error", err)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("Prometheus HTTP server ListenAndServe", "error", err)
+			}
 		}
 	}()
 

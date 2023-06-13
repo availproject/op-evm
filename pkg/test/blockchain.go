@@ -1,25 +1,54 @@
 package test
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"math/big"
 	"os"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
+	edgechain "github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	geth_crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
+// FaucetAccount and FaucetSignKey are used as a pair for an account with a plentiful balance for test purposes.
+var (
+	FaucetSignKey *ecdsa.PrivateKey = GenFaucetSignKey()
+	FaucetAccount types.Address     = GetAccountFromPrivateKey(FaucetSignKey)
+)
+
+// GenFaucetSignKey generates a new ECDSA private key which is used for the FaucetAccount.
+// It panics if the key generation fails.
+func GenFaucetSignKey() *ecdsa.PrivateKey {
+	key, err := ecdsa.GenerateKey(geth_crypto.S256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	return key
+}
+
+// GetAccountFromPrivateKey takes an ECDSA private key and returns the associated account address.
+func GetAccountFromPrivateKey(key *ecdsa.PrivateKey) types.Address {
+	pk := key.Public().(*ecdsa.PublicKey)
+	return crypto.PubKeyToAddress(pk)
+}
+
+// NewBlockchain creates a new in-memory blockchain with a specified verifier and basepath.
+// It returns an executor, a blockchain, and an error if any occurred during the initialization.
 func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, error) {
 	chain, err := NewChain(basepath)
 	if err != nil {
@@ -35,8 +64,15 @@ func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Execut
 
 	chain.Genesis.StateRoot = gr
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chain.Params.Forks.At(0), uint64(chain.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(chain.Params.ChainID),
+		chain.Params.Forks.IsActive(edgechain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(chain.Params.ChainID),
+			chain.Params.Forks.IsActive(edgechain.Homestead, 0),
+		),
+	)
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -58,6 +94,9 @@ func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Execut
 	return executor, bchain, nil
 }
 
+// NewBlockchainWithTxPool creates a new in-memory blockchain with a specified chain specification and verifier.
+// It also initializes a transaction pool with default parameters.
+// It returns an executor, a blockchain, a transaction pool, and an error if any occurred during the initialization.
 func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool, error) {
 	executor := NewInMemExecutor(chainSpec)
 
@@ -68,8 +107,15 @@ func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifie
 
 	chainSpec.Genesis.StateRoot = gr
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chainSpec.Params.Forks.At(0), uint64(chainSpec.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(chainSpec.Params.ChainID),
+		chainSpec.Params.Forks.IsActive(edgechain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(chainSpec.Params.ChainID),
+			chainSpec.Params.Forks.IsActive(edgechain.Homestead, 0),
+		),
+	)
 
 	db, err := memory.NewMemoryStorage(nil)
 	if err != nil {
@@ -106,12 +152,15 @@ func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifie
 	return executor, bchain, txPool, nil
 }
 
+// NewInMemExecutor creates a new executor with an in-memory state and returns it.
 func NewInMemExecutor(c *chain.Chain) *state.Executor {
 	storage := itrie.NewMemoryStorage()
 	st := itrie.NewState(storage)
 	return state.NewExecutor(c.Params, st, hclog.Default())
 }
 
+// getStakingContractBytecode retrieves the bytecode of the staking contract from a genesis.json file located at the given basepath.
+// It returns the bytecode as a byte slice and an error if any occurred during the retrieval.
 func getStakingContractBytecode(basepath string) ([]byte, error) {
 	jsonFile, err := os.Open(filepath.Join(basepath, "configs/genesis.json"))
 	if err != nil {
@@ -142,8 +191,11 @@ func getStakingContractBytecode(basepath string) ([]byte, error) {
 	return nil, nil
 }
 
+// NewChain creates a new Chain instance with a predefined genesis account (FaucetAccount) and staking contract.
+// The function takes a basepath as an argument, which is used to locate the staking contract's bytecode.
+// It returns a Chain instance and an error if any occurred during the initialization.
 func NewChain(basepath string) (*chain.Chain, error) {
-	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(10000), common.ETH)
 	scBytecode, err := getStakingContractBytecode(basepath)
 	if err != nil {
 		return nil, err
@@ -152,7 +204,7 @@ func NewChain(basepath string) (*chain.Chain, error) {
 	return &chain.Chain{
 		Genesis: &chain.Genesis{
 			Alloc: map[types.Address]*chain.GenesisAccount{
-				types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"): {
+				FaucetAccount: {
 					Balance: balance,
 				},
 				types.StringToAddress("0x0110000000000000000000000000000000000001"): {
@@ -166,21 +218,15 @@ func NewChain(basepath string) (*chain.Chain, error) {
 			},
 		},
 		Params: &chain.Params{
-			Forks: &chain.Forks{
-				Homestead:      new(chain.Fork),
-				Byzantium:      new(chain.Fork),
-				Constantinople: new(chain.Fork),
-				Petersburg:     new(chain.Fork),
-				Istanbul:       new(chain.Fork),
-				EIP150:         new(chain.Fork),
-				EIP158:         new(chain.Fork),
-				EIP155:         new(chain.Fork),
-			},
+			Forks:   chain.AllForksEnabled,
 			ChainID: 100,
 			Engine: map[string]interface{}{
 				"avail": map[string]interface{}{
 					"mechanisms": []string{"sequencer", "validator"},
 				},
+			},
+			BurnContract: map[uint64]string{
+				0: "0x0000000000000000000000000000000000000000",
 			},
 		},
 	}, nil

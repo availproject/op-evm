@@ -3,10 +3,13 @@ package test
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
+// GetHeadBlock retrieves the head block from the provided blockchain instance.
+// If the head block is not available, it retrieves the genesis block.
+// It may fail the test if it's unable to fetch the head block.
 func GetHeadBlock(t *testing.T, blockchain *blockchain.Blockchain) *types.Block {
 	var head *types.Block
 

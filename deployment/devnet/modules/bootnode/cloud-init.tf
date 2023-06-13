@@ -28,7 +28,6 @@ data "cloudinit_config" "cloud_init" {
         jsonrpc_port = var.jsonrpc_port
         p2p_port     = local.P2PPort
         public_dns   = var.lb_dns_name
-        node_type    = "bootstrap-sequencer"
       }))
       secrets_config_json_base64 = base64encode(templatefile("${path.module}/templates/secrets-config.json", {
         node_name                        = local.Name
@@ -38,7 +37,6 @@ data "cloudinit_config" "cloud_init" {
       avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/avail-settlement.service", {
         workspace  = local.workspace
         avail_addr = var.avail_addr
-        node_type  = "bootstrap-sequencer"
         user       = local.user
       }))
     })

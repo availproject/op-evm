@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -59,24 +59,26 @@ var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
 var balanceOnce sync.Once
 
 type Config struct {
-	AccountFilePath string
-	AvailAccount    signature.KeyringPair
-	AvailClient     avail.Client
-	AvailSender     avail.Sender
-	Blockchain      *blockchain.Blockchain
-	BlockTime       uint64
-	Bootnode        bool
-	Chain           *chain.Chain
-	Context         context.Context
-	Config          *consensus.Config
-	Executor        *state.Executor
-	Logger          hclog.Logger
-	Network         *network.Server
-	NodeType        string
-	SecretsManager  secrets.SecretsManager
-	Snapshotter     snapshot.Snapshotter
-	TxPool          *txpool.TxPool
-	AvailAppID      avail_types.UCompact
+	AccountFilePath       string
+	AvailAccount          signature.KeyringPair
+	AvailClient           avail.Client
+	AvailSender           avail.Sender
+	Blockchain            *blockchain.Blockchain
+	BlockTime             uint64
+	Bootnode              bool
+	Chain                 *chain.Chain
+	Context               context.Context
+	Config                *consensus.Config
+	Executor              *state.Executor
+	FraudListenerAddr     string
+	Logger                hclog.Logger
+	Network               *network.Server
+	NodeType              string
+	SecretsManager        secrets.SecretsManager
+	Snapshotter           snapshot.Snapshotter
+	TxPool                *txpool.TxPool
+	AvailAppID            avail_types.UCompact
+	NumBlockConfirmations uint64
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -114,6 +116,7 @@ type Avail struct {
 	blockProductionIntervalSec uint64
 	validator                  validator.Validator
 	currentNodeSyncIndex       uint64
+	fraudListenerAddr          string
 }
 
 func New(config Config) (consensus.Consensus, error) {
@@ -155,6 +158,7 @@ func New(config Config) (consensus.Consensus, error) {
 		availClient:                config.AvailClient,
 		availSender:                config.AvailSender,
 		availAppID:                 config.AvailAppID,
+		fraudListenerAddr:          config.FraudListenerAddr,
 	}
 
 	if config.Network != nil {
@@ -280,6 +284,7 @@ func (d *Avail) startBootstrapSequencer() {
 		d.availClient, d.availAccount, d.availAppID, d.signKey,
 		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+		d.fraudListenerAddr,
 	)
 
 	// Sync the node from Avail.
@@ -308,6 +313,7 @@ func (d *Avail) startSequencer() {
 		d.availClient, d.availAccount, d.availAppID, d.signKey,
 		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+		d.fraudListenerAddr,
 	)
 
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)
@@ -485,6 +491,10 @@ func (d *Avail) Prepare(header *types.Header) error {
 func (d *Avail) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	// TODO: Remove
 	return nil, nil
+}
+
+func (d *Avail) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }
 
 func (d *Avail) Close() error {

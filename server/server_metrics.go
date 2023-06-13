@@ -11,11 +11,16 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
+// setupTelemetry initializes the metrics system for the server.
+// It configures an in-memory metrics sink and a Prometheus metrics sink.
 func (s *Server) setupTelemetry() error {
 	inm := metrics.NewInmemSink(10*time.Second, time.Minute)
 	metrics.DefaultInmemSignal(inm)
 
-	promSink, err := prometheus.NewPrometheusSink()
+	promSink, err := prometheus.NewPrometheusSinkFrom(prometheus.PrometheusOpts{
+		Name:       "edge_prometheus_sink",
+		Expiration: 0,
+	})
 	if err != nil {
 		return err
 	}
@@ -29,8 +34,9 @@ func (s *Server) setupTelemetry() error {
 	return err
 }
 
-// enableDataDogProfiler enables DataDog profiler. Enable it by setting DD_ENABLE env var.
-// Additional parameters can be set with env vars (DD_) - https://docs.datadoghq.com/profiler/enabling/go/
+// enableDataDogProfiler enables DataDog profiler. It is enabled by setting
+// DD_ENABLE environment variable. Additional parameters can be set
+// with environment variables prefixed with "DD_". See https://docs.datadoghq.com/profiler/enabling/go/
 func (s *Server) enableDataDogProfiler() error {
 	if os.Getenv("DD_PROFILING_ENABLED") == "" {
 		s.logger.Debug("DataDog profiler disabled, set DD_PROFILING_ENABLED env var to enable it.")
@@ -73,6 +79,7 @@ func (s *Server) enableDataDogProfiler() error {
 	return nil
 }
 
+// closeDataDogProfiler stops the DataDog profiler and tracer when they are no longer needed.
 func (s *Server) closeDataDogProfiler() {
 	s.logger.Debug("closing DataDog profiler")
 	profiler.Stop()

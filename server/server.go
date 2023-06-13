@@ -159,7 +159,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 	}
 
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths, 0o770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 

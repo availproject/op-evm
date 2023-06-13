@@ -23,6 +23,9 @@
             "0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864": {
                 "balance": "0xffffffffffffffffffffffffffffff",
                 "secretKey": "65323966633339396531353162383239636136386261383131313038393635616565633532633231663261633137343463623238663230333233316463303835"
+            },
+            "0x0000000000000000000000000000000000000000": {
+                "balance": "0x0"
             }
         },
         "number": "0x0",
@@ -51,7 +54,10 @@
                 "blockTime": 1686644797
             }
         },
-        "blockGasTarget": 0
+        "blockGasTarget": 0,
+        "burnContract": {
+            "0": "0x0000000000000000000000000000000000000000"
+        }
     },
     "bootnodes": [
         "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa",

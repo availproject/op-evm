@@ -1,8 +1,7 @@
 package server
 
-import (
+/* import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,7 +12,10 @@ import (
 	"time"
 
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
+	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
+	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server"
 	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
@@ -27,6 +29,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -35,7 +38,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
+	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -47,10 +50,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-var (
-	errBlockTimeMissing = errors.New("block time configuration is missing")
-	errBlockTimeInvalid = errors.New("block time configuration is invalid")
-)
+type GenesisFactoryHook func(config *chain.Chain, engineName string) func(*state.Transition) error
+
+// secretsManagerBackends defines the SecretManager factories for different
+// secret management solutions
+var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
+	secrets.Local:          local.SecretsManagerFactory,
+	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
+	secrets.AWSSSM:         awsssm.SecretsManagerFactory,
+	secrets.GCPSSM:         gcpssm.SecretsManagerFactory,
+}
 
 // Server is the central manager of the blockchain client
 type Server struct {
@@ -153,13 +162,13 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
-	var dirPaths = []string{
+	dirPaths := []string{
 		"blockchain",
 		"trie",
 	}
 
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths, 0o770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
@@ -174,7 +183,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	// Set up datadog profiler
 	if ddErr := m.enableDataDogProfiler(); err != nil {
-		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
+		m.logger.Error("DataDog profiler setup failed", "error", ddErr.Error())
 	}
 
 	// Set up the secrets manager
@@ -221,83 +230,27 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	// custom write genesis hook per consensus engine
-	engineName := m.config.Chain.Params.GetEngine()
-	if factory, exists := genesisCreationFactory[server.ConsensusType(engineName)]; exists {
-		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
-	}
-
-	// apply allow list contracts deployer genesis data
+	// apply allow list genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
-	// apply block list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-			m.config.Chain.Params.ContractDeployerBlockList)
-	}
-
-	// apply transactions execution allow list genesis data
-	if m.config.Chain.Params.TransactionsAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-			m.config.Chain.Params.TransactionsAllowList)
-	}
-
-	// apply transactions execution block list genesis data
-	if m.config.Chain.Params.TransactionsBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-			m.config.Chain.Params.TransactionsBlockList)
-	}
-
-	// apply bridge allow list genesis data
-	if m.config.Chain.Params.BridgeAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-			m.config.Chain.Params.BridgeAllowList)
-	}
-
-	// apply bridge block list genesis data
-	if m.config.Chain.Params.BridgeBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-			m.config.Chain.Params.BridgeBlockList)
-	}
-
-	var initialStateRoot = types.ZeroHash
+	initialStateRoot := types.ZeroHash
 
 	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := forkmanager.ForkManagerInit(
-		forkManagerFactory[server.ConsensusType(engineName)],
-		config.Chain.Params.Forks); err != nil {
-		return nil, err
-	}
-
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// Use the london signer with eip-155 as a fallback one
-	var signer crypto.TxSigner = crypto.NewLondonSigner(
-		uint64(m.config.Chain.Params.ChainID),
-		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
-		crypto.NewEIP155Signer(
-			uint64(m.config.Chain.Params.ChainID),
-			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
-		),
-	)
+	// use the eip155 signer
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(
-		logger,
-		blockchainStorage,
-		config.Chain,
-		nil,
-		m.executor,
-		signer,
-	)
+	m.blockchain, err = blockchain.NewBlockchain(logger, blockchainStorage, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +263,11 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 			Blockchain: m.blockchain,
 		}
 
+		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
+		if err != nil {
+			return nil, err
+		}
+
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
@@ -318,9 +276,10 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 			m.grpcServer,
 			m.network,
 			&txpool.Config{
-				MaxSlots:           m.config.MaxSlots,
-				PriceLimit:         m.config.PriceLimit,
-				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
+				MaxSlots:            m.config.MaxSlots,
+				PriceLimit:          m.config.PriceLimit,
+				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
+				DeploymentWhitelist: deploymentWhitelist,
 			},
 		)
 		if err != nil {
@@ -359,6 +318,13 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		return nil, err
 	}
 
+	// TxPool Start() is only listener method that notifies specific function targets
+	// if channel information is met. It should be started prior JSONRPC as new tx
+	// can be applied in between (edge case) and result in tx hitting blackhole.
+	// When network starts, txpool should already be started so if any tx is pushed from any node
+	// we know that at that time, txpool is already ready and will receive the tx properly.
+	m.txpool.Start()
+
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
@@ -369,11 +335,6 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		return nil, err
 	}
 
-	// start consensus
-	if err := m.consensus.Start(); err != nil {
-		return nil, err
-	}
-
 	// start relayer
 	if config.Relayer {
 		if err := m.setupRelayer(); err != nil {
@@ -381,7 +342,10 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 		}
 	}
 
-	m.txpool.Start()
+	// start consensus
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
 
 	return m, nil
 }
@@ -438,7 +402,6 @@ func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*st
 
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		return 0
 	}
@@ -448,7 +411,6 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		if errors.Is(err, jsonrpc.ErrStateNotFound) {
 			return big.NewInt(0), nil
@@ -512,18 +474,6 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 		engineConfig = map[string]interface{}{}
 	}
 
-	var (
-		blockTime = common.Duration{Duration: 0}
-		err       error
-	)
-
-	if engineName != string(server.DummyConsensus) && engineName != string(server.DevConsensus) {
-		blockTime, err = ExtractBlockTime(engineConfig)
-		if err != nil {
-			return err
-		}
-	}
-
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
@@ -532,7 +482,7 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 
 	// Fill-in server dependencies.
 	consensusCfg.Blockchain = s.blockchain
-	consensusCfg.BlockTime = uint64(blockTime.Seconds())
+	consensusCfg.BlockTime = s.config.BlockTime
 	consensusCfg.Chain = s.config.Chain
 	consensusCfg.Config = config
 	consensusCfg.Context = context.Background()
@@ -542,7 +492,6 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	consensusCfg.TxPool = s.txpool
 	consensusCfg.SecretsManager = s.secretsManager
 	consensusCfg.Snapshotter = s.snapshotter
-	consensusCfg.NumBlockConfirmations = s.config.NumBlockConfirmations
 
 	consensus, err := avail_consensus.New(consensusCfg)
 	if err != nil {
@@ -552,32 +501,6 @@ func (s *Server) setupConsensus(consensusCfg avail_consensus.Config) error {
 	s.consensus = consensus
 
 	return nil
-}
-
-// extractBlockTime extracts blockTime parameter from consensus engine configuration.
-// If it is missing or invalid, an appropriate error is returned.
-func ExtractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
-	blockTimeGeneric, ok := engineConfig["blockTime"]
-	if !ok {
-		return common.Duration{}, errBlockTimeMissing
-	}
-
-	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
-	if err != nil {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	var blockTime common.Duration
-
-	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	if blockTime.Seconds() < 1 {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	return blockTime, nil
 }
 
 // setupRelayer sets up the relayer
@@ -682,7 +605,6 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
-	override types.StateOverride,
 ) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
@@ -692,12 +614,6 @@ func (j *jsonRPCHub) ApplyTxn(
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 	if err != nil {
 		return
-	}
-
-	if override != nil {
-		if err = transition.WithStateOverride(override); err != nil {
-			return
-		}
 	}
 
 	result, err = transition.Apply(txn)
@@ -884,7 +800,6 @@ func (s *Server) setupGRPC() error {
 		return err
 	}
 
-	// Start server with infinite retries
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
@@ -910,22 +825,22 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
-		s.logger.Error("failed to close blockchain", "err", err.Error())
+		s.logger.Error("failed to close blockchain", "error", err.Error())
 	}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
-		s.logger.Error("failed to close networking", "err", err.Error())
+		s.logger.Error("failed to close networking", "error", err.Error())
 	}
 
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.logger.Error("failed to close consensus", "error", err.Error())
 	}
 
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
-		s.logger.Error("failed to close storage for trie", "err", err.Error())
+		s.logger.Error("failed to close storage for trie", "error", err.Error())
 	}
 
 	if s.prometheusServer != nil {
@@ -964,15 +879,14 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
-
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
-			}
+		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			s.logger.Error("Prometheus HTTP server ListenAndServe", "error", err)
 		}
 	}()
 
 	return srv
 }
+*/

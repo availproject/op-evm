@@ -241,7 +241,6 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.Mechanism
 			MaxSlots:           rawConfig.TxPool.MaxSlots,
 			SecretsManager:     nil,
 			RestoreFile:        nil,
-			BlockTime:          rawConfig.BlockTime,
 			LogLevel:           hclog.Info,
 			LogFilePath:        rawConfig.LogFilePath,
 		},

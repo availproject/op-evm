@@ -536,16 +536,12 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
-	sw.txpool.Prepare()
+	sw.txpool.Prepare(sw.txpool.GetBaseFee())
 
 	for {
 		tx := sw.txpool.Peek()
 		if tx == nil {
 			break
-		}
-
-		if tx.ExceedsBlockGasLimit(gasLimit) {
-			continue
 		}
 
 		if err := transition.Write(tx); err != nil {

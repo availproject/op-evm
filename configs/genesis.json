@@ -47,7 +47,8 @@
                     "bootstrap-sequencer",
                     "sequencer",
                     "validator"
-                ]
+                ],
+                "blockTime": 1686644797
             }
         },
         "blockGasTarget": 0

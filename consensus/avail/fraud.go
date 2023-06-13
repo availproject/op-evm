@@ -115,7 +115,7 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 			continue
 		}
 
-		f.txpool.Prepare()
+		f.txpool.Prepare(f.txpool.GetBaseFee())
 
 	innerLoop:
 		for {
@@ -176,7 +176,7 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 }
 
 func (f *Fraud) DiscoverDisputeResolutionTx(hash types.Hash) (*types.Transaction, error) {
-	f.txpool.Prepare()
+	f.txpool.Prepare(f.txpool.GetBaseFee())
 
 	for {
 		tx := f.txpool.Peek()

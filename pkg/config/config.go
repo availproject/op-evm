@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   config.DefaultBlockTime,
+		BlockTime:   1686644797, // We are not using it as we produce blocks at our own peace.
 		Headers: &config.Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
@@ -201,7 +201,6 @@ func NewServerConfig(path string) (*CustomServerConfig, error) {
 		MaxSlots:           rawConfig.TxPool.MaxSlots,
 		MaxAccountEnqueued: rawConfig.TxPool.MaxAccountEnqueued,
 		SecretsManager:     secretsConfig,
-		BlockTime:          rawConfig.BlockTime,
 		LogLevel:           hclog.LevelFromString(rawConfig.LogLevel),
 		LogFilePath:        rawConfig.LogFilePath,
 	}

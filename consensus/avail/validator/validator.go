@@ -261,7 +261,8 @@ func (v *validator) verifyGasLimit(header *types.Header, parentHeader *types.Hea
 		diff *= -1
 	}
 
-	limit := parentHeader.GasLimit / blockchain.BlockGasTargetDivisor
+	// blockchain.BlockGasTargetDivisor is now private (v0.8.1 -> v1.0.0) so instead using it's value 1024
+	limit := parentHeader.GasLimit / 1024
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",

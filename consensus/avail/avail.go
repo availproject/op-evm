@@ -59,24 +59,25 @@ var minBalance = big.NewInt(0).Mul(big.NewInt(15), common_defs.ETH)
 var balanceOnce sync.Once
 
 type Config struct {
-	AccountFilePath string
-	AvailAccount    signature.KeyringPair
-	AvailClient     avail.Client
-	AvailSender     avail.Sender
-	Blockchain      *blockchain.Blockchain
-	BlockTime       uint64
-	Bootnode        bool
-	Chain           *chain.Chain
-	Context         context.Context
-	Config          *consensus.Config
-	Executor        *state.Executor
-	Logger          hclog.Logger
-	Network         *network.Server
-	NodeType        string
-	SecretsManager  secrets.SecretsManager
-	Snapshotter     snapshot.Snapshotter
-	TxPool          *txpool.TxPool
-	AvailAppID      avail_types.UCompact
+	AccountFilePath       string
+	AvailAccount          signature.KeyringPair
+	AvailClient           avail.Client
+	AvailSender           avail.Sender
+	Blockchain            *blockchain.Blockchain
+	BlockTime             uint64
+	Bootnode              bool
+	Chain                 *chain.Chain
+	Context               context.Context
+	Config                *consensus.Config
+	Executor              *state.Executor
+	Logger                hclog.Logger
+	Network               *network.Server
+	NodeType              string
+	SecretsManager        secrets.SecretsManager
+	Snapshotter           snapshot.Snapshotter
+	TxPool                *txpool.TxPool
+	AvailAppID            avail_types.UCompact
+	NumBlockConfirmations uint64
 }
 
 // Dev consensus protocol seals any new transaction immediately
@@ -485,6 +486,10 @@ func (d *Avail) Prepare(header *types.Header) error {
 func (d *Avail) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	// TODO: Remove
 	return nil, nil
+}
+
+func (d *Avail) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }
 
 func (d *Avail) Close() error {

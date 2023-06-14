@@ -43,7 +43,6 @@ variable "genesis_bucket_prefix" {
 variable "release" {
   description = "The avail settlement release (will match a tag from the github.com/availproject/avail-settlement repository)"
   type        = string
-  default     = "v0.0.0-test1"
 }
 
 variable "github_token" {
@@ -73,7 +72,6 @@ variable "assm_artifact_name" {
 variable "deployment_name" {
   description = "The unique name for this particular deployment"
   type        = string
-  default     = "test1"
 }
 
 variable "base_instance_type" {

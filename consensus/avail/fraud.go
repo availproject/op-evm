@@ -106,7 +106,7 @@ func (f *Fraud) EndDisputeResolution() {
 }
 
 func (f *Fraud) DiscoverDisputeResolutionTx(hash types.Hash) (*types.Transaction, error) {
-	f.txpool.Prepare()
+	f.txpool.Prepare(f.txpool.GetBaseFee())
 
 	for {
 		tx := f.txpool.Peek()

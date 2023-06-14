@@ -78,7 +78,8 @@ assm/assm
 node_modules
 contracts/stake/node_modules
 data/test-accounts/*
-deployment/devnet/.terraform
+.terraform
+deployment/nets/private
 
 cmd/server/server
 avail-settlement

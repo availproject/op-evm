@@ -1,6 +1,4 @@
 data "cloudinit_config" "cloud_init" {
-  count = var.node_count
-
   gzip          = false
   base64_encode = false
 
@@ -28,14 +26,9 @@ data "cloudinit_config" "cloud_init" {
         workspace    = local.workspace
         grpc_port    = var.grpc_port
         jsonrpc_port = var.jsonrpc_port
-        p2p_port     = local.node_tags[count.index].P2PPort
+        p2p_port     = var.p2p_port
         public_dns   = var.lb_dns_name
         node_type    = var.node_type
-      }))
-      secrets_config_json_base64 = base64encode(templatefile("${path.module}/templates/secrets-config.json", {
-        node_name                        = local.node_tags[count.index].Name
-        region                           = data.aws_region.current.name
-        nodes_secrets_ssm_parameter_path = var.nodes_secrets_ssm_parameter_path
       }))
       avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/avail-settlement.service", {
         workspace  = local.workspace
@@ -45,7 +38,4 @@ data "cloudinit_config" "cloud_init" {
       }))
     })
   }
-  depends_on = [
-    aws_lambda_invocation.genesis_init
-  ]
 }

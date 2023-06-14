@@ -553,7 +553,7 @@ func (sw *SequencerWorker) writeBlock(fraudResolver *Fraud, myAccount accounts.A
 func (sw *SequencerWorker) writeTransactions(fraudResolver *Fraud, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
-	sw.txpool.Prepare()
+	sw.txpool.Prepare(sw.txpool.GetBaseFee())
 
 	for {
 		tx := sw.txpool.Peek()
@@ -563,10 +563,6 @@ func (sw *SequencerWorker) writeTransactions(fraudResolver *Fraud, gasLimit uint
 
 		if fraudResolver.IsChainDisabled() {
 			break
-		}
-
-		if tx.ExceedsBlockGasLimit(gasLimit) {
-			continue
 		}
 
 		if err := transition.Write(tx); err != nil {

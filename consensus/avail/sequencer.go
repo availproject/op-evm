@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -47,6 +49,7 @@ type SequencerWorker struct {
 	nodeType                   MechanismType
 	stakingNode                staking.Node
 	availSender                avail.Sender
+	fraudServer                *FraudServer
 	closeCh                    chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
@@ -430,21 +433,20 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	txns := sw.writeTransactions(gasLimit, transition)
 
-	/*
-		// TRIGGER SEQUENCER SLASHING
-		if header.Number%40 == 0 {
-			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
-			tx.Nonce = 1
-			txSigner := &crypto.FrontierSigner{}
-			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
-			if err != nil {
-				sw.logger.Error("failed to sign fraud transaction", "error", err)
-				return err
-			}
-
-			txns = append(txns, dtx)
+	// XXX: Following fraud function is only called when the fraud server is
+	// actively listening and the fraud has been primed by making corresponding
+	// HTTP request.
+	sw.fraudServer.PerformFraud(func() {
+		tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+		tx.Nonce = 1
+		txSigner := &crypto.FrontierSigner{}
+		dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+		if err != nil {
+			sw.logger.Error("failed to sign fraud transaction", "error", err)
 		}
-	*/
+
+		txns = append(txns, dtx)
+	})
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -573,8 +575,9 @@ func NewSequencer(
 	nodeSignKey *ecdsa.PrivateKey, nodeAddr types.Address, nodeType MechanismType,
 	apq staking.ActiveParticipants, stakingNode staking.Node, availSender avail.Sender, closeCh <-chan struct{},
 	blockTime time.Duration, blockProductionIntervalSec uint64, currentNodeSyncIndex uint64,
+	fraudListenerAddr string,
 ) (*SequencerWorker, error) {
-	return &SequencerWorker{
+	sw := &SequencerWorker{
 		logger:                     logger,
 		blockchain:                 b,
 		executor:                   e,
@@ -590,9 +593,21 @@ func NewSequencer(
 		nodeType:                   nodeType,
 		stakingNode:                stakingNode,
 		availSender:                availSender,
+		fraudServer:                NewFraudServer(),
 		blockTime:                  blockTime,
 		blockProductionIntervalSec: blockProductionIntervalSec,
 		blockProductionEnabled:     new(atomic.Bool),
 		currentNodeSyncIndex:       currentNodeSyncIndex,
-	}, nil
+	}
+
+	if len(fraudListenerAddr) > 0 {
+		go func() {
+			err := sw.fraudServer.ListenAndServe(fraudListenerAddr)
+			if err != nil {
+				log.Fatalf("fraud server: %s", err)
+			}
+		}()
+	}
+
+	return sw, nil
 }

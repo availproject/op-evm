@@ -81,8 +81,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 					// Apply block into local blockchain, even if the block was "invalid/malicious", because
 					// otherwise the local blockchain wouldn't be consistent with the one on sequencers.
 					if err := watchTower.Apply(blk); err != nil {
-						logger.Error("cannot apply block to blockchain prior constructing fraud proof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-						continue blksLoop
+						logger.Error("failed to write block to blockchain prior constructing fraud proof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 					}
 
 					fp, err := watchTower.ConstructFraudproof(blk)

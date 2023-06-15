@@ -31,7 +31,6 @@ resource "aws_instance" "node" {
 
   tags             = {
     Name        = local.Name
-    NodeType    = "bootstrap-sequencer"
     Provisioner = data.aws_caller_identity.provisioner.account_id
     P2PPort     = local.P2PPort
   }

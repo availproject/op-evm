@@ -70,6 +70,7 @@ type Config struct {
 	Context               context.Context
 	Config                *consensus.Config
 	Executor              *state.Executor
+	FraudListenerAddr     string
 	Logger                hclog.Logger
 	Network               *network.Server
 	NodeType              string
@@ -115,6 +116,7 @@ type Avail struct {
 	blockProductionIntervalSec uint64
 	validator                  validator.Validator
 	currentNodeSyncIndex       uint64
+	fraudListenerAddr          string
 }
 
 func New(config Config) (consensus.Consensus, error) {
@@ -156,6 +158,7 @@ func New(config Config) (consensus.Consensus, error) {
 		availClient:                config.AvailClient,
 		availSender:                config.AvailSender,
 		availAppID:                 config.AvailAppID,
+		fraudListenerAddr:          config.FraudListenerAddr,
 	}
 
 	if config.Network != nil {
@@ -281,6 +284,7 @@ func (d *Avail) startBootstrapSequencer() {
 		d.availClient, d.availAccount, d.availAppID, d.signKey,
 		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+		d.fraudListenerAddr,
 	)
 
 	// Sync the node from Avail.
@@ -309,6 +313,7 @@ func (d *Avail) startSequencer() {
 		d.availClient, d.availAccount, d.availAppID, d.signKey,
 		d.minerAddr, d.nodeType, activeParticipantsQuerier, d.stakingNode, d.availSender, d.closeCh,
 		d.blockTime, d.blockProductionIntervalSec, d.currentNodeSyncIndex,
+		d.fraudListenerAddr,
 	)
 
 	d.logger.Info("About to process node staking...", "node_type", d.nodeType)

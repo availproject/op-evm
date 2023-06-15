@@ -98,12 +98,12 @@ build-all: build build-tools
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/
 	rm -rf data/avail-bootnode-1/trie/
-	./avail-settlement server --bootstrap --config-file="./configs/bootstrap-sequencer.yaml" --account-config-file="./configs/account-bootstrap-sequencer"
+	./avail-settlement server --bootstrap --config-file="./configs/bootstrap-sequencer.yaml" --account-config-file="./configs/account-bootstrap-sequencer" --fraud-srv-listen-addr ":9990"
 
 start-sequencer: build
 	rm -rf data/avail-node-1/blockchain/
 	rm -rf data/avail-node-1/trie/
-	./avail-settlement server --config-file="./configs/sequencer-1.yaml" --account-config-file="./configs/account-sequencer"
+	./avail-settlement server --config-file="./configs/sequencer-1.yaml" --account-config-file="./configs/account-sequencer" --fraud-srv-listen-addr ":9991"
 
 start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/

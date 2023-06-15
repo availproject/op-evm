@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"

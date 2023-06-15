@@ -18,7 +18,6 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 
 	"github.com/0xPolygon/polygon-edge/archive"
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
@@ -39,6 +38,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
@@ -151,7 +151,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
-	var dirPaths = []string{
+	dirPaths := []string{
 		"blockchain",
 		"trie",
 	}
@@ -219,7 +219,7 @@ func NewServer(config *server.Config, consensusCfg avail_consensus.Config) (*Ser
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	var initialStateRoot = types.ZeroHash
+	initialStateRoot := types.ZeroHash
 
 	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
@@ -393,7 +393,6 @@ func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*st
 
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		return 0
 	}
@@ -403,7 +402,6 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	account, err := getAccountImpl(t.state, root, addr)
-
 	if err != nil {
 		if errors.Is(err, jsonrpc.ErrStateNotFound) {
 			return big.NewInt(0), nil
@@ -413,6 +411,14 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	}
 
 	return account.Balance, nil
+}
+
+func (t *txpoolHub) GetBlockByHash(h types.Hash, full bool) (*types.Block, bool) {
+	return t.Blockchain.GetBlockByHash(h, full)
+}
+
+func (t *txpoolHub) Header() *types.Header {
+	return t.Blockchain.Header()
 }
 
 // setupSecretsManager sets up the secrets manager
@@ -639,7 +645,7 @@ func (j *jsonRPCHub) ApplyTxn(
 	txn *types.Transaction,
 	override types.StateOverride,
 ) (result *runtime.ExecutionResult, err error) {
-	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
+	blockCreator, err := j.Blockchain.GetConsensus().GetBlockCreator(header)
 	if err != nil {
 		return nil, err
 	}
@@ -669,12 +675,12 @@ func (j *jsonRPCHub) TraceBlock(
 		return nil, errors.New("genesis block can't have transaction")
 	}
 
-	parentHeader, ok := j.GetHeaderByHash(block.ParentHash())
+	parentHeader, ok := j.Blockchain.GetHeaderByHash(block.ParentHash())
 	if !ok {
 		return nil, errors.New("parent header not found")
 	}
 
-	blockCreator, err := j.GetConsensus().GetBlockCreator(block.Header)
+	blockCreator, err := j.Blockchain.GetConsensus().GetBlockCreator(block.Header)
 	if err != nil {
 		return nil, err
 	}

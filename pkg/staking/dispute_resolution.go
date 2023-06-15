@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"

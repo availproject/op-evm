@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -21,6 +20,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
@@ -430,23 +430,21 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 
 	txns := sw.writeTransactions(gasLimit, transition)
 
-	/* 	// TRIGGER SEQUENCER SLASHING
-	   	maliciousBlockWritten := false
-	   	if sw.nodeType != Sequencer && !maliciousBlockWritten {
-	   		if header.Number == 4 || header.Number == 5 {
-	   			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
-	   			tx.Nonce = 1
-	   			txSigner := &crypto.FrontierSigner{}
-	   			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
-	   			if err != nil {
-	   				sw.logger.Error("failed to sign fraud transaction", "error", err)
-	   				return err
-	   			}
+	/*
+		// TRIGGER SEQUENCER SLASHING
+		if header.Number%40 == 0 {
+			tx, _ := staking.BeginDisputeResolutionTx(types.ZeroAddress, types.BytesToAddress(types.ZeroAddress.Bytes()), 1_000_000)
+			tx.Nonce = 1
+			txSigner := &crypto.FrontierSigner{}
+			dtx, err := txSigner.SignTx(tx, sw.nodeSignKey)
+			if err != nil {
+				sw.logger.Error("failed to sign fraud transaction", "error", err)
+				return err
+			}
 
-	   			txns = append(txns, dtx)
-	   			maliciousBlockWritten = true
-	   		}
-	   	} */
+			txns = append(txns, dtx)
+		}
+	*/
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -484,7 +482,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 	)
 
 	// Submit block without waiting for status.
-	err = sw.availSender.Send(blk)
+	err = sw.availSender.SendAndWaitForStatus(blk, avail_types.ExtrinsicStatus{IsInBlock: true})
 	if err != nil {
 		sw.logger.Error("Error while submitting data to avail", "error", err)
 		return err

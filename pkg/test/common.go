@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 

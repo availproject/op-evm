@@ -3,7 +3,7 @@ package staking
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"

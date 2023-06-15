@@ -274,13 +274,14 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType 
 	availSender := avail.NewSender(availClient, appID, availAccount)
 
 	consensusCfg := consensus.Config{
-		Bootnode:        bootnode,
-		AvailAccount:    availAccount,
-		AvailClient:     availClient,
-		AvailSender:     availSender,
-		AccountFilePath: accountPath,
-		NodeType:        string(nodeType),
-		AvailAppID:      appID,
+		Bootnode:          bootnode,
+		AvailAccount:      availAccount,
+		AvailClient:       availClient,
+		AvailSender:       availSender,
+		AccountFilePath:   accountPath,
+		FraudListenerAddr: "",
+		NodeType:          string(nodeType),
+		AvailAppID:        appID,
 	}
 
 	serverInstance, err := server.NewServer(cfg, consensusCfg)

@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -19,6 +18,7 @@ import (
 	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
@@ -375,6 +375,9 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 		return nil, err
 	}
 
+	// Force sequential block number, to ensure it's correct in case of fork as well.
+	bb.SetBlockNumber(f.blockchain.Header().Number + 1)
+
 	bb.SetCoinbaseAddress(f.nodeAddr)
 	bb.SignWith(f.nodeSignKey)
 
@@ -447,7 +450,11 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 		return nil, err
 	}
 
-	hdr, _ := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
+	hdr, exists := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
+	if !exists {
+		return nil, fmt.Errorf("cannot find block with disputed header %q", disputeBlk.Hash().String())
+	}
+
 	transition, err := f.executor.BeginTxn(hdr.StateRoot, hdr, f.nodeAddr)
 	if err != nil {
 		f.logger.Error("failed to begin the transition for the end dispute resolution", "error", err)

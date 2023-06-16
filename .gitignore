@@ -75,6 +75,9 @@ tools/staking/staking
 tools/accounts/accounts
 assm/assm
 
+# Testing account sequencer/watchtower secrets
+config/account-*
+
 node_modules
 contracts/stake/node_modules
 data/test-accounts/*

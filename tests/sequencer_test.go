@@ -4,14 +4,14 @@ import (
 	"context"
 	"flag"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/maticnetwork/avail-settlement/pkg/devnet"
 )
 
 // nolint:unused
@@ -21,39 +21,27 @@ var availAddr = flag.String("avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Av
 var bindInterface = flag.String("bind-addr", "127.0.0.1", "IP address of the interface to bind node ports to")
 
 // nolint:unused
-var genesisCfgPath = flag.String("genesis-config", "../configs/genesis.json", "Path to genesis.json config")
-
-// nolint:unused
-var accountPath = flag.String("account-config-file", "../configs/account", "Path to the account mnemonic file")
+var accountPath = flag.String("account-path", "../data/test-accounts", "Path to the account mnemonic file")
 
 // nolint:unused
 var bootnodeAddr = flag.String("bootnode-addr", "", "Remote bootstrap sequencer address")
-
-// nolint:unused
-var nodeAddr = flag.String("node-addr", "", "Remote sequencer address")
 
 func Test_MultipleSequencers(t *testing.T) {
 	t.Skip("multi-sequencer e2e tests disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var ethClient *ethclient.Client
+	var err error
 
 	if *bootnodeAddr == "" {
-		*genesisCfgPath = filepath.Join(cwd, *genesisCfgPath)
-
 		t.Log("starting nodes")
 		bindAddr, err := netip.ParseAddr(*bindInterface)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
+		ctx, err := devnet.StartNodes(hclog.Default(), bindAddr, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.Sequencer, avail.WatchTower)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,7 +51,7 @@ func Test_MultipleSequencers(t *testing.T) {
 
 		t.Log("nodes started")
 
-		ethClient, err = ctx.GethClient()
+		ethClient, err = ctx.GethClient(avail.BootstrapSequencer)
 		if err != nil {
 			t.Fatal(err)
 		}

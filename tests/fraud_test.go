@@ -3,9 +3,10 @@ package tests
 import (
 	"context"
 	"flag"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/devnet"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,33 +18,33 @@ func Test_Fraud(t *testing.T) {
 
 	flag.Parse()
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	*genesisCfgPath = filepath.Join(cwd, *genesisCfgPath)
-
 	t.Log("starting nodes")
 
 	bindAddr, err := netip.ParseAddr(*bindInterface)
 	if err != nil {
 		t.Fatal(err)
 	}
+	var ethClient *ethclient.Client
+	if *bootnodeAddr == "" {
+		ctx, err := devnet.StartNodes(hclog.Default(), bindAddr, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.WatchTower)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	ctx, err := StartNodes(t, bindAddr, *genesisCfgPath, *availAddr, *accountPath, avail.BootstrapSequencer, avail.Sequencer, avail.WatchTower)
-	if err != nil {
-		t.Fatal(err)
-	}
+		// Shutdown all nodes once test finishes.
+		t.Cleanup(ctx.StopAll)
 
-	// Shutdown all nodes once test finishes.
-	t.Cleanup(ctx.StopAll)
+		t.Log("nodes started")
 
-	t.Log("nodes started")
-
-	ethClient, err := ctx.GethClient()
-	if err != nil {
-		t.Fatal(err)
+		ethClient, err = ctx.GethClient(avail.BootstrapSequencer)
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		ethClient, err = ethclient.Dial(*bootnodeAddr)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	waitForPeers(t, ethClient, 2)

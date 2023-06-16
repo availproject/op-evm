@@ -58,14 +58,6 @@ bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
-build-staking:
-	cd tools/staking && GOOS=${GOOS} GOARCH=${GOARCH} go build -o staking
-
-build-contract:
-	solc --abi contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
-	solc --bin contracts/SetGet/SetGet.sol -o contracts/SetGet/ --overwrite
-	abigen --bin=./contracts/SetGet/SetGet.bin --abi=./contracts/SetGet/SetGet.abi --pkg=setget --out=./contracts/SetGet/SetGet.go
-
 build-assm:
 	cd assm && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
@@ -75,7 +67,7 @@ tools-wallet:
 tools-account:
 	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-build-tools: tools-account build-staking
+build-tools: tools-account
 
 build: build-server
 
@@ -95,9 +87,6 @@ start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
 	rm -rf data/avail-watchtower-1/trie/
 	./avail-settlement server --config-file="./configs/watchtower-1.yaml" --account-config-file="./configs/account-watchtower"
-
-start-staking: build-staking 
-	./tools/staking/staking
 
 create-accounts: create-bootstrap-sequencer-account create-sequencer-account create-watchtower-account
 

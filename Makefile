@@ -63,12 +63,6 @@ build-fraud-contract:
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
-build-client:
-	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
-
-build-e2e:
-	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
-
 build-fraud: build-fraud-contract
 	cd tools/fraud && GOOS=${GOOS} GOARCH=${GOARCH} go build -o fraud
 
@@ -89,9 +83,9 @@ tools-wallet:
 tools-account:
 	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-build-tools: tools-account build-staking build-e2e
+build-tools: tools-account build-staking
 
-build: build-server build-client
+build: build-server
 
 build-all: build build-tools
 
@@ -109,9 +103,6 @@ start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
 	rm -rf data/avail-watchtower-1/trie/
 	./avail-settlement server --config-file="./configs/watchtower-1.yaml" --account-config-file="./configs/account-watchtower"
-
-start-e2e: build-e2e
-	./tools/e2e/e2e
 
 start-fraud: build-fraud
 	./tools/fraud/fraud

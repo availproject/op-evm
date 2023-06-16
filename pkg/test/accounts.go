@@ -7,15 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
+// NewAccount is a test helper function that creates a new account with a private key and returns its address and private key.
+// It takes a pointer to a testing.T object as argument.
+// This function should be used within tests to generate a new account.
+// Example usage (within a test):
+// address, privateKey := NewAccount(t)
 func NewAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	t.Helper()
 
@@ -30,6 +35,11 @@ func NewAccount(t *testing.T) (types.Address, *ecdsa.PrivateKey) {
 	return address, privateKey
 }
 
+// DepositBalance is a test helper function that deposits a specified balance to a given account on a blockchain.
+// It takes a pointer to a testing.T object, receiver address, deposit amount, blockchain and executor as arguments.
+// This function should be used within tests to make a deposit of tokens to an account.
+// Example usage (within a test, assuming receiver, amount, blockchain and executor are already defined):
+// DepositBalance(t, receiver, amount, blockchain, executor)
 func DepositBalance(t *testing.T, receiver types.Address, amount *big.Int, blockchain *blockchain.Blockchain, executor *state.Executor) {
 	t.Helper()
 

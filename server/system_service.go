@@ -6,27 +6,22 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
+// systemService is an implementation of the SystemServer gRPC service which is part of the server package.
 type systemService struct {
 	proto.UnimplementedSystemServer
-
 	server *Server
 }
 
-// GetStatus returns the current system status, in the form of:
-//
-// Network: <chainID>
-//
-// Current: { Number: <blockNumber>; Hash: <headerHash> }
-//
-// P2PAddr: <libp2pAddress>
+// GetStatus method in the systemService struct retrieves the status of the current system.
+// It returns details about the network chain ID, current block header and the libp2p network address.
 func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto.ServerStatus, error) {
 	header := s.server.blockchain.Header()
 
@@ -47,7 +42,8 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 	return status, nil
 }
 
-// Subscribe implements the blockchain event subscription service
+// Subscribe method provides a subscription service to blockchain events.
+// It pushes blockchain events to the provided stream until the stream is closed.
 func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_SubscribeServer) error {
 	sub := s.server.blockchain.SubscribeEvents()
 
@@ -88,7 +84,8 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 	return nil
 }
 
-// PeersAdd implements the 'peers add' operator service
+// PeersAdd method takes a peer ID and attempts to join it to the server network.
+// It returns a response message along with any error that may have occurred during the operation.
 func (s *systemService) PeersAdd(_ context.Context, req *proto.PeersAddRequest) (*proto.PeersAddResponse, error) {
 	if joinErr := s.server.JoinPeer(req.Id); joinErr != nil {
 		return &proto.PeersAddResponse{
@@ -101,7 +98,7 @@ func (s *systemService) PeersAdd(_ context.Context, req *proto.PeersAddRequest) 
 	}, nil
 }
 
-// PeersStatus implements the 'peers status' operator service
+// PeersStatus method takes a peer ID and returns information about the peer, if it exists.
 func (s *systemService) PeersStatus(ctx context.Context, req *proto.PeersStatusRequest) (*proto.Peer, error) {
 	peerID, err := peer.Decode(req.Id)
 	if err != nil {
@@ -116,7 +113,7 @@ func (s *systemService) PeersStatus(ctx context.Context, req *proto.PeersStatusR
 	return peer, nil
 }
 
-// getPeer returns a specific proto.Peer using the peer ID
+// getPeer method returns the information of a specific peer by using the peer ID.
 func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
 	protocols, err := s.server.network.GetProtocols(id)
 	if err != nil {
@@ -139,7 +136,7 @@ func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
 	return peer, nil
 }
 
-// PeersList implements the 'peers list' operator service
+// PeersList method retrieves a list of all peers in the network.
 func (s *systemService) PeersList(
 	ctx context.Context,
 	req *empty.Empty,
@@ -161,7 +158,7 @@ func (s *systemService) PeersList(
 	return resp, nil
 }
 
-// BlockByNumber implements the BlockByNumber operator service
+// BlockByNumber method takes a block number and returns the corresponding block from the blockchain.
 func (s *systemService) BlockByNumber(
 	ctx context.Context,
 	req *proto.BlockByNumberRequest,
@@ -176,6 +173,8 @@ func (s *systemService) BlockByNumber(
 	}, nil
 }
 
+// Export method exports blocks from the blockchain to a given stream.
+// The blocks are retrieved in chunks, from a starting block number to an ending block number.
 func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_ExportServer) error {
 	var (
 		from uint64 = 0
@@ -234,6 +233,7 @@ const (
 	maxHeaderInfoSize int = 3 * 8
 )
 
+// blockStreamWriter struct helps in streaming blockchain data over gRPC.
 type blockStreamWriter struct {
 	buf         bytes.Buffer
 	blockchain  *blockchain.Blockchain
@@ -243,6 +243,7 @@ type blockStreamWriter struct {
 	pendingTo   *uint64 // last block height in buffer
 }
 
+// newBlockStreamWriter returns an instance of blockStreamWriter with a specified maximum payload size.
 func newBlockStreamWriter(
 	stream proto.System_ExportServer,
 	blockchain *blockchain.Blockchain,
@@ -256,6 +257,8 @@ func newBlockStreamWriter(
 	}
 }
 
+// appendBlock method adds a block to the blockStreamWriter's internal buffer.
+// If the block data causes the buffer to exceed its maximum capacity, the buffer is first flushed.
 func (w *blockStreamWriter) appendBlock(b *types.Block) error {
 	data := b.MarshalRLP()
 	if uint64(maxHeaderInfoSize+w.buf.Len()+len(data)) >= w.maxPayload {
@@ -277,6 +280,8 @@ func (w *blockStreamWriter) appendBlock(b *types.Block) error {
 	return nil
 }
 
+// flush method sends the data in the buffer to the client.
+// After sending, it resets the buffer and block height tracking fields.
 func (w *blockStreamWriter) flush() error {
 	// nothing happens in case of empty buffer
 	if w.buf.Len() == 0 {
@@ -304,6 +309,7 @@ func (w *blockStreamWriter) flush() error {
 	return nil
 }
 
+// reset method clears the buffer and resets the pending block height values.
 func (w *blockStreamWriter) reset() {
 	w.buf.Reset()
 	w.pendingFrom = nil

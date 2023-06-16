@@ -63,9 +63,6 @@ build-fraud-contract:
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
-build-client:
-	cd client && GOOS=${GOOS} GOARCH=${GOARCH} go build -o client
-
 build-e2e:
 	cd tools/e2e && GOOS=${GOOS} GOARCH=${GOARCH} go build -o e2e
 
@@ -91,7 +88,7 @@ tools-account:
 
 build-tools: tools-account build-staking build-e2e
 
-build: build-server build-client
+build: build-server
 
 build-all: build build-tools
 

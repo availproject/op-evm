@@ -1,17 +1,19 @@
-package tests
+package devnet
 
 import (
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net"
 	"net/netip"
-	"net/url"
 	"os"
 	"path"
 	"sync"
-	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -29,13 +31,8 @@ import (
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
-const (
-	testAccountPath = "../data/test-accounts"
-)
-
 type Context struct {
-	servers     []instance
-	jsonRPCURLs []*url.URL
+	servers []instance
 }
 
 type instance struct {
@@ -43,41 +40,41 @@ type instance struct {
 	accountPath string
 	config      *edge_server.Config
 	server      *server.Server
+	fraudAddr   string
 }
 
-// StartServers starts configured nodes
-func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, accountPath string, nodeTypes ...consensus.MechanismType) (*Context, error) {
-	t.Helper()
+//go:embed genesis.json
+var genesisBytes []byte
 
+// StartNodes starts configured nodes
+func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPath string, nodeTypes ...consensus.MechanismType) (*Context, error) {
 	ctx := &Context{}
-	if err := createAvailAccounts(t, availAddr, nodeTypes); err != nil {
-		t.Fatal(err)
+	if err := createAvailAccounts(logger, availAddr, accountsPath, nodeTypes); err != nil {
+		return nil, err
 	}
 
 	// Set up a [TCP] port allocator.
 	pa := NewPortAllocator(bindAddr)
 
-	nnh := newNodeNameHelper()
+	nnh := newNodeNameHelper(accountsPath)
 	for _, nt := range nodeTypes {
-		cfg, err := configureNode(t, pa, nt, genesisCfgPath)
+		cfg, err := configureNode(pa, nt)
 		if err != nil {
 			_ = pa.Release()
 			return nil, err
 		}
 
-		si := instance{
-			nodeType:    nt,
-			config:      cfg.Config,
-			accountPath: nnh.nextAccountPath(nt),
-		}
-
-		u, err := url.Parse(fmt.Sprintf("http://%s/", cfg.Config.JSONRPC.JSONRPCAddr.String()))
+		fraudAddr, err := pa.Allocate()
 		if err != nil {
 			return nil, err
 		}
-		ctx.jsonRPCURLs = append(ctx.jsonRPCURLs, u)
 
-		ctx.servers = append(ctx.servers, si)
+		ctx.servers = append(ctx.servers, instance{
+			nodeType:    nt,
+			config:      cfg.Config,
+			accountPath: nnh.nextAccountPath(nt),
+			fraudAddr:   fraudAddr.String(),
+		})
 	}
 
 	// Release allocated [TCP] ports to be used in Edge nodes.
@@ -127,34 +124,34 @@ func StartNodes(t testing.TB, bindAddr netip.Addr, genesisCfgPath, availAddr, ac
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(si.config, availAddr, si.accountPath, si.nodeType)
+		srv, err := startNode(si.config, availAddr, si.accountPath, si.fraudAddr, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
 
 		ctx.servers[i].server = srv
 
-		t.Logf("%d: started node %q", i, si.nodeType)
+		logger.Info("started node", "i", i, "nodeType", si.nodeType)
 	}
 
-	t.Logf("all %d nodes started", len(ctx.servers))
+	logger.Info("all nodes started", "servers_count", len(ctx.servers))
 
 	return ctx, nil
 }
 
-func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.MechanismType, genesisCfgPath string) (*pkg_config.CustomServerConfig, error) {
-	t.Helper()
-
+func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (_ *pkg_config.CustomServerConfig, err error) {
 	rawConfig := config.DefaultConfig()
-	rawConfig.DataDir = t.TempDir()
-	rawConfig.GenesisPath = genesisCfgPath
-
-	chainSpec, err := chain.Import(genesisCfgPath)
+	rawConfig.DataDir, err = os.MkdirTemp("", "*")
 	if err != nil {
 		return nil, err
 	}
 
-	// Reset bootnodes, in case there're any in the JSON file.
+	chainSpec := &chain.Chain{}
+	if err := json.Unmarshal(genesisBytes, chainSpec); err != nil {
+		return nil, err
+	}
+
+	// Reset bootnodes, in case there are any in the JSON file.
 	chainSpec.Bootnodes = nil
 
 	jsonRpcAddr, err := pa.Allocate()
@@ -250,7 +247,7 @@ func configureNode(t testing.TB, pa *PortAllocator, nodeType consensus.Mechanism
 	return cfg, nil
 }
 
-func startNode(cfg *edge_server.Config, availAddr, accountPath string, nodeType consensus.MechanismType) (*server.Server, error) {
+func startNode(cfg *edge_server.Config, availAddr, accountPath, fraudListenerAddr string, nodeType consensus.MechanismType) (*server.Server, error) {
 	var bootnode bool
 	if nodeType == consensus.BootstrapSequencer {
 		bootnode = true
@@ -329,16 +326,26 @@ func (pa *PortAllocator) Release() error {
 	return lastErr
 }
 
-func (sc *Context) GethClient() (*ethclient.Client, error) {
-	if len(sc.jsonRPCURLs) == 0 {
+func (sc *Context) GethClient(nodeType consensus.MechanismType) (*ethclient.Client, error) {
+	if len(sc.servers) == 0 {
 		return nil, fmt.Errorf("no json-rpc URLs available")
 	}
+	addr, err := sc.FirstRPCAddrForNodeType(nodeType)
+	if err != nil {
+		return nil, err
+	}
 
-	return ethclient.Dial(sc.jsonRPCURLs[0].String())
+	return ethclient.Dial(fmt.Sprintf("http://%s/", addr))
 }
 
-func (sc *Context) JSONRPCURLs() []*url.URL {
-	return sc.jsonRPCURLs
+func (sc *Context) Output(w io.Writer) {
+	tw := tabwriter.NewWriter(w, 0, 0, 0, ' ', tabwriter.Debug)
+	fmt.Fprintf(tw, "\t NODE TYPE \t JSONRPC URL \t FRAUD SERVER URL \t GRPC ADDR \t\n")
+	for _, s := range sc.servers {
+		fmt.Fprintf(tw, "\t %s \t http://%s/ \t http://%s/ \t %s \t\n",
+			s.nodeType, s.config.JSONRPC.JSONRPCAddr, s.fraudAddr, s.config.GRPCAddr)
+	}
+	tw.Flush()
 }
 
 func (sc *Context) StopAll() {
@@ -347,24 +354,19 @@ func (sc *Context) StopAll() {
 	}
 }
 
-// FirstRPCURLForNodeType looks up and returns the url of the node for the node type
-func (sc *Context) FirstRPCURLForNodeType(nodeType consensus.MechanismType) (*url.URL, error) {
-	if len(sc.servers) != len(sc.jsonRPCURLs) {
-		return nil, fmt.Errorf("servers and jsonRPCURLs have different lengths")
-	}
-	for i, srv := range sc.servers {
+// FirstRPCAddrForNodeType looks up and returns the url of the node for the node type
+func (sc *Context) FirstRPCAddrForNodeType(nodeType consensus.MechanismType) (*net.TCPAddr, error) {
+	for _, srv := range sc.servers {
 		if srv.nodeType == nodeType {
-			return sc.jsonRPCURLs[i], nil
+			return sc.servers[0].config.JSONRPC.JSONRPCAddr, nil
 		}
 	}
 
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
 }
 
-func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []consensus.MechanismType) error {
-	t.Helper()
-
-	nnh := newNodeNameHelper()
+func createAvailAccounts(logger hclog.Logger, availAddr, accountPath string, nodeTypes []consensus.MechanismType) error {
+	nnh := newNodeNameHelper(accountPath)
 
 	var accountWg sync.WaitGroup
 
@@ -374,15 +376,16 @@ func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []consensus.M
 	}
 
 	var nonceIncrement uint64
+	errCh := make(chan error)
 	for _, nt := range nodeTypes {
 		accountWg.Add(1)
 
 		go func(accountPath string, nonceIncrement uint64) {
 			defer accountWg.Done()
 			// Initiate creation of the avail account if not present
-			err := createAvailAccount(t, availClient, accountPath, nonceIncrement)
+			err := createAvailAccount(logger, availClient, accountPath, nonceIncrement)
 			if err != nil {
-				t.Fatalf("failed to create new avail account: %s", err)
+				errCh <- fmt.Errorf("failed to create new avail account: %w", err)
 				return
 			}
 		}(nnh.nextAccountPath(nt), nonceIncrement)
@@ -391,15 +394,23 @@ func createAvailAccounts(t testing.TB, availAddr string, nodeTypes []consensus.M
 		time.Sleep(250 * time.Millisecond)
 	}
 
-	t.Log("Waiting for Avail accounts to be created...")
-	accountWg.Wait()
-	t.Log("Avail accounts created")
-	return err
+	logger.Info("Waiting for Avail accounts to be created...")
+	wait := make(chan struct{})
+	go func() {
+		accountWg.Wait()
+		wait <- struct{}{}
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-wait:
+	}
+
+	logger.Info("Avail accounts created")
+	return nil
 }
 
-func createAvailAccount(t testing.TB, availClient avail.Client, accountPath string, nonceIncrement uint64) error {
-	t.Helper()
-
+func createAvailAccount(logger hclog.Logger, availClient avail.Client, accountPath string, nonceIncrement uint64) error {
 	// If file exists, make sure that we return the file and not go through account creation process.
 	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
 	// TODO: Potentially add lookup for account balance check and if it's too low, process with creation
@@ -432,26 +443,34 @@ func createAvailAccount(t testing.TB, availClient avail.Client, accountPath stri
 		return err
 	}
 
-	t.Logf("Successfully deposited '%d' AVL to '%s'", 15, availAccount.Address)
+	logger.Info("Successfully deposited", "avl", 15, "to", availAccount.Address)
 
 	if err := os.WriteFile(accountPath, []byte(availAccount.URI), 0o644); err != nil {
 		return err
 	}
 
-	t.Logf("Successfully written mnemonic into '%s'", accountPath)
+	logger.Info("Successfully written mnemonic", "into", accountPath)
 
 	return nil
 }
 
-type nodeNameHelper map[consensus.MechanismType]int
-
-func newNodeNameHelper() nodeNameHelper { return make(nodeNameHelper) }
-
-func (h nodeNameHelper) next(nodeType consensus.MechanismType) string {
-	h[nodeType]++
-	return fmt.Sprintf("%s-%d", nodeType, h[nodeType])
+type nodeNameHelper struct {
+	accountsPath string
+	nodeCounter  map[consensus.MechanismType]int
 }
 
-func (h nodeNameHelper) nextAccountPath(nodeType consensus.MechanismType) string {
-	return path.Join(testAccountPath, h.next(nodeType))
+func newNodeNameHelper(accountsPath string) nodeNameHelper {
+	return nodeNameHelper{
+		accountsPath: accountsPath,
+		nodeCounter:  make(map[consensus.MechanismType]int),
+	}
+}
+
+func (h *nodeNameHelper) next(nodeType consensus.MechanismType) string {
+	h.nodeCounter[nodeType]++
+	return fmt.Sprintf("%s-%d", nodeType, h.nodeCounter[nodeType])
+}
+
+func (h *nodeNameHelper) nextAccountPath(nodeType consensus.MechanismType) string {
+	return path.Join(h.accountsPath, h.next(nodeType))
 }

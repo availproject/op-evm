@@ -2,7 +2,7 @@ resource "aws_lb" "avail_settlement_nodes" {
   name               = "avl-sl-lb-${var.deployment_name}"
   load_balancer_type = "network"
   internal           = false
-  subnets            = var.public_subnets_id
+  subnets            = [var.public_subnets_id[0]]
 }
 
 resource "aws_lb_listener" "grpc_listener" {

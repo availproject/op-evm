@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
 type txpoolHub struct {
@@ -41,6 +41,14 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	}
 
 	return account.Balance, nil
+}
+
+func (t *txpoolHub) GetBlockByHash(h types.Hash, full bool) (*types.Block, bool) {
+	return t.Blockchain.GetBlockByHash(h, full)
+}
+
+func (t *txpoolHub) Header() *types.Header {
+	return t.Blockchain.Header()
 }
 
 func NewTxpoolHub(s state.State, bc *blockchain.Blockchain) *txpoolHub {

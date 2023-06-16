@@ -1,13 +1,14 @@
 package test
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"math/big"
 	"os"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	edgechain "github.com/0xPolygon/polygon-edge/chain"
@@ -17,9 +18,31 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	geth_crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
+
+// FaucetAccount is an address to account in genesis with plenty of balance.
+var (
+	FaucetSignKey *ecdsa.PrivateKey = GenFaucetSignKey()
+	FaucetAccount types.Address     = GetAccountFromPrivateKey(FaucetSignKey)
+)
+
+func GenFaucetSignKey() *ecdsa.PrivateKey {
+	key, err := ecdsa.GenerateKey(geth_crypto.S256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	return key
+}
+
+func GetAccountFromPrivateKey(key *ecdsa.PrivateKey) types.Address {
+	pk := key.Public().(*ecdsa.PublicKey)
+	return crypto.PubKeyToAddress(pk)
+}
 
 func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, error) {
 	chain, err := NewChain(basepath)
@@ -158,7 +181,7 @@ func getStakingContractBytecode(basepath string) ([]byte, error) {
 }
 
 func NewChain(basepath string) (*chain.Chain, error) {
-	balance := big.NewInt(0).Mul(big.NewInt(1000), common.ETH)
+	balance := big.NewInt(0).Mul(big.NewInt(10000), common.ETH)
 	scBytecode, err := getStakingContractBytecode(basepath)
 	if err != nil {
 		return nil, err
@@ -167,7 +190,7 @@ func NewChain(basepath string) (*chain.Chain, error) {
 	return &chain.Chain{
 		Genesis: &chain.Genesis{
 			Alloc: map[types.Address]*chain.GenesisAccount{
-				types.StringToAddress("0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031"): {
+				FaucetAccount: {
 					Balance: balance,
 				},
 				types.StringToAddress("0x0110000000000000000000000000000000000001"): {

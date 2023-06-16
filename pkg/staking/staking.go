@@ -5,7 +5,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/hashicorp/go-hclog"

@@ -17,23 +17,23 @@ import (
 
 func GetCommand() *cobra.Command {
 	var bootnode bool
-	var availAddr, path, accountPath string
+	var availAddr, path, accountPath, fraudListenAddr string
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Run the settlement layer server",
 		Run: func(cmd *cobra.Command, args []string) {
-			Run(availAddr, path, accountPath, bootnode)
+			Run(availAddr, path, accountPath, fraudListenAddr, bootnode)
 		},
 	}
 	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
 	cmd.Flags().StringVar(&path, "config-file", "./configs/bootnode.yaml", "Path to the configuration file")
 	cmd.Flags().StringVar(&accountPath, "account-config-file", "./configs/account", "Path to the account mnemonic file")
 	cmd.Flags().BoolVar(&bootnode, "bootstrap", false, "bootstrap flag must be specified for the first node booting a new network from the genesis")
+	cmd.Flags().StringVar(&fraudListenAddr, "fraud-srv-listen-addr", ":9990", "Fraud server listen address")
 	return cmd
 }
 
-func Run(availAddr, path, accountPath string, bootnode bool) {
-
+func Run(availAddr, path, accountPath, fraudListenAddr string, bootnode bool) {
 	// Enable LibP2P logging
 	golog.SetAllLoggers(golog.LevelWarn)
 
@@ -66,12 +66,13 @@ func Run(availAddr, path, accountPath string, bootnode bool) {
 
 	// Attach the consensus to the server
 	cfg := consensus.Config{
-		AvailAccount: availAccount,
-		AvailClient:  availClient,
-		AvailSender:  availSender,
-		Bootnode:     bootnode,
-		NodeType:     config.NodeType,
-		AvailAppID:   appID,
+		AvailAccount:      availAccount,
+		AvailClient:       availClient,
+		AvailSender:       availSender,
+		Bootnode:          bootnode,
+		FraudListenerAddr: fraudListenAddr,
+		NodeType:          config.NodeType,
+		AvailAppID:        appID,
 	}
 
 	serverInstance, err := server.NewServer(config.Config, cfg)

@@ -95,7 +95,7 @@ module "alb" {
   jsonrpc_port         = var.jsonrpc_port
   p2p_port             = var.p2p_port
   asg_name             = module.nodes["sequencer"].asg_name
-  bootnode_instance_id = module.bootnode.instance.id
+  bootnode_instance_id = module.bootnode.instance_id
 }
 
 module "bootnode" {

@@ -24,12 +24,14 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
-// FaucetAccount is an address to account in genesis with plenty of balance.
+// FaucetAccount and FaucetSignKey are used as a pair for an account with a plentiful balance for test purposes.
 var (
 	FaucetSignKey *ecdsa.PrivateKey = GenFaucetSignKey()
 	FaucetAccount types.Address     = GetAccountFromPrivateKey(FaucetSignKey)
 )
 
+// GenFaucetSignKey generates a new ECDSA private key which is used for the FaucetAccount.
+// It panics if the key generation fails.
 func GenFaucetSignKey() *ecdsa.PrivateKey {
 	key, err := ecdsa.GenerateKey(geth_crypto.S256(), rand.Reader)
 	if err != nil {
@@ -39,11 +41,14 @@ func GenFaucetSignKey() *ecdsa.PrivateKey {
 	return key
 }
 
+// GetAccountFromPrivateKey takes an ECDSA private key and returns the associated account address.
 func GetAccountFromPrivateKey(key *ecdsa.PrivateKey) types.Address {
 	pk := key.Public().(*ecdsa.PublicKey)
 	return crypto.PubKeyToAddress(pk)
 }
 
+// NewBlockchain creates a new in-memory blockchain with a specified verifier and basepath.
+// It returns an executor, a blockchain, and an error if any occurred during the initialization.
 func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Executor, *blockchain.Blockchain, error) {
 	chain, err := NewChain(basepath)
 	if err != nil {
@@ -89,6 +94,9 @@ func NewBlockchain(verifier blockchain.Verifier, basepath string) (*state.Execut
 	return executor, bchain, nil
 }
 
+// NewBlockchainWithTxPool creates a new in-memory blockchain with a specified chain specification and verifier.
+// It also initializes a transaction pool with default parameters.
+// It returns an executor, a blockchain, a transaction pool, and an error if any occurred during the initialization.
 func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifier) (*state.Executor, *blockchain.Blockchain, *txpool.TxPool, error) {
 	executor := NewInMemExecutor(chainSpec)
 
@@ -144,12 +152,15 @@ func NewBlockchainWithTxPool(chainSpec *chain.Chain, verifier blockchain.Verifie
 	return executor, bchain, txPool, nil
 }
 
+// NewInMemExecutor creates a new executor with an in-memory state and returns it.
 func NewInMemExecutor(c *chain.Chain) *state.Executor {
 	storage := itrie.NewMemoryStorage()
 	st := itrie.NewState(storage)
 	return state.NewExecutor(c.Params, st, hclog.Default())
 }
 
+// getStakingContractBytecode retrieves the bytecode of the staking contract from a genesis.json file located at the given basepath.
+// It returns the bytecode as a byte slice and an error if any occurred during the retrieval.
 func getStakingContractBytecode(basepath string) ([]byte, error) {
 	jsonFile, err := os.Open(filepath.Join(basepath, "configs/genesis.json"))
 	if err != nil {
@@ -180,6 +191,9 @@ func getStakingContractBytecode(basepath string) ([]byte, error) {
 	return nil, nil
 }
 
+// NewChain creates a new Chain instance with a predefined genesis account (FaucetAccount) and staking contract.
+// The function takes a basepath as an argument, which is used to locate the staking contract's bytecode.
+// It returns a Chain instance and an error if any occurred during the initialization.
 func NewChain(basepath string) (*chain.Chain, error) {
 	balance := big.NewInt(0).Mul(big.NewInt(10000), common.ETH)
 	scBytecode, err := getStakingContractBytecode(basepath)

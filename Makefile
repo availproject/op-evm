@@ -55,16 +55,8 @@ bootstrap-staking-contract: build-staking-contract
 
 bootstrap: bootstrap-config bootstrap-secrets bootstrap-genesis
 
-build-fraud-contract:
-	solc --abi tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
-	solc --bin tools/fraud/contract/Fraud.sol -o tools/fraud/contract/ --overwrite
-	abigen --bin=./tools/fraud/contract/Contract.bin --abi=./tools/fraud/contract/Contract.abi --pkg=fraud --out=./tools/fraud/contract/Fraud.go
-
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
-
-build-fraud: build-fraud-contract
-	cd tools/fraud && GOOS=${GOOS} GOARCH=${GOARCH} go build -o fraud
 
 build-staking:
 	cd tools/staking && GOOS=${GOOS} GOARCH=${GOARCH} go build -o staking
@@ -103,9 +95,6 @@ start-watchtower: build
 	rm -rf data/avail-watchtower-1/blockchain/
 	rm -rf data/avail-watchtower-1/trie/
 	./avail-settlement server --config-file="./configs/watchtower-1.yaml" --account-config-file="./configs/account-watchtower"
-
-start-fraud: build-fraud
-	./tools/fraud/fraud
 
 start-staking: build-staking 
 	./tools/staking/staking

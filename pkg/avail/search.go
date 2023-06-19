@@ -12,8 +12,15 @@ import (
 // something went wrong.
 type SearchFunc func(*types.SignedBlock) (int64, bool, error)
 
-// SearchBlock
-// What we really need is to figure out in which
+// SearchBlock searches for a block at the specified offset using the provided search function.
+//
+// Parameters:
+//   - offset: The offset from the current block to start the search. If offset is 0, it starts from the latest block.
+//   - searchFunc: The search function that determines the seek offset based on the current Avail block.
+//
+// Return:
+//   - *types.SignedBlock: The found block.
+//   - error: An error if the block search fails.
 func (c *client) SearchBlock(offset int64, searchFunc SearchFunc) (*types.SignedBlock, error) {
 	// In case offset is zero, it means that we have new chain node and we need to sync it
 	// from latest head in avail towards first block.

@@ -11,15 +11,17 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
-// BlockDataHandler is a function type for a callback invoked on new block.
+// BlockDataHandler is an interface for handling Avail block data.
 type BlockDataHandler interface {
+	// HandleData is called when block data is received.
 	HandleData(bs []byte) error
+
+	// HandleError is called when an error occurs during block processing.
 	HandleError(err error)
 }
 
-// BlockDataWatcher provides an implementation that is watching for new blocks from
-// Avail and filters extrinsics with embedded `Blob` data, invoking handler with
-// the decoded `Blob`.
+// BlockDataWatcher watches for new Avail blocks and filters extrinsics with embedded `Blob` data.
+// It invokes the handler with the decoded `Blob`.
 type BlockDataWatcher struct {
 	appID   types.UCompact
 	client  Client
@@ -27,7 +29,9 @@ type BlockDataWatcher struct {
 	stop    chan struct{}
 }
 
-// NewBlockDataWatcher constructs and starts the watcher following Avail blocks.
+// NewBlockDataWatcher creates and starts a new BlockDataWatcher.
+// It takes a client of type Client, an appID of type types.UCompact, and a handler of type BlockDataHandler.
+// It returns a pointer to the BlockDataWatcher instance and an error if any.
 func NewBlockDataWatcher(client Client, appID types.UCompact, handler BlockDataHandler) (*BlockDataWatcher, error) {
 	watcher := BlockDataWatcher{
 		appID:   appID,
@@ -38,6 +42,8 @@ func NewBlockDataWatcher(client Client, appID types.UCompact, handler BlockDataH
 	return &watcher, nil
 }
 
+// Start starts the BlockDataWatcher and begins processing blocks.
+// It returns an error if the watcher fails to start.
 func (bw *BlockDataWatcher) Start() error {
 	api, err := instance(bw.client)
 	if err != nil {
@@ -64,6 +70,8 @@ func (bw *BlockDataWatcher) Start() error {
 	return nil
 }
 
+// processBlocks listens for new block heads and filters extrinsics with embedded `Blob` data.
+// It invokes the handler with the decoded `Blob` data.
 func (bw *BlockDataWatcher) processBlocks(api *gsrpc.SubstrateAPI, callIdx types.CallIndex, sub *chain.NewHeadsSubscription) {
 	defer sub.Unsubscribe()
 

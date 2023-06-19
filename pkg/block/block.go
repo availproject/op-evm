@@ -1,3 +1,4 @@
+// Package block provides utilities for constructing and building blockchain blocks.
 package block
 
 import (
@@ -12,26 +13,24 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
 
+// Constants defining different block sources
 const (
-	// SourceAvail is the constant for Avail as a block source.
-	SourceAvail = "Avail"
-
-	// SourceWatchTower is the constant for watch tower as a block source.
+	SourceAvail      = "Avail"
 	SourceWatchTower = "WatchTower"
 )
 
-var (
-	// ErrNoExtrinsicFound is returned when FromAvail(avail_blk) cannot decode
-	// working Edge block from Avail block's extrinsic data.
-	ErrNoExtrinsicFound = errors.New("no compatible extrinsic found")
-)
+// Error returned when no compatible extrinsic is found in Avail block's extrinsic data
+var ErrNoExtrinsicFound = errors.New("no compatible extrinsic found")
 
+// FromAvail converts Avail blocks into Edge blocks.
+// It takes an Avail block, appID, callIdx, and logger as parameters.
+// It returns a slice of Edge blocks or an error if conversion fails.
 func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, callIdx avail_types.CallIndex, logger hclog.Logger) ([]*types.Block, error) {
 	toReturn := []*types.Block{}
 
 	for i, extrinsic := range avail_blk.Block.Extrinsics {
 		if extrinsic.Signature.AppID.Int64() != appID.Int64() {
-			logger.Debug("block extrinsic's  AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
+			logger.Debug("block extrinsic's AppID doesn't match", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "extrinsic_app_id", extrinsic.Signature.AppID, "filter_app_id", appID)
 			continue
 		}
 
@@ -42,16 +41,9 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 
 		var blob avail.Blob
 		{
-			// XXX: This decoding process is an inefficient hack to
-			// workaround problem in the encoding pipeline from client
-			// code to Avail server. See more information about this in
-			// sender.SubmitData().
 			var bs avail_types.Bytes
 			err := codec.Decode(extrinsic.Method.Args, &bs)
 			if err != nil {
-				// Don't return just yet because there is no way of filtering
-				// uninteresting extrinsics / method.Args and failing decoding
-				// is the only way to distinct those.
 				logger.Info("decoding block extrinsic's raw bytes from args failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
@@ -59,9 +51,6 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 			decoder := scale.NewDecoder(bytes.NewBuffer(bs))
 			err = blob.Decode(*decoder)
 			if err != nil {
-				// Don't return just yet because there is no way of filtering
-				// uninteresting extrinsics / method.Args and failing decoding
-				// is the only way to distinct those.
 				logger.Info("decoding blob from extrinsic data failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}

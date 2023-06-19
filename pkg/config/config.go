@@ -57,7 +57,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		GenesisPath:    "./genesis.json",
 		DataDir:        "",
-		BlockGasTarget: "0x0",
+		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &config.Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
 			MaxPeers:         defaultNetworkConfig.MaxPeers,
@@ -77,7 +77,7 @@ func DefaultConfig() *Config {
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   1686644797,
+		BlockTime:   1686644797, // We are not using it as we produce blocks at our own peace.
 		Headers: &config.Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
@@ -168,7 +168,7 @@ func NewServerConfig(path string) (*CustomServerConfig, error) {
 		return nil, err
 	}
 
-	nodeType, err := ParseNodeType(rawConfig)
+	nodeType, err := ParseNodeType(rawConfig) //nolint:typecheck
 	if err != nil {
 		return nil, err
 	}

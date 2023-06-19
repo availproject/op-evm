@@ -1,11 +1,13 @@
 package tail
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	edge_types "github.com/0xPolygon/polygon-edge/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/juju/ansiterm"
 	"github.com/spf13/cobra"
 
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
@@ -23,12 +25,12 @@ func GetCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
-	cmd.Flags().Int64Var(&offset, "offset", -1, "Block offset; defaults to first block")
+	cmd.Flags().Int64Var(&offset, "offset", 1, "Block offset; defaults to first block")
 	return cmd
 }
 
 func Run(availAddr string, offset int64) {
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, hclog.NewNullLogger())
 	if err != nil {
 		panic(err)
 	}
@@ -43,36 +45,13 @@ func Run(availAddr string, offset int64) {
 		panic(err)
 	}
 
-	blk, err := availClient.SearchBlock(0, func(blk *types.SignedBlock) (int64, bool, error) {
-		blks, err := block.FromAvail(blk, appID, callIdx, hclog.NewNullLogger())
-		if err != nil {
-			panic(err)
-		}
+	availBlkStream := availClient.BlockStream(1)
 
-		var min, max uint64
-		for _, b := range blks {
-			if b.Number() < min || min == 0 {
-				min = b.Number()
-			}
-
-			if b.Number() > max || max == 0 {
-				max = b.Number()
-			}
-
-			if b.Header.Number == uint64(offset) {
-				return int64(blk.Block.Header.Number), true, nil
-			}
-		}
-
-		// TODO: Fix the condition when the exact offset block is not found.
-		return 0, false, fmt.Errorf("TODO")
-	})
-
-	availBlkStream := availClient.BlockStream(uint64(blk.Block.Header.Number))
+	table := ansiterm.NewTabWriter(os.Stdout, 4, 4, 1, ' ', 0)
 
 	for blk := range availBlkStream.Chan() {
 		blks, err := block.FromAvail(blk, appID, callIdx, hclog.NewNullLogger())
-		if err != nil {
+		if err != nil && !errors.Is(err, block.ErrNoExtrinsicFound) {
 			panic(err)
 		}
 
@@ -81,11 +60,81 @@ func Run(availAddr string, offset int64) {
 				continue
 			}
 
-			printBlock(b)
+			printBlock(table, b)
 		}
+
+		table.Flush()
 	}
 }
 
-func printBlock(blk *edge_types.Block) {
-	fmt.Printf("blk %d:%s\n", blk.Number(), blk.Hash().String())
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	} else {
+		return x
+	}
+}
+
+func printBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	switch {
+	case blk.Number() == 0:
+		printGenesis(table, blk)
+	case isFraudProofBlock(blk):
+		printFraudProofBlock(table, blk)
+	case isBeginDisputeResolutionBlock(blk):
+		printBeginDisputeResolutionBlock(table, blk)
+	case isEndDisputeResolutionBlock(blk):
+		printSlashBlock(table, blk)
+	default:
+		printDefaultBlock(table, blk)
+	}
+}
+
+//       nbr hash parent nTxs description
+// BLK:  %d  %s   %s     %d   %s
+
+func printGenesis(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	table.SetForeground(ansiterm.Magenta)
+	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "GENESIS")
+	table.Reset()
+}
+
+func printDefaultBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	table.SetForeground(ansiterm.Gray)
+	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "DEFAULT")
+	table.Reset()
+}
+
+func printFraudProofBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	table.SetForeground(ansiterm.BrightYellow)
+	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "FRAUDPROOF")
+	table.Reset()
+}
+
+func printBeginDisputeResolutionBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	// TODO: Check if block is forking or not; take it into account when selecting color.
+	table.SetForeground(ansiterm.BrightBlue)
+	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")
+	table.Reset()
+}
+
+func printSlashBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+	table.SetForeground(ansiterm.BrightRed)
+	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "END DISPUTE RESOLUTION")
+	table.Reset()
+}
+
+func isFraudProofBlock(blk *edge_types.Block) bool {
+	_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
+	return exists
+}
+
+func isBeginDisputeResolutionBlock(blk *edge_types.Block) bool {
+	_, exists := block.GetExtraDataBeginDisputeResolutionTarget(blk.Header)
+	return exists
+}
+
+func isEndDisputeResolutionBlock(blk *edge_types.Block) bool {
+	_, exists := block.GetExtraDataEndDisputeResolutionTarget(blk.Header)
+	return exists
 }

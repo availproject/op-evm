@@ -1,3 +1,6 @@
+// Package config provides utility functions for parsing and extracting specific information from a server configuration.
+// It includes functions for parsing the genesis configuration, network addresses, secrets configuration, and node type.
+// The package handles various scenarios, such as handling missing or empty fields, providing default values, and returning appropriate errors.
 package config
 
 import (
@@ -15,12 +18,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// CustomServerConfig is a custom configuration for the server.
 type CustomServerConfig struct {
 	Config   *server.Config
 	NodeType string
 }
 
-// Config defines the server configuration params
+// Config defines the server configuration params.
 type Config struct {
 	GenesisPath              string            `json:"chain_config" yaml:"chain_config"`
 	SecretsConfigPath        string            `json:"secrets_config" yaml:"secrets_config"`
@@ -46,14 +50,14 @@ type Config struct {
 	NodeType              string `json:"node_type" yaml:"node_type"`
 }
 
-// DefaultConfig returns the default server configuration
+// DefaultConfig returns the default server configuration.
 func DefaultConfig() *Config {
 	defaultNetworkConfig := network.DefaultConfig()
 
 	return &Config{
 		GenesisPath:    "./genesis.json",
 		DataDir:        "",
-		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
+		BlockGasTarget: "0x0",
 		Network: &config.Network{
 			NoDiscover:       defaultNetworkConfig.NoDiscover,
 			MaxPeers:         defaultNetworkConfig.MaxPeers,
@@ -73,7 +77,7 @@ func DefaultConfig() *Config {
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   1686644797, // We are not using it as we produce blocks at our own peace.
+		BlockTime:   1686644797,
 		Headers: &config.Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
@@ -85,10 +89,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// ReadConfigFile reads the config file from the specified path, builds a Config object
-// and returns it.
-//
-// Supported file types: .json, .hcl, .yaml, .yml
+// ReadConfigFile reads the config file from the specified path, builds a Config object, and returns it.
 func ReadConfigFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -120,8 +121,7 @@ func ReadConfigFile(path string) (*Config, error) {
 	return config, nil
 }
 
-// --------------
-
+// NewServerConfig creates a new CustomServerConfig based on the configuration file at the specified path.
 func NewServerConfig(path string) (*CustomServerConfig, error) {
 	rawConfig, err := ReadConfigFile(path)
 	if err != nil {
@@ -168,7 +168,7 @@ func NewServerConfig(path string) (*CustomServerConfig, error) {
 		return nil, err
 	}
 
-	nodeType, err := ParseNodeType(rawConfig) //nolint:typecheck
+	nodeType, err := ParseNodeType(rawConfig)
 	if err != nil {
 		return nil, err
 	}

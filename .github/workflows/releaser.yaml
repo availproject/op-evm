@@ -25,8 +25,6 @@ jobs:
         run: make build-all GOOS=linux GOARCH=arm64
       - name: Add avail-settlement binary to zip archive
         run: zip -j avail-settlement-linux-arm64.zip avail-settlement
-      - name: Add accounts binary to zip archive
-        run: zip -j accounts-linux-arm64.zip tools/accounts/accounts
 
       - name: Build assm go binary
         run: make build-assm GOOS=linux GOARCH=amd64

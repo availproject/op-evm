@@ -41,9 +41,16 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 
 		var blob avail.Blob
 		{
+			// XXX: This decoding process is an inefficient hack to
+			// workaround problem in the encoding pipeline from client
+			// code to Avail server. See more information about this in
+			// sender.SubmitData().
 			var bs avail_types.Bytes
 			err := codec.Decode(extrinsic.Method.Args, &bs)
 			if err != nil {
+				// Don't return just yet because there is no way of filtering
+				// uninteresting extrinsics / method.Args and failing decoding
+				// is the only way to distinct those.
 				logger.Info("decoding block extrinsic's raw bytes from args failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}
@@ -51,6 +58,9 @@ func FromAvail(avail_blk *avail_types.SignedBlock, appID avail_types.UCompact, c
 			decoder := scale.NewDecoder(bytes.NewBuffer(bs))
 			err = blob.Decode(*decoder)
 			if err != nil {
+				// Don't return just yet because there is no way of filtering
+				// uninteresting extrinsics / method.Args and failing decoding
+				// is the only way to distinct those.
 				logger.Info("decoding blob from extrinsic data failed", "avail_block_number", avail_blk.Block.Header.Number, "extrinsic_index", i, "error", err)
 				continue
 			}

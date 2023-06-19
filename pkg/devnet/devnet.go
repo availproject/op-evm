@@ -152,8 +152,10 @@ func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPat
 // configureNode configures a devnet node based on the provided port allocator and node type.
 // It returns the customized server config for the node.
 func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (*pkg_config.CustomServerConfig, error) {
+	var err error
+
 	rawConfig := config.DefaultConfig()
-	rawConfig.DataDir, err := os.MkdirTemp("", "*")
+	rawConfig.DataDir, err = os.MkdirTemp("", "*")
 	if err != nil {
 		return nil, err
 	}

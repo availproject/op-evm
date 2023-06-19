@@ -1,3 +1,7 @@
+// Package staking contains the definitions and operations related to active participant staking mechanism in the system.
+// The package provides two main types: ActiveParticipants and activeParticipantsQuerier.
+// ActiveParticipants is an interface that represents the active participants of the system and their operations.
+// activeParticipantsQuerier is an implementation of the ActiveParticipants interface that queries the active participants.
 package staking
 
 import (
@@ -8,31 +12,50 @@ import (
 	"strings"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
+// DumbActiveParticipants is a struct with no behavior, intended for testing purposes.
+// All its methods return nil values.
 type DumbActiveParticipants struct{}
 
+// Get method of DumbActiveParticipants struct always returns nil values.
+// It satisfies the ActiveParticipants interface.
 func (dasq *DumbActiveParticipants) Get(nodeType NodeType) ([]types.Address, error) { return nil, nil }
+
+// Contains method of DumbActiveParticipants struct always returns true.
+// It satisfies the ActiveParticipants interface.
 func (dasq *DumbActiveParticipants) Contains(_ types.Address, nodeType NodeType) (bool, error) {
 	return true, nil
 }
+
+// GetBalance method of DumbActiveParticipants struct always returns nil values.
+// It satisfies the ActiveParticipants interface.
 func (dasq *DumbActiveParticipants) GetBalance(_ types.Address) (*big.Int, error) {
 	return nil, nil
 }
+
+// GetTotalStakedAmount method of DumbActiveParticipants struct always returns nil values.
+// It satisfies the ActiveParticipants interface.
 func (dasq *DumbActiveParticipants) GetTotalStakedAmount() (*big.Int, error) {
 	return nil, nil
 }
+
+// InProbation method of DumbActiveParticipants struct always returns true.
+// It satisfies the ActiveParticipants interface.
 func (dasq *DumbActiveParticipants) InProbation(_ types.Address) (bool, error) {
 	return true, nil
 }
 
+// ActiveParticipants is an interface for obtaining details about active participants in the network.
+// It includes methods for getting participant addresses, checking participant existence,
+// checking probation status, and getting balances.
 type ActiveParticipants interface {
 	Get(nodeType NodeType) ([]types.Address, error)
 	Contains(addr types.Address, nodeType NodeType) (bool, error)
@@ -41,12 +64,17 @@ type ActiveParticipants interface {
 	GetTotalStakedAmount() (*big.Int, error)
 }
 
+// activeParticipantsQuerier is a concrete implementation of the ActiveParticipants interface.
+// It uses the blockchain, executor, and logger to query participant details from the blockchain.
 type activeParticipantsQuerier struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
 }
 
+// NewActiveParticipantsQuerier creates a new instance of activeParticipantsQuerier.
+// It takes a blockchain, executor, and logger as parameters.
+// It returns the ActiveParticipants interface.
 func NewActiveParticipantsQuerier(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) ActiveParticipants {
 	return &activeParticipantsQuerier{
 		blockchain: blockchain,
@@ -55,6 +83,9 @@ func NewActiveParticipantsQuerier(blockchain *blockchain.Blockchain, executor *s
 	}
 }
 
+// Get method returns the addresses of active participants based on the given node type.
+// It takes the nodeType parameter, which represents the type of node (Sequencer or WatchTower).
+// It returns a slice of addresses and an error if the operation fails.
 func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, error) {
 	parent := asq.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -99,6 +130,9 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 	}
 }
 
+// Contains method checks if the given address is contained in the active participants list.
+// It takes the addr parameter, which represents the address to check, and the nodeType parameter, which represents the type of node (Sequencer or WatchTower).
+// It returns a boolean value indicating whether the address is found and an error if the operation fails.
 func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType NodeType) (bool, error) {
 	addrs, err := asq.Get(nodeType)
 	if err != nil {
@@ -119,6 +153,9 @@ func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType Node
 
 }
 
+// InProbation method checks if the given address is in probation.
+// It takes the address parameter, which represents the address to check.
+// It returns a boolean value indicating whether the address is in probation and an error if the operation fails.
 func (asq *activeParticipantsQuerier) InProbation(address types.Address) (bool, error) {
 	parent := asq.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -157,6 +194,9 @@ func (asq *activeParticipantsQuerier) InProbation(address types.Address) (bool, 
 	return false, nil
 }
 
+// GetBalance method retrieves the balance of the given address.
+// It takes the address parameter, which represents the address to query.
+// It returns the balance as a big.Int value and an error if the operation fails.
 func (asq *activeParticipantsQuerier) GetBalance(address types.Address) (*big.Int, error) {
 	parent := asq.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -189,6 +229,8 @@ func (asq *activeParticipantsQuerier) GetBalance(address types.Address) (*big.In
 	return balance, nil
 }
 
+// GetTotalStakedAmount method retrieves the total staked amount in the system.
+// It returns the total staked amount as a big.Int value and an error if the operation fails.
 func (asq *activeParticipantsQuerier) GetTotalStakedAmount() (*big.Int, error) {
 	parent := asq.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -221,6 +263,9 @@ func (asq *activeParticipantsQuerier) GetTotalStakedAmount() (*big.Int, error) {
 	return balance, nil
 }
 
+// QueryParticipants queries the current participants from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns a slice of addresses representing the current participants and an error if the operation fails.
 func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentParticipants"]
 	if !ok {
@@ -249,6 +294,9 @@ func QueryParticipants(t *state.Transition, gasLimit uint64, from types.Address)
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+// QueryActiveSequencers queries the current active sequencers from the staking contract.
+// It takes a blockchain, an executor, a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns a slice of addresses representing the current active sequencers and an error if the operation fails.
 func QueryActiveSequencers(blockchain *blockchain.Blockchain, executor *state.Executor, t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	toReturn := []types.Address{}
 
@@ -298,6 +346,9 @@ mainLoop:
 	return toReturn, nil
 }
 
+// QuerySequencers queries the current sequencers from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns a slice of addresses representing the current sequencers and an error if the operation fails.
 func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencers"]
 	if !ok {
@@ -326,6 +377,9 @@ func QuerySequencers(t *state.Transition, gasLimit uint64, from types.Address) (
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+// QuerySequencersInProbation queries the current sequencers in probation from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns a slice of addresses representing the sequencers in probation and an error if the operation fails.
 func QuerySequencersInProbation(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentSequencersInProbation"]
 	if !ok {
@@ -354,6 +408,9 @@ func QuerySequencersInProbation(t *state.Transition, gasLimit uint64, from types
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+// QueryWatchtower queries the current watchtowers from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns a slice of addresses representing the current watchtowers and an error if the operation fails.
 func QueryWatchtower(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentWatchtowers"]
 	if !ok {
@@ -382,6 +439,9 @@ func QueryWatchtower(t *state.Transition, gasLimit uint64, from types.Address) (
 	return DecodeParticipants(method, res.ReturnValue)
 }
 
+// DecodeParticipants decodes the returned results from the staking contract into addresses.
+// It takes a method object and the returned value as parameters.
+// It returns a slice of addresses decoded from the returned value and an error if the operation fails.
 func DecodeParticipants(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
@@ -407,6 +467,9 @@ func DecodeParticipants(method *abi.Method, returnValue []byte) ([]types.Address
 	return addresses, nil
 }
 
+// QueryParticipantBalance queries the staked amount of a participant from the staking contract.
+// It takes a transaction transition, gas limit, the address of the sender, and the address of the participant as parameters.
+// It returns the staked amount as a big.Int value and an error if the operation fails.
 func QueryParticipantBalance(t *state.Transition, gasLimit uint64, from types.Address, addr types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentAccountStakedAmount"]
 	if !ok {
@@ -445,6 +508,9 @@ func QueryParticipantBalance(t *state.Transition, gasLimit uint64, from types.Ad
 	return new(big.Int).SetBytes(res.ReturnValue), nil
 }
 
+// QueryParticipantTotalStakedAmount queries the total staked amount from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns the total staked amount as a big.Int value and an error if the operation fails.
 func QueryParticipantTotalStakedAmount(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentStakedAmount"]
 	if !ok {

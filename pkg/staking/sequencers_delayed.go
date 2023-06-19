@@ -2,18 +2,19 @@ package staking
 
 import "github.com/0xPolygon/polygon-edge/types"
 
+// cachingRandomizedActiveSequencersQuerier is an implementation of the ActiveSequencers interface
+// that provides deterministic randomization of the list of currently active sequencers.
 type cachingRandomizedActiveSequencersQuerier struct {
-	rngSeedFn RandomSeedFn
-	querier   ActiveSequencers
-
+	rngSeedFn      RandomSeedFn
+	querier        ActiveSequencers
 	lastSeed       int64
 	lastSequencers []types.Address
 }
 
-// NewRandomizedActiveSequencersQuerier returns an implementation of
-// `ActiveSequencers` that deterministically randomizes list of currently
-// active sequencers. Given same number from `RandomSeedFn` and list of
-// addresses from `ActiveSequencers`, the return value of `Get()` is the same.
+// NewCachingRandomizedActiveSequencersQuerier creates a new cachingRandomizedActiveSequencersQuerier instance.
+// It returns an implementation of the ActiveSequencers interface that deterministically randomizes the list of
+// currently active sequencers. The return value of the Get method will be the same for the same seed and list
+// of addresses from ActiveSequencers.
 func NewCachingRandomizedActiveSequencersQuerier(rngSeedFn RandomSeedFn, activeParticipants ActiveParticipants) ActiveSequencers {
 	return &cachingRandomizedActiveSequencersQuerier{
 		rngSeedFn: rngSeedFn,
@@ -21,6 +22,9 @@ func NewCachingRandomizedActiveSequencersQuerier(rngSeedFn RandomSeedFn, activeP
 	}
 }
 
+// Get returns the list of currently active sequencers.
+// If the seed is the same as the last seed and there is a cached list of sequencers, the cached value is returned.
+// Otherwise, it retrieves the sequencers from the underlying querier and caches the result.
 func (c *cachingRandomizedActiveSequencersQuerier) Get() ([]types.Address, error) {
 	seed := c.rngSeedFn()
 
@@ -38,6 +42,9 @@ func (c *cachingRandomizedActiveSequencersQuerier) Get() ([]types.Address, error
 	return sequencers, nil
 }
 
+// Contains checks if the provided address is in the list of currently active sequencers.
+// If the seed is the same as the last seed and there is a cached list of sequencers, the cached list is used for the check.
+// Otherwise, it retrieves the sequencers from the underlying querier, caches the result, and performs the check.
 func (c *cachingRandomizedActiveSequencersQuerier) Contains(addr types.Address) (bool, error) {
 	seed := c.rngSeedFn()
 

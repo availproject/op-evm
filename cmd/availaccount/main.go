@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
@@ -55,7 +56,7 @@ func GetCommand() *cobra.Command {
 // Example usage:
 // Run("ws://127.0.0.1:9944/v1/json-rpc", "./configs/account", 18, false)
 func Run(availAddr, path string, balance uint64, retry bool) {
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, hclog.Default())
 	if err != nil {
 		panic(err)
 	}

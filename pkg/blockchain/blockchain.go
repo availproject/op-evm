@@ -1,3 +1,4 @@
+// Package blockchain provides functionality for interacting with a blockchain.
 package blockchain
 
 import (

@@ -6,29 +6,49 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/umbracle/ethgo/abi"
 )
 
+// ParticipantRate is an interface for managing the minimum and maximum number of participants.
 type ParticipantRate interface {
+	// CurrentMinimum returns the current minimum number of participants.
+	// It retrieves the value from the staking system and returns it as a *big.Int.
+	// An error is returned if the operation fails.
 	CurrentMinimum() (*big.Int, error)
+
+	// CurrentMaximum returns the current maximum number of participants.
+	// It retrieves the value from the staking system and returns it as a *big.Int.
+	// An error is returned if the operation fails.
 	CurrentMaximum() (*big.Int, error)
+
+	// SetMinimum sets the minimum number of participants.
+	// It takes the new minimum value and a signing key as parameters.
+	// An error is returned if the operation fails.
 	SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error
+
+	// SetMaximum sets the maximum number of participants.
+	// It takes the new maximum value and a signing key as parameters.
+	// An error is returned if the operation fails.
 	SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) error
 }
 
+// participantRate is a concrete implementation of the ParticipantRate interface.
+// It uses a blockchain, executor, and logger to manage the participant rates.
 type participantRate struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
 }
 
+// NewParticipantRater creates a new instance of participantRate.
+// It takes a blockchain, executor, and logger as parameters and returns a ParticipantRate interface.
 func NewParticipantRater(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) ParticipantRate {
 	return &participantRate{
 		blockchain: blockchain,
@@ -37,6 +57,9 @@ func NewParticipantRater(blockchain *blockchain.Blockchain, executor *state.Exec
 	}
 }
 
+// SetMinimum sets the minimum number of participants.
+// It takes the new minimum value and a signing key as parameters.
+// It returns an error if the operation fails.
 func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -66,6 +89,9 @@ func (st *participantRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey
 	return nil
 }
 
+// SetMaximum sets the maximum number of participants.
+// It takes the new maximum value and a signing key as parameters.
+// It returns an error if the operation fails.
 func (st *participantRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -95,6 +121,9 @@ func (st *participantRate) SetMaximum(newMin *big.Int, signKey *ecdsa.PrivateKey
 	return nil
 }
 
+// CurrentMinimum returns the current minimum number of participants.
+// It retrieves the value from the staking contract and returns it as a big.Int.
+// It returns an error if the operation fails.
 func (st *participantRate) CurrentMinimum() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -122,6 +151,9 @@ func (st *participantRate) CurrentMinimum() (*big.Int, error) {
 	return threshold, nil
 }
 
+// CurrentMaximum returns the current maximum number of participants.
+// It retrieves the value from the staking contract and returns it as a big.Int.
+// It returns an error if the operation fails.
 func (st *participantRate) CurrentMaximum() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -149,6 +181,9 @@ func (st *participantRate) CurrentMaximum() (*big.Int, error) {
 	return threshold, nil
 }
 
+// SetMinimumParticipantsTx creates a transaction to set the minimum number of participants.
+// It takes the sender address, the new minimum value, and the gas limit as parameters.
+// It returns the transaction and an error if the operation fails.
 func SetMinimumParticipantsTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetMinNumParticipants"]
 	if !ok {
@@ -176,6 +211,9 @@ func SetMinimumParticipantsTx(from types.Address, amount *big.Int, gasLimit uint
 	}, nil
 }
 
+// GetMinimumParticipantsTx retrieves the current minimum number of participants from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns the current minimum value as a big.Int and an error if the operation fails.
 func GetMinimumParticipantsTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetMinNumParticipants"]
 	if !ok {
@@ -206,6 +244,9 @@ func GetMinimumParticipantsTx(t *state.Transition, gasLimit uint64, from types.A
 	return toReturn, nil
 }
 
+// SetMaximumParticipantsTx creates a transaction to set the maximum number of participants.
+// It takes the sender address, the new maximum value, and the gas limit as parameters.
+// It returns the transaction and an error if the operation fails.
 func SetMaximumParticipantsTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetMaxNumParticipants"]
 	if !ok {
@@ -233,6 +274,9 @@ func SetMaximumParticipantsTx(from types.Address, amount *big.Int, gasLimit uint
 	}, nil
 }
 
+// GetMaximumParticipantsTx retrieves the current maximum number of participants from the staking contract.
+// It takes a transaction transition, gas limit, and the address of the sender as parameters.
+// It returns the current maximum value as a big.Int and an error if the operation fails.
 func GetMaximumParticipantsTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetMaxNumParticipants"]
 	if !ok {

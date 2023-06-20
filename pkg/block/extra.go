@@ -27,6 +27,8 @@ const (
 	KeyEndDisputeResolutionOf = "END_DISPUTE_RESOLUTION_OF"
 )
 
+// EncodeExtraDataFields encodes the given map of extra data fields into a byte slice.
+// It takes a map of string keys to byte slice values and returns a byte slice representation of the encoded data.
 func EncodeExtraDataFields(data map[string][]byte) []byte {
 	var keys []string
 	for k := range data {
@@ -47,6 +49,8 @@ func EncodeExtraDataFields(data map[string][]byte) []byte {
 	return vv.MarshalTo(nil)
 }
 
+// DecodeExtraDataFields decodes the byte slice into a map of extra data fields.
+// It takes a byte slice representing the encoded data and returns a map of string keys to byte slice values.
 func DecodeExtraDataFields(data []byte) (map[string][]byte, error) {
 	kv := make(map[string][]byte)
 
@@ -82,7 +86,9 @@ func DecodeExtraDataFields(data []byte) (map[string][]byte, error) {
 	return kv, nil
 }
 
-// AssignExtraValidators is a helper method that adds validators to the extra field in the header
+// AssignExtraValidators adds the validators to the extra data field in the header.
+// It takes the header and a slice of validator addresses and modifies the header's extra data field accordingly.
+// Returns an error if there is an issue decoding or encoding the extra data field.
 func AssignExtraValidators(h *types.Header, validators []types.Address) error {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -103,7 +109,9 @@ func AssignExtraValidators(h *types.Header, validators []types.Address) error {
 	return nil
 }
 
-// PutIbftExtra sets the extra data field in the header to the passed in istanbul extra data
+// PutValidatorExtra sets the extra data field in the header to the given ValidatorExtra.
+// It takes the header and a ValidatorExtra struct and modifies the header's extra data field accordingly.
+// Returns an error if there is an issue decoding or encoding the extra data field.
 func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -119,7 +127,9 @@ func PutValidatorExtra(h *types.Header, istanbulExtra *ValidatorExtra) error {
 	return nil
 }
 
-// getValidatorExtra returns the istanbul extra data field from the passed in header
+// getValidatorExtra returns the ValidatorExtra from the extra data field in the header.
+// It takes the header and returns the ValidatorExtra struct decoded from the header's extra data field.
+// Returns an error if there is an issue decoding the extra data field or if the extra data field is not found.
 func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -140,6 +150,9 @@ func getValidatorExtra(h *types.Header) (*ValidatorExtra, error) {
 	return extra, nil
 }
 
+// GetExtraDataFraudProofTarget returns the fraudproof target from the extra data field in the header.
+// It takes the header and returns the fraudproof target as a Hash value.
+// Returns the fraudproof target and a boolean indicating if it was found in the extra data field.
 func GetExtraDataFraudProofTarget(h *types.Header) (types.Hash, bool) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -160,6 +173,9 @@ func GetExtraDataFraudProofTarget(h *types.Header) (types.Hash, bool) {
 	return toReturn, true
 }
 
+// GetExtraDataBeginDisputeResolutionTarget returns the begin dispute resolution target from the extra data field in the header.
+// It takes the header and returns the begin dispute resolution target as a Hash value.
+// Returns the begin dispute resolution target and a boolean indicating if it was found in the extra data field.
 func GetExtraDataBeginDisputeResolutionTarget(h *types.Header) (types.Hash, bool) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -180,6 +196,9 @@ func GetExtraDataBeginDisputeResolutionTarget(h *types.Header) (types.Hash, bool
 	return toReturn, true
 }
 
+// GetExtraDataEndDisputeResolutionTarget returns the end dispute resolution target from the extra data field in the header.
+// It takes the header and returns the end dispute resolution target as a Hash value.
+// Returns the end dispute resolution target and a boolean indicating if it was found in the extra data field.
 func GetExtraDataEndDisputeResolutionTarget(h *types.Header) (types.Hash, bool) {
 	kv, err := DecodeExtraDataFields(h.ExtraData)
 	if err != nil {
@@ -200,19 +219,21 @@ func GetExtraDataEndDisputeResolutionTarget(h *types.Header) (types.Hash, bool) 
 	return toReturn, true
 }
 
-// IstanbulExtra defines the structure of the extra field for Istanbul
+// ValidatorExtra defines the structure of the extra data field for validators.
 type ValidatorExtra struct {
 	Validators    []types.Address
 	Seal          []byte
 	CommittedSeal [][]byte
 }
 
-// MarshalRLPTo defines the marshal function wrapper for ValidatorExtra
+// MarshalRLPTo marshals the ValidatorExtra struct to an RLP-encoded byte slice.
+// It takes the ValidatorExtra struct and a destination byte slice, and returns the marshaled byte slice.
 func (i *ValidatorExtra) MarshalRLPTo(dst []byte) []byte {
 	return types.MarshalRLPTo(i.MarshalRLPWith, dst)
 }
 
-// MarshalRLPWith defines the marshal function implementation for ValidatorExtra
+// MarshalRLPWith marshals the ValidatorExtra struct to an RLP value using the given RLP arena.
+// It takes the ValidatorExtra struct and an RLP arena, and returns the RLP value.
 func (i *ValidatorExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 
@@ -249,12 +270,14 @@ func (i *ValidatorExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-// UnmarshalRLP defines the unmarshal function wrapper for ValidatorExtra
+// UnmarshalRLP unmarshals the ValidatorExtra struct from an RLP-encoded byte slice.
+// It takes the input byte slice and returns an error if there is an issue unmarshaling the data.
 func (i *ValidatorExtra) UnmarshalRLP(input []byte) error {
 	return types.UnmarshalRlp(i.UnmarshalRLPFrom, input)
 }
 
-// UnmarshalRLPFrom defines the unmarshal implementation for ValidatorExtra
+// UnmarshalRLPFrom unmarshals the ValidatorExtra struct from an RLP value using the given RLP parser and value.
+// It takes the RLP parser, RLP value, and returns an error if there is an issue unmarshaling the data.
 func (i *ValidatorExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {

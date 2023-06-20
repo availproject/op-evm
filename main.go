@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/maticnetwork/avail-settlement/cmd/availaccount"
+	"github.com/maticnetwork/avail-settlement/cmd/devnet"
 	"github.com/maticnetwork/avail-settlement/cmd/server"
 	"github.com/maticnetwork/avail-settlement/cmd/tail"
 )
@@ -18,6 +19,7 @@ func main() {
 	cmd.AddCommand(
 		server.GetCommand(),
 		availaccount.GetCommand(),
+		devnet.GetCommand(),
 		secrets.GetCommand(),
 		tail.GetCommand(),
 	)

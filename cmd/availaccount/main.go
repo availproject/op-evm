@@ -8,18 +8,29 @@ import (
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
 
 const (
-	// 1 AVL == 10^18 Avail fractions.
+	// AVL is a constant representing 1 Avail token in its smallest denomination.
+	// The Avail token has 18 decimal places, so 1 Avail token equals 10^18 of its smallest denomination.
 	AVL = 1_000_000_000_000_000_000
 
+	// maxUint64 is the maximum value that can be represented by a uint64.
 	maxUint64 = ^uint64(0)
 )
 
+// GetCommand returns a Cobra command for creating an avail account and depositing the balance.
+// It takes no arguments and returns a pointer to a cobra.Command.
+// Example usage:
+// cmd := GetCommand()
+//
+//	if err := cmd.Execute(); err != nil {
+//	   log.Fatalf("cmd.Execute error: %v", err)
+//	}
 func GetCommand() *cobra.Command {
 	var balance uint64
 	var availAddr, path string
@@ -38,8 +49,14 @@ func GetCommand() *cobra.Command {
 	return cmd
 }
 
+// Run is responsible for setting up and executing the process of creating an Avail account and
+// depositing a balance into it. It takes the Avail JSON-RPC URL, a file path for saving the
+// account mnemonic, the balance to deposit into the account, and a retry flag to indicate
+// whether the process should be retried if an error occurs.
+// Example usage:
+// Run("ws://127.0.0.1:9944/v1/json-rpc", "./configs/account", 18, false)
 func Run(availAddr, path string, balance uint64, retry bool) {
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, hclog.Default())
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +97,14 @@ func Run(availAddr, path string, balance uint64, retry bool) {
 	log.Printf("Successfuly written mnemonic into '%s'", path)
 }
 
-// Deposit balance in chunks of maxUint64 (because of the API limitations).
+// deposit is a helper function used to deposit a specified balance into an Avail account.
+// It works by depositing the balance in chunks of maxUint64 due to the API limitations.
+// This function takes an Avail client, an Avail account, and a balance, and returns an error.
+// Example usage (assuming availClient and availAccount are already defined):
+//
+//	if err := deposit(availClient, availAccount, 1000); err != nil {
+//	   log.Fatalf("deposit error: %v", err)
+//	}
 func deposit(availClient avail.Client, availAccount signature.KeyringPair, balance uint64) (err error) {
 	amount := big.NewInt(0).Mul(big.NewInt(0).SetUint64(balance), big.NewInt(AVL))
 

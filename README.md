@@ -1,127 +1,64 @@
-# Polygon Avail Settlement
+# Avail Settlement Layer PoC
 
-Polygon Avail Settlement provides a settlement layer for Polygon Avail.
+Avail SL is a blockchain settlement system designed for efficient and secure transaction processing. It provides a decentralized infrastructure for settlement and enables high-throughput, low-latency transaction processing on the blockchain. Avail SL is built on top of the Polygon network, extending Polygon Edge and offers advanced features for block validation, fraudproof detection, and transaction verification.
 
+## Features
 
-# Run instructions
-
-0.) Requirements
-
-- Avail node needs to be present and running locally.
-- Need to clone and execute following make file commands from the root branch directory.
-
-1.) Start sequencer and validator nodes. 
-
-Have two tabs, and run them one by another, fast. 
-
-```
-make start-sequencer
-make start-validator
-```
-
-2.) Open third tab and run the E2E test
-
-```
-make start-e2e
-```
-
-----
-
-If all is produced well you will see following:
-
-```
-cortex@rij01-data01:~/eq/settlement$ make start-e2e
-cd tools/e2e && go build -o e2e
-./tools/e2e/e2e
-2022/08/04 12:24:47 Current Headers -> Sequencer: 3269 | Validator: 3269 | Synced: true 
-2022/08/04 12:24:47 Genesis Account Hex: 0x064A4a5053F3de5eacF5E72A2E97D5F9CF55f031 | Test Account Hex: 0x65F0bDe66C970F391bd648B7ea22e1c193221c65
-2022/08/04 12:24:47 Sequencer Balances -> Genesis: 989 | Test: 11 
-2022/08/04 12:24:47 Validator Balances -> Genesis: 989 | Test: 11 
-2022/08/04 12:24:47 Initial balances are matching between sequencer and validator nodes!
-2022/08/04 12:24:47 Sequencer -> initiating transfer of 1 ETH from genesis to test account...
-2022/08/04 12:24:48 Sequencer -> genesis to test account 1 ETH transfer success! Tx hash: 0xeae656cc94e5e7bef5b27cd90cb8fbd7b7fb421daf9938f1386d717a5cfda187 
-2022/08/04 12:24:48 Sequencer -> Awaiting for balance confirmation. Target -> Genesis: 988 | Test: 12
-2022/08/04 12:24:53 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:24:53 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:24:58 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:24:58 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:25:03 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:25:03 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:25:08 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:25:08 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:25:13 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:25:13 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:25:18 Sequencer -> Ticker balance check -> Genesis Account: 989 | Test Account: 11 
-2022/08/04 12:25:18 Sequencer -> Balances not matching yet... Waiting 5 seconds and rechecking...
-2022/08/04 12:25:23 Sequencer -> Ticker balance check -> Genesis Account: 988 | Test Account: 12 
-2022/08/04 12:25:23 Sequencer -> Balance transfer confirmation successful! Time took: 35.69459452s 
-2022/08/04 12:25:23 Validator -> Starting transfer confirmation check...
-2022/08/04 12:25:28 Validator -> Ticker balance check -> Genesis Account: 988 | Test Account: 12 
-2022/08/04 12:25:28 Validator -> Balance transfer confirmation successful! Total time took: 40.695656088s 
-2022/08/04 12:25:28 E2E BALANCE TEST SUCCESSFUL!
-```
-
-Each of these methods will run go build and produce sufficient binaries.
-Precompiled wallets as well as the datasets necessary for nodes to run are already in place.
+- Block Validation: Avail SL ensures that incoming blocks conform to the specified structure and contain valid transaction data.
+- Fraudproof Detection: The system is equipped with fraudproof detection mechanisms to identify and handle malicious blocks.
+- Transaction Verification: Avail SL verifies the integrity and correctness of transactions, ensuring the accuracy of settlement processes.
+- High Throughput: The system is optimized for high throughput, enabling fast and efficient transaction processing.
+- Low Latency: Avail SL minimizes transaction confirmation times, reducing latency and enabling near-instantaneous settlement.
+- Decentralized Infrastructure: Avail SL operates on a decentralized infrastructure, ensuring the security and resilience of the settlement system.
+- Optimistic Rollup: Avail SL is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
 
 
-# Node Secrets
+## Components
 
-```
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-bootnode-1
+### Bootstrap Sequencer
 
-[SECRETS INIT]
-Public key (address) = 0x1bC763b9c36Bb679B17Fc9ed01Ec5e27AF145864
-Node ID              = 16Uiu2HAmMNxPzdzkNmtV97e9Y7kvHWahpGysW2Mq7GdDCDFdAcZa
+The Bootstrap Sequencer component is responsible for bootstrapping the Avail settlement system. It initializes the necessary parameters, establishes the initial block structure, and sets up the initial state of the system.
 
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-node-1
+### Sequencer
 
-[SECRETS INIT]
-Public key (address) = 0x00D916EFbEeDb102A4D235a1EB525Fa147E5588e
-Node ID              = 16Uiu2HAkwyY1aXwC7o7nrUofsBXwUkxYwsj21LtE9jmhmTuei5mw
+The Sequencer component is the main transaction processor in Avail. It receives incoming transactions, orders them, and includes them in the blocks to be added to the blockchain. The Sequencer plays a crucial role in maintaining the integrity and consistency of the Avail settlement system.
 
-/home/cortex/go/bin/polygon-edge secrets init --data-dir ./data/avail-node-2
+### WatchTower
 
-[SECRETS INIT]
-Public key (address) = 0x2734E3c95E2dBD08363f5298247b30a186c48b82
-Node ID              = 16Uiu2HAm1vufDoGrukYQaTCDDE642B45HFLnUo5J2QcPpTosuiYp
+The WatchTower component is responsible for block validation, fraudproof detection, and transaction verification. It ensures the integrity of incoming blocks and identifies potential fraud or malicious activities.
 
-```
+### Blockchain
 
-## Bootnode
+The Blockchain component provides the underlying blockchain infrastructure for Avail. It stores and manages the blockchain data, including blocks, transactions, and state information. The consensus mechanism is based on the Avail database, ensuring secure and reliable settlement operations.
 
-```
-/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmUUNRnZLKRitXN9waugxMeqLYZ6PnwA8iPoiLMqRVZwQf
-```
+### Staking
 
+The Staking component handles the staking mechanisms within Avail. It manages stakeholder addresses, tracks staked amounts, and facilitates dispute resolution processes.
 
-# Server startup (polygon-edge)
+## Settlement Layer
 
-## Bootnode (seal)
-```
-polygon-edge server --data-dir ./data/bootnode-1 --chain ./configs/genesis.json --grpc-address :10000 --libp2p :10001 --json
-rpc :10002 --seal
-```
+The settlement layer in Avail operates on an optimistic model, enabling efficient and rapid transaction processing. It leverages advanced techniques and algorithms to ensure high-throughput settlement while maintaining data integrity and security.
 
-```
-make build && ./server/server -config-file="./configs/bootnode.yaml"
-```
+## Getting Started
 
-## Node (non seal)
-```
-polygon-edge server --data-dir ./data/node-1 --chain ./configs/genesis.json --grpc-address :20000 --libp2p :20001 --json
-rpc :20002
-```
+To get started with Avail, follow these steps:
 
-```
-make build && ./server/server -config-file="./configs/node-1.yaml"
-```
+1. Install the required dependencies and libraries.
+2. Set up the Avail environment by configuring the blockchain connection and network parameters.
+3. Deploy and initialize the Bootstrap Sequencer and Sequencer components.
+4. Connect to the blockchain network and start processing incoming transactions.
+5. Monitor the system for fraudproof detections and handle dispute resolution processes when necessary.
 
-# Client
+For detailed instructions on installation, configuration, and usage, refer to the TODO.
 
-```
-cortex@rij01-data01:~/eq/settlement$ make build-client && ./client/client 
-cd client && go build -o client
-2022/06/29 15:09:54 client: &ethclient.Client{c:(*rpc.Client)(0xc0001be100)}
-2022/06/29 15:09:54 Got the header number: 0
-```
+## Contributing
+
+We welcome contributions to the Avail project. If you find any issues, have suggestions for improvements, or would like to contribute new features, please open a GitHub issue or submit a pull request.
+
+## License
+
+TODO
+
+## Contact
+
+For any inquiries or questions, please contact the Avail SL development team at TODO

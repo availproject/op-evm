@@ -27,12 +27,17 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+// availBlockWindowLen is the length of the Avail block window.
 const availBlockWindowLen = 7
 
+// TransitionInterface represents an interface for write transitions.
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
+// SequencerWorker represents the struct for a Sequencer Worker.
+// A Sequencer Worker is responsible for handling operations like running the block production process,
+// snapshot processing, fraud detection and resolution, handling sequencer staking/unstaking, and more.
 type SequencerWorker struct {
 	logger                     hclog.Logger
 	blockchain                 *blockchain.Blockchain
@@ -64,6 +69,10 @@ type SequencerWorker struct {
 	availBlockNumWhenStaked *int64
 }
 
+// Run starts the main operation of the SequencerWorker.
+// It utilizes the given account and key to run various tasks like fraud detection and resolution,
+// block production, snapshot processing, and more.
+// Errors from these tasks are handled and appropriately logged.
 func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) error {
 	t := new(atomic.Int64)
 
@@ -268,6 +277,11 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	}
 }
 
+// IsNextSequencer checks if the current worker is the next sequencer.
+// It queries the staked sequencers from the active sequencers querier, and
+// compares the first sequencer with the node address of the current worker.
+// If an error occurs during the querying, it logs the error and returns false.
+// It returns true if the first sequencer is the current worker, false otherwise.
 func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.ActiveSequencers) bool {
 	sequencers, err := activeSequencersQuerier.Get()
 	if err != nil {
@@ -278,6 +292,12 @@ func (sw *SequencerWorker) IsNextSequencer(activeSequencersQuerier staking.Activ
 	return bytes.Equal(sequencers[0].Bytes(), sw.nodeAddr.Bytes())
 }
 
+// processStorageSnapshot processes a snapshot received from a peer.
+// It verifies if the snapshot is an immediate continuation to the current local blockchain.
+// If not, it skips the snapshot. Otherwise, it applies the snapshot.
+// After applying the snapshot, it refreshes the internal HEAD block in the blockchain.
+// If the block number or the block hash of the refreshed HEAD block doesn't match the snapshot,
+// it logs an error. It returns an error if one occurs during the process.
 func (sw *SequencerWorker) processStorageSnapshot(ss *snapshot.Snapshot) error {
 	sw.logger.Debug("received snapshot from peer", "block_number", ss.BlockNumber)
 
@@ -315,6 +335,10 @@ func (sw *SequencerWorker) processStorageSnapshot(ss *snapshot.Snapshot) error {
 	return nil
 }
 
+// ensureEnoughAvailBalance ensures that there is enough available balance.
+// It gets the balance of the avail account of the worker.
+// If the balance is less than 5 AVL, it deposits more tokens. Otherwise, it logs the healthy balance.
+// It returns an error if one occurs during the process.
 func (sw *SequencerWorker) ensureEnoughAvailBalance() error {
 	balance, err := avail.GetBalance(sw.availClient, sw.availAccount)
 	if err != nil {
@@ -337,7 +361,11 @@ func (sw *SequencerWorker) ensureEnoughAvailBalance() error {
 	return nil
 }
 
-// runWriteBlocksLoop produces blocks at an interval defined in the blockProductionIntervalSec config option
+// runWriteBlocksLoop runs a loop that produces blocks at an interval defined in the blockProductionIntervalSec config option.
+// The loop listens for a tick from a ticker and a signal from the close channel.
+// When it receives a tick and block production is enabled, and the chain is not disabled,
+// and the current worker is the next sequencer, it writes a block.
+// When it receives a signal from the close channel, it stops the loop.
 func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.ActiveSequencers, fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) {
 	t := time.NewTicker(time.Duration(sw.blockProductionIntervalSec) * time.Second)
 	defer t.Stop()
@@ -381,8 +409,10 @@ func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.Ac
 	}
 }
 
-// writeNewBLock generates a new block based on transactions from the pool,
-// and writes them to the blockchain
+// writeBlock writes a block.
+// It generates a new block based on transactions from the pool, and writes the block to the blockchain.
+// It also distributes the snapshot of the block to other sequencers over P2P.
+// It returns an error if one occurs during the process.
 func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key) error {
 	parent := sw.blockchain.Header()
 
@@ -528,11 +558,14 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	sw.logger.Debug("state snapshot sent over P2P")
+	sw.logger.Debug("State snapshot sent over P2P")
 
 	return nil
 }
 
+// writeTransactions writes transactions.
+// It gets transactions from the transaction pool, and writes the transactions to a state transition.
+// It returns a slice of successful transactions that have been written without errors.
 func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
@@ -568,6 +601,8 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 	return successful
 }
 
+// NewSequencer creates a new SequencerWorker.
+// It returns an error if one occurs during the creation.
 func NewSequencer(
 	logger hclog.Logger, b *blockchain.Blockchain, e *state.Executor, txp *txpool.TxPool,
 	snapshotter snapshot.Snapshotter, snapshotDistributor snapshot.Distributor,

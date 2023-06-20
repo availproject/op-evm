@@ -1,8 +1,7 @@
 # Deploy devnet on aws using terraform
 
 This directory has two subdirectories: `devnet` and `nets`.
-The `devnet` directory is a reusable [Terraform
-module](https://www.terraform.io/language/modules). The `nets` folder
+The `devnet` directory is a reusable [Terraform module](https://www.terraform.io/language/modules). The `nets` folder
 holds specific configurations for particular devnets. Said another way,
 the `nets` are instances of `devnet`. 
 

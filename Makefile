@@ -64,14 +64,9 @@ build-assm:
 tools-wallet:
 	cd tools/wallet && GOOS=${GOOS} GOARCH=${GOARCH} go build
 
-tools-account:
-	cd tools/accounts && GOOS=${GOOS} GOARCH=${GOARCH} go build
-
-build-tools: tools-account
-
 build: build-server
 
-build-all: build build-tools
+build-all: build
 
 start-bootstrap-sequencer: build
 	rm -rf data/avail-bootnode-1/blockchain/

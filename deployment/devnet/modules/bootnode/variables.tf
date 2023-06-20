@@ -58,11 +58,6 @@ variable "avail_settlement_artifact_url" {
   type        = string
 }
 
-variable "accounts_artifact_url" {
-  description = "The artifact url for `accounts` binary"
-  type        = string
-}
-
 variable "avail_addr" {
   description = "Avail address"
   type = string
@@ -78,7 +73,7 @@ variable "iam_profile_id" {
   type = string
 }
 
-variable "lb_dns_name" {
+variable  "lb_dns_name" {
   description = "Load balancer DNS name"
   type = string
 }

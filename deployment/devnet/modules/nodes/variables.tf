@@ -58,11 +58,6 @@ variable "avail_settlement_artifact_url" {
   type        = string
 }
 
-variable "accounts_artifact_url" {
-  description = "The artifact url for `accounts` binary"
-  type        = string
-}
-
 variable "avail_addr" {
   description = "Avail address"
   type = string

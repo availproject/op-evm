@@ -6,19 +6,27 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/umbracle/ethgo/abi"
 )
 
+// Threshold represents an interface for managing the staking threshold.
 type Threshold interface {
-	Current() (*big.Int, error)
+	// Set sets the new staking threshold value.
+	// It takes the new amount and a signing key as parameters.
+	// An error is returned if the operation fails.
 	Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error
+
+	// Current returns the current staking threshold value.
+	// It retrieves the value from the staking system and returns it as a *big.Int.
+	// An error is returned if the operation fails.
+	Current() (*big.Int, error)
 }
 
 type threshold struct {
@@ -27,6 +35,7 @@ type threshold struct {
 	logger     hclog.Logger
 }
 
+// NewStakingThresholdQuerier returns a new instance of the staking threshold querier.
 func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) Threshold {
 	return &threshold{
 		blockchain: blockchain,
@@ -35,6 +44,7 @@ func NewStakingThresholdQuerier(blockchain *blockchain.Blockchain, executor *sta
 	}
 }
 
+// Set sets the new staking threshold value.
 func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -64,6 +74,7 @@ func (st *threshold) Set(newAmount *big.Int, signKey *ecdsa.PrivateKey) error {
 	return nil
 }
 
+// Current returns the current staking threshold value.
 func (st *threshold) Current() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -91,6 +102,7 @@ func (st *threshold) Current() (*big.Int, error) {
 	return threshold, nil
 }
 
+// SetThresholdTx returns a transaction to set the staking threshold.
 func SetThresholdTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetStakingMinThreshold"]
 	if !ok {
@@ -118,6 +130,7 @@ func SetThresholdTx(from types.Address, amount *big.Int, gasLimit uint64) (*type
 	}, nil
 }
 
+// GetThresholdTx returns the current staking threshold from the transition state.
 func GetThresholdTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentStakingThreshold"]
 	if !ok {

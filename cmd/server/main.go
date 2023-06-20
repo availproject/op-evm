@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/hashicorp/go-hclog"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/spf13/cobra"
 
@@ -63,7 +64,7 @@ func Run(availAddr, path, accountPath, fraudListenAddr string, bootnode bool) {
 		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
 	}
 
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, hclog.Default())
 	if err != nil {
 		log.Fatalf("failed to create Avail client: %s\n", err)
 	}

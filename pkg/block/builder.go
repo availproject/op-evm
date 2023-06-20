@@ -6,34 +6,53 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
-var (
-	ErrInvalidHash    = errors.New("invalid hash")
-	ErrSignKeyMissing = errors.New("signing key missing")
-)
+// ErrInvalidHash represents an error indicating an invalid hash.
+var ErrInvalidHash = errors.New("invalid hash")
+
+// ErrSignKeyMissing represents an error indicating a missing signing key.
+var ErrSignKeyMissing = errors.New("signing key missing")
 
 // Builder provides a builder interface for constructing blocks.
 type Builder interface {
+	// SetBlockNumber sets the block number and returns the builder.
 	SetBlockNumber(number uint64) Builder
+
+	// SetCoinbaseAddress sets the coinbase address and returns the builder.
 	SetCoinbaseAddress(coinbaseAddr types.Address) Builder
+
+	// SetDifficulty sets the block difficulty and returns the builder.
 	SetDifficulty(d uint64) Builder
+
+	// SetExtraDataField sets an extra data field with a key-value pair and returns the builder.
 	SetExtraDataField(key string, value []byte) Builder
+
+	// SetGasLimit sets the gas limit and returns the builder.
 	SetGasLimit(limit uint64) Builder
+
+	// SetParentStateRoot sets the parent state root and returns the builder.
 	SetParentStateRoot(parentRoot types.Hash) Builder
+
+	// AddTransactions adds transactions to the block and returns the builder.
 	AddTransactions(txs ...*types.Transaction) Builder
 
+	// SignWith signs the block with the provided private key and returns the builder.
 	SignWith(signKey *ecdsa.PrivateKey) Builder
 
+	// Build constructs and returns the built block.
 	Build() (*types.Block, error)
+
+	// Write writes the built block to the specified source.
 	Write(src string) error
 }
 
+// blockBuilder is a builder for constructing blocks.
 type blockBuilder struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
@@ -54,17 +73,23 @@ type blockBuilder struct {
 	signKey      *ecdsa.PrivateKey
 }
 
+// BlockBuilderFactory is a factory interface for creating block builders.
 type BlockBuilderFactory interface {
-	FromParentHash(hash types.Hash) (Builder, error)
+	// FromParentHash creates a block builder using the parent block's hash.
+	FromParentHash(parent types.Hash) (Builder, error)
+
+	// FromBlockchainHead creates a block builder using the blockchain's head.
 	FromBlockchainHead() (Builder, error)
 }
 
+// blockBuilderFactory is a factory for creating block builders.
 type blockBuilderFactory struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
 }
 
+// NewBlockBuilderFactory creates a new block builder factory.
 func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) BlockBuilderFactory {
 	return &blockBuilderFactory{
 		blockchain: blockchain,
@@ -73,11 +98,15 @@ func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.E
 	}
 }
 
+// FromBlockchainHead creates a block builder using the blockchain's head.
+// It returns an error if the blockchain head is not available.
 func (bbf *blockBuilderFactory) FromBlockchainHead() (Builder, error) {
 	hdr := bbf.blockchain.Header()
 	return bbf.FromParentHeader(hdr)
 }
 
+// FromParentHash creates a block builder using the parent block's hash.
+// It returns an error if the parent block is not found in the blockchain.
 func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, error) {
 	hdr, found := bbf.blockchain.GetHeaderByHash(parent)
 	if !found {
@@ -87,6 +116,7 @@ func (bbf *blockBuilderFactory) FromParentHash(parent types.Hash) (Builder, erro
 	return bbf.FromParentHeader(hdr)
 }
 
+// FromParentHeader creates a block builder using the parent block's header.
 func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder, error) {
 	bb := &blockBuilder{
 		blockchain: bbf.blockchain,
@@ -106,46 +136,55 @@ func (bbf *blockBuilderFactory) FromParentHeader(parent *types.Header) (Builder,
 	return bb, nil
 }
 
+// SetBlockNumber sets the block number for the block builder.
 func (bb *blockBuilder) SetBlockNumber(n uint64) Builder {
 	bb.header.Number = n
 	return bb
 }
 
+// SetCoinbaseAddress sets the coinbase address for the block builder.
 func (bb *blockBuilder) SetCoinbaseAddress(coinbaseAddr types.Address) Builder {
 	bb.coinbase = &coinbaseAddr
 	return bb
 }
 
+// SetDifficulty sets the difficulty for the block builder.
 func (bb *blockBuilder) SetDifficulty(d uint64) Builder {
 	bb.difficulty = &d
 	return bb
 }
 
+// SetExtraDataField sets the value of an extra data field for the block builder.
 func (bb *blockBuilder) SetExtraDataField(key string, value []byte) Builder {
 	bb.extraData[key] = value
 	return bb
 }
 
+// SetGasLimit sets the gas limit for the block builder.
 func (bb *blockBuilder) SetGasLimit(limit uint64) Builder {
 	bb.gasLimit = &limit
 	return bb
 }
 
+// SetParentStateRoot sets the parent state root for the block builder.
 func (bb *blockBuilder) SetParentStateRoot(parentRoot types.Hash) Builder {
 	bb.parentRoot = &parentRoot
 	return bb
 }
 
+// AddTransactions adds one or more transactions to the block builder.
 func (bb *blockBuilder) AddTransactions(tx ...*types.Transaction) Builder {
 	bb.transactions = append(bb.transactions, tx...)
 	return bb
 }
 
+// SignWith signs the block with the given private key.
 func (bb *blockBuilder) SignWith(signKey *ecdsa.PrivateKey) Builder {
 	bb.signKey = signKey
 	return bb
 }
 
+// Write builds and writes the block to the blockchain.
 func (bb *blockBuilder) Write(src string) error {
 	blk, err := bb.Build()
 	if err != nil {
@@ -187,6 +226,7 @@ func (bb *blockBuilder) setDefaults() {
 	}
 }
 
+// Build creates a new block using the provided parameters.
 func (bb *blockBuilder) Build() (*types.Block, error) {
 	var err error
 

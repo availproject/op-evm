@@ -15,6 +15,8 @@ const (
 	AVL = 1_000_000_000_000_000_000
 )
 
+// NewAccount generates a new Avail account by creating a mnemonic phrase and deriving the key pair.
+// It returns the generated key pair and an error if there is an issue.
 func NewAccount() (signature.KeyringPair, error) {
 	entropy, err := bip39.NewEntropy(128)
 	if err != nil {
@@ -34,6 +36,8 @@ func NewAccount() (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
+// NewAccountFromMnemonic generates an Avail account using the provided mnemonic phrase.
+// It returns the generated key pair and an error if there is an issue.
 func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	keyPair, err := signature.KeyringPairFromSecret(mnemonic, 42)
 	if err != nil {
@@ -43,6 +47,8 @@ func NewAccountFromMnemonic(mnemonic string) (signature.KeyringPair, error) {
 	return keyPair, nil
 }
 
+// AccountFromFile reads an Avail account from a file containing the mnemonic phrase.
+// It returns the generated key pair and an error if there is an issue.
 func AccountFromFile(filePath string) (signature.KeyringPair, error) {
 	accountBytes, err := os.ReadFile(filePath)
 	if err != nil {
@@ -57,6 +63,8 @@ func AccountFromFile(filePath string) (signature.KeyringPair, error) {
 	return availAccount, nil
 }
 
+// AccountExistsFromMnemonic checks if an Avail account exists on the blockchain using the provided mnemonic phrase.
+// It takes a client and the file path of the mnemonic phrase, and returns a boolean indicating if the account exists and an error if there is an issue.
 func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
 	account, err := AccountFromFile(filePath)
 	if err != nil {
@@ -82,6 +90,9 @@ func AccountExistsFromMnemonic(client Client, filePath string) (bool, error) {
 	return api.RPC.State.GetStorageLatest(key, &accountInfo)
 }
 
+// DepositBalance deposits a specified amount of Avail tokens from the specified account to the specified recipient.
+// It takes a client, the account key pair, the amount to deposit, and the nonce increment.
+// It returns an error if there is an issue.
 func DepositBalance(client Client, account signature.KeyringPair, amount, nonceIncrement uint64) error {
 	api, err := instance(client)
 	if err != nil {
@@ -179,6 +190,8 @@ func DepositBalance(client Client, account signature.KeyringPair, amount, nonceI
 	}
 }
 
+// GetBalance retrieves the Avail token balance of the specified account.
+// It takes a client and the account key pair, and returns the account balance as a *big.Int and an error if there is an issue.
 func GetBalance(client Client, account signature.KeyringPair) (*big.Int, error) {
 	api, err := instance(client)
 	if err != nil {

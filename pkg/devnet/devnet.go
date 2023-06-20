@@ -276,7 +276,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath, fraudListenerAdd
 		AvailClient:       availClient,
 		AvailSender:       availSender,
 		AccountFilePath:   accountPath,
-		FraudListenerAddr: "",
+		FraudListenerAddr: fraudListenerAddr,
 		NodeType:          string(nodeType),
 		AvailAppID:        appID,
 	}

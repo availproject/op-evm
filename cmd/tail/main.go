@@ -122,8 +122,9 @@ func printSlashBlock(tw *ansiterm.TabWriter, blk *types.Block) {
 }
 
 func isFraudProofBlock(blk *types.Block) bool {
-	_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
-	return exists
+	_, fpExists := block.GetExtraDataFraudProofTarget(blk.Header)
+	_, bdrExists := block.GetExtraDataBeginDisputeResolutionTarget(blk.Header)
+	return fpExists && bdrExists
 }
 
 func isBeginDisputeResolutionBlock(blk *types.Block) bool {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	edge_types "github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/juju/ansiterm"
 	"github.com/spf13/cobra"
@@ -75,7 +75,7 @@ func abs(x int64) int64 {
 	}
 }
 
-func printBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printBlock(table *ansiterm.TabWriter, blk *types.Block) {
 	switch {
 	case blk.Number() == 0:
 		printGenesis(table, blk)
@@ -93,48 +93,48 @@ func printBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
 //       nbr hash parent nTxs description
 // BLK:  %d  %s   %s     %d   %s
 
-func printGenesis(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printGenesis(table *ansiterm.TabWriter, blk *types.Block) {
 	table.SetForeground(ansiterm.Magenta)
 	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "GENESIS")
 	table.Reset()
 }
 
-func printDefaultBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printDefaultBlock(table *ansiterm.TabWriter, blk *types.Block) {
 	table.SetForeground(ansiterm.Gray)
 	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "DEFAULT")
 	table.Reset()
 }
 
-func printFraudProofBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printFraudProofBlock(table *ansiterm.TabWriter, blk *types.Block) {
 	table.SetForeground(ansiterm.BrightYellow)
 	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "FRAUDPROOF")
 	table.Reset()
 }
 
-func printBeginDisputeResolutionBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printBeginDisputeResolutionBlock(table *ansiterm.TabWriter, blk *types.Block) {
 	// TODO: Check if block is forking or not; take it into account when selecting color.
 	table.SetForeground(ansiterm.BrightBlue)
 	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")
 	table.Reset()
 }
 
-func printSlashBlock(table *ansiterm.TabWriter, blk *edge_types.Block) {
+func printSlashBlock(table *ansiterm.TabWriter, blk *types.Block) {
 	table.SetForeground(ansiterm.BrightRed)
 	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "END DISPUTE RESOLUTION")
 	table.Reset()
 }
 
-func isFraudProofBlock(blk *edge_types.Block) bool {
+func isFraudProofBlock(blk *types.Block) bool {
 	_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
 	return exists
 }
 
-func isBeginDisputeResolutionBlock(blk *edge_types.Block) bool {
+func isBeginDisputeResolutionBlock(blk *types.Block) bool {
 	_, exists := block.GetExtraDataBeginDisputeResolutionTarget(blk.Header)
 	return exists
 }
 
-func isEndDisputeResolutionBlock(blk *edge_types.Block) bool {
+func isEndDisputeResolutionBlock(blk *types.Block) bool {
 	_, exists := block.GetExtraDataEndDisputeResolutionTarget(blk.Header)
 	return exists
 }

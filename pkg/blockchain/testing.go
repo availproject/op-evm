@@ -24,8 +24,11 @@ var (
 	errRecoveryAddressFailed = errors.New("failed to recover from field")
 )
 
-// NewTestHeadersWithSeed creates a new chain with a seed factor
+// NewTestHeadersWithSeed creates a new chain with a seed factor.
+// It takes the genesis header, the number of headers to generate, and a seed as parameters.
+// It returns a slice of generated headers.
 func NewTestHeadersWithSeed(genesis *types.Header, n int, seed uint64) []*types.Header {
+	// head returns a new header with the given number and seed.
 	head := func(i int64) *types.Header {
 		return &types.Header{
 			Number:       uint64(i),
@@ -56,17 +59,23 @@ func NewTestHeadersWithSeed(genesis *types.Header, n int, seed uint64) []*types.
 	return headers
 }
 
-// NewTestHeaders creates a chain of valid headers
+// NewTestHeaders creates a chain of valid headers.
+// It takes the number of headers to generate as a parameter.
+// It returns a slice of generated headers.
 func NewTestHeaders(n int) []*types.Header {
 	return NewTestHeadersWithSeed(nil, n, 0)
 }
 
-// AppendNewTestHeaders creates n new headers from an already existing chain
+// AppendNewTestHeaders creates n new headers from an already existing chain.
+// It takes the existing headers and the number of headers to generate as parameters.
+// It returns a slice of appended headers.
 func AppendNewTestHeaders(headers []*types.Header, n int) []*types.Header {
 	return AppendNewTestheadersWithSeed(headers, n, 0)
 }
 
-// AppendNewTestheadersWithSeed creates n new headers from an already existing chain
+// AppendNewTestheadersWithSeed creates n new headers from an already existing chain.
+// It takes the existing headers, the number of headers to generate, and a seed as parameters.
+// It returns a slice of appended headers.
 func AppendNewTestheadersWithSeed(headers []*types.Header, n int, seed uint64) []*types.Header {
 	// We do +1 because the first header will be the genesis we supplied
 	newHeaders := NewTestHeadersWithSeed(headers[len(headers)-1], n+1, seed)
@@ -74,9 +83,11 @@ func AppendNewTestheadersWithSeed(headers []*types.Header, n int, seed uint64) [
 	preHeaders := make([]*types.Header, len(headers))
 	copy(preHeaders, headers)
 
-	return append(preHeaders, newHeaders[1:]...) //nolint:makezero
+	return append(preHeaders, newHeaders[1:]...)
 }
 
+// HeadersToBlocks converts a slice of headers to a slice of blocks.
+// It takes the headers as a parameter and returns the corresponding blocks.
 func HeadersToBlocks(headers []*types.Header) []*types.Block {
 	blocks := make([]*types.Block, len(headers))
 	for indx, i := range headers {
@@ -86,7 +97,9 @@ func HeadersToBlocks(headers []*types.Header) []*types.Block {
 	return blocks
 }
 
-// NewTestBlockchain creates a new dummy blockchain for testing
+// NewTestBlockchain creates a new dummy blockchain for testing.
+// It takes a testing context and a slice of headers as parameters.
+// It returns a new Blockchain instance.
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	t.Helper()
 
@@ -125,6 +138,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	return b
 }
 
+// TestCallbackType defines the type of callback used in NewMockBlockchain.
 type TestCallbackType string
 
 const (
@@ -134,10 +148,10 @@ const (
 	StorageCallback  TestCallbackType = "StorageCallback"
 )
 
-// NewMockBlockchain constructs a new mock blockchain
-func NewMockBlockchain(
-	callbackMap map[TestCallbackType]interface{},
-) (*Blockchain, error) {
+// NewMockBlockchain constructs a new mock blockchain.
+// It takes a map of callback types to corresponding callback functions as a parameter.
+// It returns a new Blockchain instance or an error if construction fails.
+func NewMockBlockchain(callbackMap map[TestCallbackType]interface{}) (*Blockchain, error) {
 	var (
 		mockVerifier = &MockVerifier{}
 		executor     = &mockExecutor{}
@@ -225,6 +239,7 @@ type (
 	preStateCommitDelegate  func(*types.Header, *state.Transition) error
 )
 
+// MockVerifier is a mock implementation of the Verifier interface.
 type MockVerifier struct {
 	verifyHeaderFn    verifyHeaderDelegate
 	processHeadersFn  processHeadersDelegate
@@ -232,6 +247,8 @@ type MockVerifier struct {
 	preStateCommitFn  preStateCommitDelegate
 }
 
+// VerifyHeader verifies the given header.
+// It takes the header as a parameter and returns an error if verification fails.
 func (m *MockVerifier) VerifyHeader(header *types.Header) error {
 	if m.verifyHeaderFn != nil {
 		return m.verifyHeaderFn(header)
@@ -240,10 +257,14 @@ func (m *MockVerifier) VerifyHeader(header *types.Header) error {
 	return nil
 }
 
+// HookVerifyHeader sets the verifyHeader callback function.
+// It takes the callback function as a parameter.
 func (m *MockVerifier) HookVerifyHeader(fn verifyHeaderDelegate) {
 	m.verifyHeaderFn = fn
 }
 
+// ProcessHeaders processes the given headers.
+// It takes the headers as a parameter and returns an error if processing fails.
 func (m *MockVerifier) ProcessHeaders(headers []*types.Header) error {
 	if m.processHeadersFn != nil {
 		return m.processHeadersFn(headers)
@@ -252,10 +273,14 @@ func (m *MockVerifier) ProcessHeaders(headers []*types.Header) error {
 	return nil
 }
 
+// HookProcessHeaders sets the processHeaders callback function.
+// It takes the callback function as a parameter.
 func (m *MockVerifier) HookProcessHeaders(fn processHeadersDelegate) {
 	m.processHeadersFn = fn
 }
 
+// GetBlockCreator returns the address of the block creator based on the header.
+// It takes the header as a parameter and returns the block creator address and an error if retrieval fails.
 func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, error) {
 	if m.getBlockCreatorFn != nil {
 		return m.getBlockCreatorFn(header)
@@ -264,10 +289,14 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 	return types.BytesToAddress(header.Miner), nil
 }
 
+// HookGetBlockCreator sets the getBlockCreator callback function.
+// It takes the callback function as a parameter.
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
 	m.getBlockCreatorFn = fn
 }
 
+// PreCommitState is a hook called before finalizing the state transition on inserting a block.
+// It takes the header and transition as parameters and returns an error if pre-committing fails.
 func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition) error {
 	if m.preStateCommitFn != nil {
 		return m.preStateCommitFn(header, txn)
@@ -276,6 +305,8 @@ func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transitio
 	return nil
 }
 
+// HookPreCommitState sets the preStateCommit callback function.
+// It takes the callback function as a parameter.
 func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 	m.preStateCommitFn = fn
 }
@@ -284,15 +315,15 @@ func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 
 type processBlockDelegate func(types.Hash, *types.Block, types.Address) (*state.Transition, error)
 
+// mockExecutor is a mock implementation of the Executor interface.
 type mockExecutor struct {
 	processBlockFn processBlockDelegate
 }
 
-func (m *mockExecutor) ProcessBlock(
-	parentRoot types.Hash,
-	block *types.Block,
-	blockCreator types.Address,
-) (*state.Transition, error) {
+// ProcessBlock processes the given block.
+// It takes the parent root, block, and block creator as parameters.
+// It returns the state transition and an error if processing fails.
+func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error) {
 	if m.processBlockFn != nil {
 		return m.processBlockFn(parentRoot, block, blockCreator)
 	}
@@ -300,6 +331,8 @@ func (m *mockExecutor) ProcessBlock(
 	return nil, nil
 }
 
+// HookProcessBlock sets the processBlock callback function.
+// It takes the callback function as a parameter.
 func (m *mockExecutor) HookProcessBlock(fn processBlockDelegate) {
 	m.processBlockFn = fn
 }
@@ -316,6 +349,9 @@ func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
 	return types.ZeroAddress, errRecoveryAddressFailed
 }
 
+// TestBlockchain creates a new Blockchain for testing.
+// It takes a testing context and the genesis configuration as parameters.
+// It returns a new Blockchain instance.
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
 		genesis = &chain.Genesis{}
@@ -336,6 +372,9 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	return b
 }
 
+// newBlockChain creates a new Blockchain instance.
+// It takes the chain configuration and the executor as parameters.
+// It returns a new Blockchain instance or an error if creation fails.
 func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) {
 	if executor == nil {
 		executor = &mockExecutor{}

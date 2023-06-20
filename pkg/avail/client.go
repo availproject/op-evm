@@ -23,10 +23,11 @@ type Client interface {
 type client struct {
 	api         *gsrpc.SubstrateAPI
 	genesisHash types.Hash
+	logger      hclog.Logger
 }
 
 // NewClient constructs a new Avail Client for `url`.
-func NewClient(url string) (Client, error) {
+func NewClient(url string, logger hclog.Logger) (Client, error) {
 	api, err := gsrpc.NewSubstrateAPI(url)
 	if err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ func NewClient(url string) (Client, error) {
 	return &client{
 		api:         api,
 		genesisHash: genesisHash,
+		logger:      logger,
 	}, nil
 }
 
@@ -58,7 +60,7 @@ func (c *client) instance() *gsrpc.SubstrateAPI {
 }
 
 func (c *client) BlockStream(offset uint64) BlockStream {
-	return newBlockStream(c, hclog.Default(), offset)
+	return newBlockStream(c, c.logger, offset)
 }
 
 func (c *client) GenesisHash() types.Hash {

@@ -90,6 +90,8 @@ func DefaultConfig() *Config {
 }
 
 // ReadConfigFile reads the config file from the specified path, builds a Config object, and returns it.
+//
+// Supported file types: .json, .hcl, .yaml, .yml
 func ReadConfigFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

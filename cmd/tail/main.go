@@ -47,7 +47,7 @@ func Run(availAddr string, offset int64) {
 
 	availBlkStream := availClient.BlockStream(1)
 
-	table := ansiterm.NewTabWriter(os.Stdout, 4, 4, 1, ' ', 0)
+	tw := ansiterm.NewTabWriter(os.Stdout, 4, 4, 1, ' ', 0)
 
 	for blk := range availBlkStream.Chan() {
 		blks, err := block.FromAvail(blk, appID, callIdx, hclog.NewNullLogger())
@@ -60,10 +60,10 @@ func Run(availAddr string, offset int64) {
 				continue
 			}
 
-			printBlock(table, b)
+			printBlock(tw, b)
 		}
 
-		table.Flush()
+		tw.Flush()
 	}
 }
 
@@ -75,53 +75,50 @@ func abs(x int64) int64 {
 	}
 }
 
-func printBlock(table *ansiterm.TabWriter, blk *types.Block) {
+func printBlock(tw *ansiterm.TabWriter, blk *types.Block) {
 	switch {
 	case blk.Number() == 0:
-		printGenesis(table, blk)
+		printGenesis(tw, blk)
 	case isFraudProofBlock(blk):
-		printFraudProofBlock(table, blk)
+		printFraudProofBlock(tw, blk)
 	case isBeginDisputeResolutionBlock(blk):
-		printBeginDisputeResolutionBlock(table, blk)
+		printBeginDisputeResolutionBlock(tw, blk)
 	case isEndDisputeResolutionBlock(blk):
-		printSlashBlock(table, blk)
+		printSlashBlock(tw, blk)
 	default:
-		printDefaultBlock(table, blk)
+		printDefaultBlock(tw, blk)
 	}
 }
 
-//       nbr hash parent nTxs description
-// BLK:  %d  %s   %s     %d   %s
-
-func printGenesis(table *ansiterm.TabWriter, blk *types.Block) {
-	table.SetForeground(ansiterm.Magenta)
-	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "GENESIS")
-	table.Reset()
+func printGenesis(tw *ansiterm.TabWriter, blk *types.Block) {
+	tw.SetForeground(ansiterm.Magenta)
+	fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "GENESIS")
+	tw.Reset()
 }
 
-func printDefaultBlock(table *ansiterm.TabWriter, blk *types.Block) {
-	table.SetForeground(ansiterm.Gray)
-	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "DEFAULT")
-	table.Reset()
+func printDefaultBlock(tw *ansiterm.TabWriter, blk *types.Block) {
+	tw.SetForeground(ansiterm.Gray)
+	fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "NORMAL")
+	tw.Reset()
 }
 
-func printFraudProofBlock(table *ansiterm.TabWriter, blk *types.Block) {
-	table.SetForeground(ansiterm.BrightYellow)
-	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "FRAUDPROOF")
-	table.Reset()
+func printFraudProofBlock(tw *ansiterm.TabWriter, blk *types.Block) {
+	tw.SetForeground(ansiterm.BrightYellow)
+	fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "FRAUDPROOF")
+	tw.Reset()
 }
 
-func printBeginDisputeResolutionBlock(table *ansiterm.TabWriter, blk *types.Block) {
+func printBeginDisputeResolutionBlock(tw *ansiterm.TabWriter, blk *types.Block) {
 	// TODO: Check if block is forking or not; take it into account when selecting color.
-	table.SetForeground(ansiterm.BrightBlue)
-	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")
-	table.Reset()
+	tw.SetForeground(ansiterm.BrightBlue)
+	fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")
+	tw.Reset()
 }
 
-func printSlashBlock(table *ansiterm.TabWriter, blk *types.Block) {
-	table.SetForeground(ansiterm.BrightRed)
-	fmt.Fprintf(table, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "END DISPUTE RESOLUTION")
-	table.Reset()
+func printSlashBlock(tw *ansiterm.TabWriter, blk *types.Block) {
+	tw.SetForeground(ansiterm.BrightRed)
+	fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "END DISPUTE RESOLUTION")
+	tw.Reset()
 }
 
 func isFraudProofBlock(blk *types.Block) bool {

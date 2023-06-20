@@ -276,7 +276,7 @@ func startNode(logger hclog.Logger, cfg *edge_server.Config, availAddr, accountP
 		AvailClient:       availClient,
 		AvailSender:       availSender,
 		AccountFilePath:   accountPath,
-		FraudListenerAddr: "",
+		FraudListenerAddr: fraudListenerAddr,
 		NodeType:          string(nodeType),
 		AvailAppID:        appID,
 	}

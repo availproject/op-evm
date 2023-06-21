@@ -5,36 +5,35 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 var (
-	// ErrInvalidBlock is general error used when block structure is invalid
-	// or its field values are inconsistent.
+	// ErrInvalidBlock is a general error used when the block structure is invalid or its field values are inconsistent.
 	ErrInvalidBlock = errors.New("invalid block")
 
-	// ErrParentBlockNotFound is returned when the local blockchain doesn't
-	// contain block for the referenced parent hash.
+	// ErrParentBlockNotFound is returned when the local blockchain doesn't contain a block for the referenced parent hash.
 	ErrParentBlockNotFound = errors.New("parent block not found")
 
-	// FraudproofPrefix is byte sequence that prefixes the fraudproof objected
-	// malicious block hash in `ExtraData` of the fraudproof block header.
+	// FraudproofPrefix is a byte sequence that prefixes the fraudproof objected malicious block hash in the `ExtraData` of the fraudproof block header.
 	FraudproofPrefix = []byte("FRAUDPROOF_OF:")
 )
 
+// WatchTower is an interface that defines methods for applying, checking, and constructing fraudproof blocks.
 type WatchTower interface {
 	Apply(blk *types.Block) error
 	Check(blk *types.Block) error
 	ConstructFraudproof(blk *types.Block) (*types.Block, error)
 }
 
+// watchTower implements the WatchTower interface and provides the actual implementation for the methods.
 type watchTower struct {
 	blockchain          *blockchain.Blockchain
 	executor            *state.Executor
@@ -46,6 +45,7 @@ type watchTower struct {
 	signKey *ecdsa.PrivateKey
 }
 
+// New creates a new instance of WatchTower with the provided parameters.
 func New(blockchain *blockchain.Blockchain, executor *state.Executor, txp *txpool.TxPool, logger hclog.Logger, account types.Address, signKey *ecdsa.PrivateKey) WatchTower {
 	return &watchTower{
 		blockchain:          blockchain,
@@ -59,6 +59,8 @@ func New(blockchain *blockchain.Blockchain, executor *state.Executor, txp *txpoo
 	}
 }
 
+// Check checks the validity of a block by verifying it using the local blockchain.
+// It returns an error if the block is invalid.
 func (wt *watchTower) Check(blk *types.Block) error {
 	if blk == nil {
 		return fmt.Errorf("%w: block == nil", ErrInvalidBlock)
@@ -76,6 +78,7 @@ func (wt *watchTower) Check(blk *types.Block) error {
 	return nil
 }
 
+// Apply applies a block to the blockchain by writing it to the blockchain and resetting the transaction pool.
 func (wt *watchTower) Apply(blk *types.Block) error {
 	if err := wt.blockchain.WriteBlock(blk, block.SourceWatchTower); err != nil {
 		return fmt.Errorf("failed to write block: %w", err)
@@ -92,6 +95,8 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 	return nil
 }
 
+// ConstructFraudproof constructs a fraudproof block by challenging a malicious block and submitting the watchtower's stake.
+// It returns the constructed fraudproof block if successful.
 func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.Block, error) {
 	builder, err := wt.blockBuilderFactory.FromParentHash(maliciousBlock.ParentHash())
 	if err != nil {
@@ -148,8 +153,7 @@ func (wt *watchTower) ConstructFraudproof(maliciousBlock *types.Block) (*types.B
 	return blk, nil
 }
 
-// constructFraudproofTxs returns set of transactions that challenge the
-// malicious block and submit watchtower's stake.
+// constructFraudproofTxs returns a set of transactions that challenge the malicious block and submit the watchtower's stake.
 func constructFraudproofTxs(watchtowerAddress types.Address, maliciousBlock *types.Block) ([]*types.Transaction, error) {
 	bdrTx, err := constructBeginDisputeResolutionTx(watchtowerAddress, maliciousBlock)
 	if err != nil {
@@ -159,6 +163,7 @@ func constructFraudproofTxs(watchtowerAddress types.Address, maliciousBlock *typ
 	return []*types.Transaction{bdrTx}, nil
 }
 
+// constructBeginDisputeResolutionTx constructs a transaction for beginning the dispute resolution process.
 func constructBeginDisputeResolutionTx(watchtowerAddress types.Address, maliciousBlock *types.Block) (*types.Transaction, error) {
 	tx, err := staking.BeginDisputeResolutionTx(watchtowerAddress, types.BytesToAddress(maliciousBlock.Header.Miner), maliciousBlock.Header.GasLimit)
 	if err != nil {

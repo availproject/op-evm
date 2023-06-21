@@ -15,30 +15,43 @@ import (
 
 /****************************************************************************/
 
-// For now hand coded address of the sequencer
-const SequencerAddress = "0xF817d12e6933BbA48C14D4c992719B46aD9f5f61"
-
 var (
-	// ErrInvalidBlock is general error used when block structure is invalid
-	// or its field values are inconsistent.
-	ErrInvalidBlock         = errors.New("invalid block")
+	// ErrInvalidBlock is a general error used when the block structure is invalid or its field values are inconsistent.
+	ErrInvalidBlock = errors.New("invalid block")
+
+	// ErrInvalidBlockSequence is returned when the block sequence is invalid.
 	ErrInvalidBlockSequence = errors.New("invalid block sequence")
-	ErrInvalidParentHash    = errors.New("parent block hash is invalid")
-	ErrInvalidSha3Uncles    = errors.New("invalid block sha3 uncles root")
-	ErrInvalidTxRoot        = errors.New("invalid block transactions root")
-	ErrNoBlock              = errors.New("no block data passed in")
-	ErrParentHashMismatch   = errors.New("invalid parent block hash")
-	ErrParentNotFound       = errors.New("parent block not found")
+
+	// ErrInvalidParentHash is returned when the parent block hash is invalid.
+	ErrInvalidParentHash = errors.New("parent block hash is invalid")
+
+	// ErrInvalidSha3Uncles is returned when the block's sha3 uncles root is invalid.
+	ErrInvalidSha3Uncles = errors.New("invalid block sha3 uncles root")
+
+	// ErrInvalidTxRoot is returned when the block's transactions root is invalid.
+	ErrInvalidTxRoot = errors.New("invalid block transactions root")
+
+	// ErrNoBlock is returned when no block data is passed in.
+	ErrNoBlock = errors.New("no block data passed in")
+
+	// ErrParentHashMismatch is returned when the parent block hash doesn't match.
+	ErrParentHashMismatch = errors.New("invalid parent block hash")
+
+	// ErrParentNotFound is returned when the parent block is not found.
+	ErrParentNotFound = errors.New("parent block not found")
 )
 
+// Validator is an interface that defines methods for applying, checking, and processing fraudproof blocks.
 type Validator interface {
 	Apply(block *types.Block) error
 	Check(block *types.Block) error
 	ProcessFraudproof(block *types.Block) error
 }
 
+// ValidatorSet represents a set of validators.
 type ValidatorSet []types.Address
 
+// validator implements the Validator interface and provides the actual implementation for the methods.
 type validator struct {
 	blockchain *blockchain.Blockchain
 
@@ -46,6 +59,7 @@ type validator struct {
 	sequencerAddress types.Address
 }
 
+// New creates a new instance of Validator with the provided parameters.
 func New(blockchain *blockchain.Blockchain, sequencer types.Address, logger hclog.Logger) Validator {
 	return &validator{
 		blockchain: blockchain,
@@ -55,6 +69,7 @@ func New(blockchain *blockchain.Blockchain, sequencer types.Address, logger hclo
 	}
 }
 
+// Apply applies a block to the blockchain by writing it to the blockchain.
 func (v *validator) Apply(blk *types.Block) error {
 	if err := v.blockchain.WriteBlock(blk, block.SourceAvail); err != nil {
 		return fmt.Errorf("failed to write block while bulk syncing: %w", err)
@@ -66,6 +81,8 @@ func (v *validator) Apply(blk *types.Block) error {
 	return nil
 }
 
+// Check checks the validity of a block by verifying its header and performing block verification.
+// It returns an error if the block is invalid.
 func (v *validator) Check(blk *types.Block) error {
 	if blk.Header == nil {
 		return fmt.Errorf("%w: block.Header == nil", ErrInvalidBlock)
@@ -77,6 +94,8 @@ func (v *validator) Check(blk *types.Block) error {
 	return nil
 }
 
+// ProcessFraudproof processes a fraudproof block by extracting the fraudproof information from its header.
+// It performs the necessary actions based on the fraudproof information.
 func (v *validator) ProcessFraudproof(blk *types.Block) error {
 	extraDataKV, err := block.DecodeExtraDataFields(blk.Header.ExtraData)
 	if err != nil {
@@ -96,7 +115,8 @@ func (v *validator) ProcessFraudproof(blk *types.Block) error {
 	return nil
 }
 
-// verifyFinalizedBlock is modified version of `blockchain.Blockchain.VerifyFinalizedBlock()`
+// verifyFinalizedBlock verifies a finalized block by performing header verification and block verification.
+// It returns an error if the block is invalid.
 func (v *validator) verifyFinalizedBlock(blk *types.Block) error {
 	// Make sure the consensus layer verifies this block header
 	if err := v.verifyHeader(blk.Header); err != nil {
@@ -111,8 +131,8 @@ func (v *validator) verifyFinalizedBlock(blk *types.Block) error {
 	return nil
 }
 
-// verifyBlock does the base (common) block verification steps by
-// verifying the block body as well as the parent information
+// verifyBlock performs the base block verification steps by verifying the block's parent information and block body.
+// It returns an error if the block is invalid.
 func (v *validator) verifyBlock(blk *types.Block) error {
 	// Make sure the block is present
 	if blk == nil {
@@ -132,8 +152,8 @@ func (v *validator) verifyBlock(blk *types.Block) error {
 	return nil
 }
 
-// TODO - Check if miner address was the same (active sequencer at that point in the time)
-// through the avail block
+// verifyHeader verifies the header of a block by checking the sequencer address and the miner address.
+// It returns an error if the header is invalid.
 func (v *validator) verifyHeader(header *types.Header) error {
 	signer, err := block.AddressRecoverFromHeader(header)
 	if err != nil {
@@ -161,41 +181,12 @@ func (v *validator) verifyHeader(header *types.Header) error {
 		"sequencer", minerAddr,
 	)
 
-	/*
-		parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
-		if !ok {
-			return fmt.Errorf(
-				"unable to get parent header for block number %d",
-				header.Number,
-			)
-		}
-
-		snap, err := i.getSnapshot(parent.Number)
-		if err != nil {
-			return err
-		}
-
-		// verify all the header fields + seal
-		if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
-			return err
-		}
-
-		// verify the committed seals
-		if err := verifyCommittedFields(snap, header, i.quorumSize(header.Number)); err != nil {
-			return err
-		}
-
-		return nil
-	*/
 	return nil
 }
 
-// verifyBlockParent makes sure that the child block is in line
-// with the locally saved parent block. This means checking:
-// - The parent exists
-// - The hashes match up
-// - The block numbers match up
-// - The block gas limit / used matches up
+// verifyBlockParent verifies that the child block is in line with the locally saved parent block.
+// It checks the existence of the parent block, the matching of hashes, the matching of block numbers,
+// and the matching of gas limit/gas used.
 func (v *validator) verifyBlockParent(childBlk *types.Block) error {
 	// Grab the parent block
 	parentHash := childBlk.ParentHash()
@@ -251,7 +242,8 @@ func (v *validator) verifyBlockParent(childBlk *types.Block) error {
 	return nil
 }
 
-// verifyGasLimit is a helper function for validating a gas limit in a header
+// verifyGasLimit verifies the gas limit of a block header.
+// It returns an error if the gas limit is invalid.
 func (v *validator) verifyGasLimit(header *types.Header, parentHeader *types.Header) error {
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf(
@@ -286,10 +278,8 @@ func (v *validator) verifyGasLimit(header *types.Header, parentHeader *types.Hea
 	return nil
 }
 
-// verifyBlockBody verifies that the block body is valid. This means checking:
-// - The trie roots match up (state, transactions, receipts, uncles)
-// - The receipts match up
-// - The execution result matches up
+// verifyBlockBody verifies that the block body is valid by checking the uncle root and transactions root.
+// It returns an error if the block body is invalid.
 func (v *validator) verifyBlockBody(blk *types.Block) error {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(blk.Uncles); hash != blk.Header.Sha3Uncles {

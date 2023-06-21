@@ -51,7 +51,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 				continue
 			}
 
-			blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
+			blks, err := avail.BlockFromAvail(availBlk, d.availAppID, callIdx, d.logger)
 			if err != nil {
 				logger.Error("cannot extract Edge blocks from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 				continue

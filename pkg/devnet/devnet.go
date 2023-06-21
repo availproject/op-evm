@@ -1,3 +1,7 @@
+// Package devnet provides functionality to start and manage a development network (devnet) consisting of multiple nodes.
+// It offers utilities for configuring and starting nodes with various consensus mechanisms, such as BootstrapSequencer or Sequencer.
+// The package handles the creation of Avail accounts, configuration of node settings, and starting the associated servers.
+// It also provides functions to interact with the devnet, such as obtaining the JSON-RPC URL or stopping all the nodes.
 package devnet
 
 import (
@@ -31,10 +35,18 @@ import (
 	"github.com/maticnetwork/avail-settlement/server"
 )
 
+//go:embed genesis.json
+var genesisBytes []byte
+
+// ErrInvalidNodeType is returned when an invalid node type is provided.
+var ErrInvalidNodeType = errors.New("invalid node type")
+
+// Context represents the devnet context with information about the running nodes.
 type Context struct {
 	servers []instance
 }
 
+// instance represents an individual devnet node instance.
 type instance struct {
 	nodeType    consensus.MechanismType
 	accountPath string
@@ -43,10 +55,8 @@ type instance struct {
 	fraudAddr   string
 }
 
-//go:embed genesis.json
-var genesisBytes []byte
-
-// StartNodes starts configured nodes
+// StartNodes starts the devnet nodes based on the provided parameters.
+// It creates the Avail accounts, configures and starts the nodes, and returns the devnet context.
 func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPath string, nodeTypes ...consensus.MechanismType) (*Context, error) {
 	ctx := &Context{}
 	if err := createAvailAccounts(logger, availAddr, accountsPath, nodeTypes); err != nil {
@@ -139,7 +149,11 @@ func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPat
 	return ctx, nil
 }
 
-func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (_ *pkg_config.CustomServerConfig, err error) {
+// configureNode configures a devnet node based on the provided port allocator and node type.
+// It returns the customized server config for the node.
+func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (*pkg_config.CustomServerConfig, error) {
+	var err error
+
 	rawConfig := config.DefaultConfig()
 	rawConfig.DataDir, err = os.MkdirTemp("", "*")
 	if err != nil {
@@ -247,6 +261,8 @@ func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (_ *pkg_
 	return cfg, nil
 }
 
+// startNode starts a devnet node based on the provided config, Avail address, account path, fraud listener address, and node type.
+// It returns the started server instance.
 func startNode(logger hclog.Logger, cfg *edge_server.Config, availAddr, accountPath, fraudListenerAddr string, nodeType consensus.MechanismType) (*server.Server, error) {
 	var bootnode bool
 	if nodeType == consensus.BootstrapSequencer {
@@ -289,17 +305,21 @@ func startNode(logger hclog.Logger, cfg *edge_server.Config, availAddr, accountP
 	return serverInstance, nil
 }
 
+// PortAllocator provides functionality to allocate and release ports for node communication.
 type PortAllocator struct {
 	bindAddr  netip.Addr
 	listeners []net.Listener
 }
 
+// NewPortAllocator creates a new PortAllocator with the provided bind address.
 func NewPortAllocator(bindAddr netip.Addr) *PortAllocator {
 	return &PortAllocator{
 		bindAddr: bindAddr,
 	}
 }
 
+// Allocate allocates a new port from the PortAllocator's bind address.
+// It returns the allocated port as a netip.AddrPort.
 func (pa *PortAllocator) Allocate() (netip.AddrPort, error) {
 	addrPort := netip.AddrPortFrom(pa.bindAddr, 0)
 	lst, err := net.Listen("tcp", addrPort.String())
@@ -312,6 +332,8 @@ func (pa *PortAllocator) Allocate() (netip.AddrPort, error) {
 	return netip.ParseAddrPort(lst.Addr().String())
 }
 
+// Release releases all the ports allocated by the PortAllocator.
+// It returns the last error encountered during port release, if any.
 func (pa *PortAllocator) Release() error {
 	var lastErr error
 
@@ -326,9 +348,11 @@ func (pa *PortAllocator) Release() error {
 	return lastErr
 }
 
+// GethClient returns an Ethereum client for the specified node type.
+// It connects to the JSON-RPC URL of the first available node of the specified type.
 func (sc *Context) GethClient(nodeType consensus.MechanismType) (*ethclient.Client, error) {
 	if len(sc.servers) == 0 {
-		return nil, fmt.Errorf("no json-rpc URLs available")
+		return nil, fmt.Errorf("no JSON-RPC URLs available")
 	}
 	addr, err := sc.FirstRPCAddrForNodeType(nodeType)
 	if err != nil {
@@ -338,6 +362,7 @@ func (sc *Context) GethClient(nodeType consensus.MechanismType) (*ethclient.Clie
 	return ethclient.Dial(fmt.Sprintf("http://%s/", addr))
 }
 
+// Output prints the details of all the devnet nodes to the provided writer.
 func (sc *Context) Output(w io.Writer) {
 	tw := tabwriter.NewWriter(w, 0, 0, 0, ' ', tabwriter.Debug)
 	fmt.Fprintf(tw, "\t NODE TYPE \t JSONRPC URL \t FRAUD SERVER URL \t GRPC ADDR \t\n")
@@ -348,13 +373,14 @@ func (sc *Context) Output(w io.Writer) {
 	tw.Flush()
 }
 
+// StopAll stops all the running devnet nodes.
 func (sc *Context) StopAll() {
 	for _, srvInstance := range sc.servers {
 		srvInstance.server.Close()
 	}
 }
 
-// FirstRPCAddrForNodeType looks up and returns the url of the node for the node type
+// FirstRPCAddrForNodeType looks up and returns the JSON-RPC URL of the node for the specified node type.
 func (sc *Context) FirstRPCAddrForNodeType(nodeType consensus.MechanismType) (*net.TCPAddr, error) {
 	for i, srv := range sc.servers {
 		if srv.nodeType == nodeType {
@@ -365,6 +391,7 @@ func (sc *Context) FirstRPCAddrForNodeType(nodeType consensus.MechanismType) (*n
 	return nil, fmt.Errorf("no %s node present in the servers", nodeType)
 }
 
+// createAvailAccounts creates the Avail accounts for the devnet nodes.
 func createAvailAccounts(logger hclog.Logger, availAddr, accountPath string, nodeTypes []consensus.MechanismType) error {
 	nnh := newNodeNameHelper(accountPath)
 
@@ -410,6 +437,7 @@ func createAvailAccounts(logger hclog.Logger, availAddr, accountPath string, nod
 	return nil
 }
 
+// createAvailAccount creates a new Avail account and deposits initial balance.
 func createAvailAccount(logger hclog.Logger, availClient avail.Client, accountPath string, nonceIncrement uint64) error {
 	// If file exists, make sure that we return the file and not go through account creation process.
 	// In rare cases, funds may be depleted but in that case we can erase files and run it again.
@@ -454,11 +482,13 @@ func createAvailAccount(logger hclog.Logger, availClient avail.Client, accountPa
 	return nil
 }
 
+// nodeNameHelper provides functionality to generate unique node names and account paths.
 type nodeNameHelper struct {
 	accountsPath string
 	nodeCounter  map[consensus.MechanismType]int
 }
 
+// newNodeNameHelper creates a new nodeNameHelper with the specified accounts path.
 func newNodeNameHelper(accountsPath string) nodeNameHelper {
 	return nodeNameHelper{
 		accountsPath: accountsPath,
@@ -466,11 +496,13 @@ func newNodeNameHelper(accountsPath string) nodeNameHelper {
 	}
 }
 
+// next generates the next node name for the specified node type.
 func (h *nodeNameHelper) next(nodeType consensus.MechanismType) string {
 	h.nodeCounter[nodeType]++
 	return fmt.Sprintf("%s-%d", nodeType, h.nodeCounter[nodeType])
 }
 
+// nextAccountPath generates the next account path for the specified node type.
 func (h *nodeNameHelper) nextAccountPath(nodeType consensus.MechanismType) string {
 	return path.Join(h.accountsPath, h.next(nodeType))
 }

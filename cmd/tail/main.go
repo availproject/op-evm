@@ -128,8 +128,9 @@ func printBeginDisputeResolutionBlock(tw *ansiterm.TabWriter, jsonrpcClnt *jsonr
 
 	if isFork {
 		tw.SetForeground(ansiterm.BrightGreen)
-		fmt.Fprintf(tw, "%d -> %d\t%s -> %s\t%s\n", parent.Number, blk.Number(), blk.ParentHash().String(), blk.Hash().String(), "FORK")
 		fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")
+		tw.Flush()
+		fmt.Fprintf(tw, "\t%s\t%d -> %d\t%s -> %s\n", "↳ FORK:", parent.Number, blk.Number(), blk.ParentHash().String(), blk.Hash().String())
 	} else {
 		tw.SetForeground(ansiterm.BrightBlue)
 		fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\n", blk.Number(), blk.Hash().String(), blk.ParentHash().String(), len(blk.Transactions), "BEGIN DISPUTE RESOLUTION")

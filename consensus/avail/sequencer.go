@@ -55,7 +55,7 @@ type SequencerWorker struct {
 	stakingNode                staking.Node
 	availSender                avail.Sender
 	fraudServer                *FraudServer
-	closeCh                    chan struct{}
+	closeCh                    <-chan struct{}
 	blockTime                  time.Duration // Minimum block generation time in seconds
 	blockProductionIntervalSec uint64
 	blockProductionEnabled     *atomic.Bool
@@ -633,6 +633,7 @@ func NewSequencer(
 		blockProductionIntervalSec: blockProductionIntervalSec,
 		blockProductionEnabled:     new(atomic.Bool),
 		currentNodeSyncIndex:       currentNodeSyncIndex,
+		closeCh:                    closeCh,
 	}
 
 	if len(fraudListenerAddr) > 0 {

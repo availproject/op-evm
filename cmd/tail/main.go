@@ -76,14 +76,6 @@ func Run(availAddr, jsonrpcAddr string, offset int64) {
 	}
 }
 
-func abs(x int64) int64 {
-	if x < 0 {
-		return -x
-	} else {
-		return x
-	}
-}
-
 func printBlock(tw *ansiterm.TabWriter, jsonrpcClnt *jsonrpc.Client, blk *types.Block) {
 	switch {
 	case blk.Number() == 0:

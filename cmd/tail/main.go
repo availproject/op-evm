@@ -59,8 +59,8 @@ func Run(availAddr, jsonrpcAddr string, offset int64) {
 	tw := ansiterm.NewTabWriter(os.Stdout, 4, 4, 1, ' ', 0)
 
 	for blk := range availBlkStream.Chan() {
-		blks, err := block.FromAvail(blk, appID, callIdx, hclog.NewNullLogger())
-		if err != nil && !errors.Is(err, block.ErrNoExtrinsicFound) {
+		blks, err := avail.BlockFromAvail(blk, appID, callIdx, hclog.NewNullLogger())
+		if err != nil && !errors.Is(err, avail.ErrNoExtrinsicFound) {
 			panic(err)
 		}
 

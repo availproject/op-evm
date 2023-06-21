@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
 // ErrInvalidHash represents an error indicating an invalid hash.
@@ -52,9 +51,16 @@ type Builder interface {
 	Write(src string) error
 }
 
+type blockchain interface {
+	CalculateGasLimit(number uint64) (uint64, error)
+	GetHeaderByHash(types.Hash) (*types.Header, bool)
+	Header() *types.Header
+	WriteBlock(block *types.Block, source string) error
+}
+
 // blockBuilder is a builder for constructing blocks.
 type blockBuilder struct {
-	blockchain *blockchain.Blockchain
+	blockchain blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
 
@@ -84,13 +90,13 @@ type BlockBuilderFactory interface {
 
 // blockBuilderFactory is a factory for creating block builders.
 type blockBuilderFactory struct {
-	blockchain *blockchain.Blockchain
+	blockchain blockchain
 	executor   *state.Executor
 	logger     hclog.Logger
 }
 
 // NewBlockBuilderFactory creates a new block builder factory.
-func NewBlockBuilderFactory(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) BlockBuilderFactory {
+func NewBlockBuilderFactory(blockchain blockchain, executor *state.Executor, logger hclog.Logger) BlockBuilderFactory {
 	return &blockBuilderFactory{
 		blockchain: blockchain,
 		executor:   executor,

@@ -4,7 +4,6 @@ import (
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
 // getNextAvailBlockNumber determines the next Avail block number to be processed.
@@ -87,9 +86,9 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 			return 0, nil
 		}
 
-		edgeBlks, err := block.FromAvail(blk, d.availAppID, callIdx, d.logger)
+		edgeBlks, err := avail.BlockFromAvail(blk, d.availAppID, callIdx, d.logger)
 		if len(edgeBlks) == 0 && err != nil {
-			if err != block.ErrNoExtrinsicFound {
+			if err != avail.ErrNoExtrinsicFound {
 				d.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
 				continue
 			}
@@ -136,8 +135,8 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 // case of any error during the process, it returns the error.
 func (d *Avail) syncFunc(targetEdgeBlock int64, callIdx avail_types.CallIndex) avail.SearchFunc {
 	return func(availBlk *avail_types.SignedBlock) (int64, bool, error) {
-		blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
-		if err != nil && err != block.ErrNoExtrinsicFound {
+		blks, err := avail.BlockFromAvail(availBlk, d.availAppID, callIdx, d.logger)
+		if err != nil && err != avail.ErrNoExtrinsicFound {
 			return -1, false, err
 		}
 

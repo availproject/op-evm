@@ -26,9 +26,6 @@ build-staking-contract:
 build-server:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -o avail-settlement main.go
 
-build-assm:
-	cd assm && GOOS=${GOOS} GOARCH=${GOARCH} go build
-
 build: build-server
 
 start-bootstrap-sequencer: build

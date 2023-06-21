@@ -26,11 +26,6 @@ jobs:
       - name: Add avail-settlement binary to zip archive
         run: zip -j avail-settlement-linux-arm64.zip avail-settlement
 
-      - name: Build assm go binary
-        run: make build-assm GOOS=linux GOARCH=amd64
-      - name: Add assm binary to zip archive
-        run: zip -j assm-linux-amd64.zip assm/assm
-
       - name: Publish release for tags
         uses: svenstaro/upload-release-action@v2
         with:

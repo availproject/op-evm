@@ -12,13 +12,3 @@ variable "github_token_ssm_parameter_path" {
   description = "AWS System manager parameter path accessing the github token"
   type        = string
 }
-
-variable "s3_bucket_genesis_name" {
-  description = "Genesis bucket name"
-  type = string
-}
-
-variable "genesis_init_lambda_name" {
-  description = "The name of the lambda function to initialize genesis.json"
-  type = string
-}

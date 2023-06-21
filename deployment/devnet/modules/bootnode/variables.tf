@@ -28,11 +28,6 @@ variable "p2p_port" {
   type        = number
 }
 
-variable "s3_bucket_genesis_name" {
-  description = "Genesis bucket name"
-  type = string
-}
-
 variable "nodes_secrets_ssm_parameter_path" {
   description = "AWS System manager parameter path for creating the path to store the secrets"
   type        = string
@@ -63,11 +58,6 @@ variable "avail_addr" {
   type = string
 }
 
-variable "genesis_init_lambda_name" {
-  description = "The name of the lambda function to initialize genesis.json"
-  type = string
-}
-
 variable "iam_profile_id" {
   description = "IAM profile id"
   type = string
@@ -85,5 +75,15 @@ variable "subnets_by_zone" {
 
 variable "key_name" {
   description = "AWS ssh public key name"
+  type = string
+}
+
+variable "name" {
+  description = "The name of the bootstrap sequencer node"
+  type        = string
+}
+
+variable "genesis_json" {
+  description = "genesis.json configuration file contents"
   type = string
 }

@@ -1,37 +1,40 @@
-# Deploy devnet on aws using terraform
+# Deploy Development Network (DevNet) on AWS using Terraform
 
-This directory has two subdirectories: `devnet` and `nets`.
-The `devnet` directory is a reusable [Terraform module](https://www.terraform.io/language/modules). The `nets` folder
-holds specific configurations for particular devnets. Said another way,
-the `nets` are instances of `devnet`. 
+## Introduction
+This documentation provides instructions on how to deploy a Development Network (DevNet) on AWS using Terraform.
+The `devnet` directory consists of reusable [Terraform modules](https://www.terraform.io/language/modules).
+The `nets` directory holds specific configurations for individual networks.
+Said another way, the `nets` are instances of `devnet`.
 
 ## Prerequisites
-- Install aws cli tool and run `aws configure`, copy your Access Key ID and Secret Access Key from the aws console.
-- Install session manager plugin for AWS CLI
-- Install terraform and run `terraform login`.
+Before proceeding with the deployment, ensure the following prerequisites are met:
+- Install the AWS CLI tool and run `aws configure` to set up your Access Key ID and Secret Access Key obtained from the AWS console.
+- Install the Session Manager plugin for AWS CLI.
+- Install Terraform.
 
-## Provision avail network
-- Provision your avail network
-- If your network is publicly available pass the `avail_hostname` and `avail_port` variables to the terraform script bellow using `-var` or `-var-file` arguments. 
-- If your avail network is private and is in the same region and account as this deployment use `avail_peer` variable to configure the peering (normally `route53_zone_private_id`, `route_table_private_ids` and `vpc_id` will be outputted from the avail deployment terraform script)
+## Provisioning the Avail Network
+To provision the Avail Network, follow these steps:
+- Deploy your avail network.
+- If your Avail Network is publicly available, pass the `avail_hostname` and `avail_port` variables to the Terraform script bellow using the `-var` or `-var-file` arguments.
+- If your Avail Network is private and located in the same region and AWS account as this deployment, use the `avail_peer` variable to configure the peering. Typically, the `route53_zone_private_id`, `route_table_private_ids` and `vpc_id` will be outputted from the Avail deployment Terraform script.
 
-## Provision the AWS resources using terraform and deploy the nodes
+## Provisioning AWS Resources and Deploying the Nodes
+To provision the necessary AWS resources and deploy the nodes, perform the following steps:
 
-Terraform requires `github_token` variable to get the release from the private repo.
+1. The Terraform script requires the `github_token` variable to access the release from the private repository.
+2. Open a terminal and navigate to the `./deployment/devnet` directory.
+3. Initialize Terraform by running `terraform init`.
+4. Apply the Terraform configuration using the command `terraform apply -var github_token=$G_TOKEN`.
+  - You can customize the deployment options by specifying Terraform variables in the format `terraform apply -var <key>=<value>` or `terraform apply -var-file="<tfvars-filename>"`.
+  - For available variables to customize the deployment, refer to the `devnet/variables.tf` file.
 
-Run commands:
-- `cd ./deployment/devnet`
-- `terraform init`
-- `terraform apply -var github_token=$G_TOKEN` 
+## Deploying Your Own Network
+To deploy your own DevNet for testing purposes, follow these steps:
+1. If you prefer not to push your configuration to the git repository, you have the option to create a Terraform module within the `nets/private` folder. This folder is specifically ignored by git.
+2. If you wish to persist your configuration to git, create a Terraform module under the `nets/<devnet-name>` folder.
+3. Inside the `nets/private` folder, create a file named `main.tf`.
+4. Use the provided template below to fill in the required details:
 
-You can configure the deployment options using terraform variables like so: `terraform apply -var <key>=<value>` or `terraform apply -var-file="<filename>.tfvars"`
-Check out [variables.tf](./devnet/variables.tf) to see what variables you can provide in order to customize the deployment.
-
-## Deploy your own net
-
-If you want to deploy your own devnet for testing you can create a terraform module in `nets/private` this folder is ignored by git.
-
-Create a file called `main.tf` and use the template below to fill in with your details:
 ```terraform
 terraform {
   backend "s3" {
@@ -47,7 +50,7 @@ module "devnet" {
   region          = "<region>"
   base_ami        = "<ami>" # Latest ubuntu ami 
   avail_hostname  = "internal-rpc.testnetsl.avail.private"
-  release         = "v0.0.0-test3" # Use latest release
+  release         = "v0.0.0-test5" # Use latest release
   avail_peer      = {
     route53_zone_private_id = "<route53-zone>"
     route_table_private_ids = [ 
@@ -61,38 +64,40 @@ module "devnet" {
 }
 ```
 
-## Debugging instances
+## Debugging Instances
+To debug instances in the DevNet, follow these steps:
 
-Install session manager plugin for AWS CLI (On macOS)
-___
-- `curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"`
-- `unzip sessionmanager-bundle.zip`
-- `sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin`
+### Installing the Session Manager Plugin for AWS CLI (macOS)
 
-Get the private key from terraform
-___
-- `terraform output --raw ssh_pk > key.pem`
-- `chmod 400 key.pem`
+Run the following commands in the terminal:
+```shell
+curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"
+unzip sessionmanager-bundle.zip
+sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
+```
 
-Configure aws proxy options and connect using ssh
-___
-- `vi ~/.ssh/config`
-- Add the following lines: 
+### Getting the Private Key from Terraform:
+1. Retrieve the private key from Terraform by running the command `terraform output --raw ssh_pk > key.pem`.
+2. Set the correct permissions for the private key file using `chmod 600 key.pem`.
+
+### Configuring AWS Proxy Options and Connecting via SSH
+1. Open the `~/.ssh/config` file using a text editor.
+2. Add the following lines to the file:
   ```
   host i-* mi-*
   ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
   ```
-- `chmod 600 ~/.ssh/config`
-- `ssh -i key.pem ubuntu@[INSTANCE-ID]`
+3. Save the changes and set the correct permissions for the `~/.ssh/config` file using `chmod 600 ~/.ssh/config`.
+4. Connect to the instance using SSH with the following command (replace `[INSTANCE-ID]` with the actual instance ID):
 
-### Forward avail explorer on your localhost using ssh proxy
-- Run `ssh -N -L 8888:internal-rpc.testnet04.avail.private:80 -i key.pem ubuntu@<instance-id>`
-- Run `ssh -N -L 9944:internal-rpc.testnet04.avail.private:8546 -i key.pem ubuntu@<instance-id>` in a new console
-- Open `localhost:8888` in your browser
-- In the explorer press on **Local Node** (with address: `127.0.0.1:9944`) option in the networks settings menu, under development and press switch.
-- Explore the blocks!
+### For more information, refer to the following resources:
+- [AWS Session Manager Plugin Installation Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
+- [AWS Session Manager Troubleshooting Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-troubleshooting.html#plugin-not-found)
+- [AWS Session Manager Getting Started Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-getting-started.html)
 
-For more info check:
-- https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
-- https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-troubleshooting.html#plugin-not-found
-- https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-getting-started.html
+## Forwarding Avail Explorer to Localhost using SSH Proxy
+1. Open a new console and run the command `ssh -N -L 8888:internal-rpc.testnet04.avail.private:80 -i key.pem ubuntu@<instance-id>`.
+2. In another console, run the command `ssh -N -L 9944:internal-rpc.testnet04.avail.private:8546 -i key.pem ubuntu@<instance-id>`.
+3. Open your browser and access `localhost:8888`.
+4. In the Avail Explorer, select the **Local Node** option (with address: `127.0.0.1:9944`) in the networks settings menu, located under development, and press **Switch**.
+5. Explore the blocks in the Avail Explorer!

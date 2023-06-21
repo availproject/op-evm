@@ -356,9 +356,9 @@ func (sc *Context) StopAll() {
 
 // FirstRPCAddrForNodeType looks up and returns the url of the node for the node type
 func (sc *Context) FirstRPCAddrForNodeType(nodeType consensus.MechanismType) (*net.TCPAddr, error) {
-	for _, srv := range sc.servers {
+	for i, srv := range sc.servers {
 		if srv.nodeType == nodeType {
-			return sc.servers[0].config.JSONRPC.JSONRPCAddr, nil
+			return sc.servers[i].config.JSONRPC.JSONRPCAddr, nil
 		}
 	}
 

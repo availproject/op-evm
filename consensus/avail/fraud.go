@@ -360,23 +360,33 @@ func (f *Fraud) produceBeginDisputeResolutionBlock(blockBuilderFactory block.Blo
 	var bb block.Builder
 	var err error
 
+	chainTD, found := f.blockchain.GetChainTD()
+	if !found {
+		return nil, fmt.Errorf("couldn't get chain TD: %s", err)
+	}
+
 	// We are going to fork the chain but only if the malicious participant is sequencer.
 	// Otherwise we are making sure we slash the watchtower and continue normal operation...
 	switch nodeType {
 	case Sequencer:
 		bb, err = blockBuilderFactory.FromParentHash(maliciousHeader.ParentHash)
+		if err != nil {
+			return nil, err
+		}
+
+		// Force sequential block number.
+		bb.SetBlockNumber(f.blockchain.Header().Number + 1)
+
+		// Increase difficulty by one to cause reorg, since we are forking the chain.
+		bb.SetDifficulty(chainTD.Uint64() + 1)
 	case WatchTower:
 		bb, err = blockBuilderFactory.FromBlockchainHead()
+		if err != nil {
+			return nil, err
+		}
 	default:
 		panic("unsupported node type: " + nodeType)
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Force sequential block number, to ensure it's correct in case of fork as well.
-	bb.SetBlockNumber(f.blockchain.Header().Number + 1)
 
 	bb.SetCoinbaseAddress(f.nodeAddr)
 	bb.SignWith(f.nodeSignKey)
@@ -450,11 +460,7 @@ func (f *Fraud) produceSlashBlock(blockBuilderFactory block.BlockBuilderFactory,
 		return nil, err
 	}
 
-	hdr, exists := f.blockchain.GetHeaderByHash(disputeBlk.Hash())
-	if !exists {
-		return nil, fmt.Errorf("cannot find block with disputed header %q", disputeBlk.Hash().String())
-	}
-
+	hdr := f.blockchain.Header()
 	transition, err := f.executor.BeginTxn(hdr.StateRoot, hdr, f.nodeAddr)
 	if err != nil {
 		f.logger.Error("failed to begin the transition for the end dispute resolution", "error", err)

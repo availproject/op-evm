@@ -49,7 +49,7 @@
                 "mechanisms": [
                     "bootstrap-sequencer",
                     "sequencer",
-                    "validator"
+                    "watchtower"
                 ],
                 "blockTime": 1686644797
             }

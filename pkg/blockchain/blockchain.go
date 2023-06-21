@@ -2,6 +2,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,6 +16,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
+	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
+	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/umbracle/ethgo/abi"
 
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
@@ -620,8 +624,10 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 
 	// Validate the chain
 	for i := 1; i < len(headers); i++ {
+		_, isFork := block.GetExtraDataBeginDisputeResolutionTarget(headers[i])
+
 		// Check the sequence
-		if headers[i].Number-1 != headers[i-1].Number {
+		if !isFork && headers[i].Number-1 != headers[i-1].Number {
 			return fmt.Errorf(
 				"number sequence not correct at %d, %d and %d",
 				i,
@@ -733,13 +739,25 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 
 	// Make sure the block numbers are correct
 	if childBlock.Number()-1 != parent.Number {
-		b.logger.Error(fmt.Sprintf(
-			"number sequence not correct at %d and %d",
-			childBlock.Number(),
-			parent.Number,
-		))
+		// Check if one of the transactions is `BeginDisputeResolutionTx`, which can
+		// perform a fork in case the corresponding sequencer made fraud.
+		isDisputeResolutionFork := false
+		for _, tx := range childBlock.Transactions {
+			if !isDisputeResolutionFork {
+				isDisputeResolutionFork = isBeginDisputeResolutionTx(tx)
+			} else {
+				break
+			}
+		}
 
-		return ErrInvalidBlockSequence
+		if !isDisputeResolutionFork {
+			b.logger.Error(fmt.Sprintf(
+				"number sequence not correct at %d and %d",
+				childBlock.Number(),
+				parent.Number,
+			))
+			return ErrInvalidBlockSequence
+		}
 	}
 
 	// Make sure the gas limit is within correct bounds
@@ -748,6 +766,38 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 	}
 
 	return nil
+}
+
+func isBeginDisputeResolutionTx(tx *types.Transaction) bool {
+	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
+	if !ok {
+		panic("BeginDisputeResolution method doesn't exist in Staking contract ABI. Contract is broken.")
+	}
+
+	fnSelector := method.ID()
+
+	if len(fnSelector) >= len(tx.Input) {
+		return false
+	}
+
+	splitIdx := len(fnSelector)
+	s := tx.Input[:splitIdx]
+	if !bytes.Equal(s, fnSelector) {
+		return false
+	}
+
+	decodedInput, err := method.Inputs.Decode(tx.Input[splitIdx:])
+	if err != nil {
+		return false
+	}
+
+	m, ok := decodedInput.(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	_, exists := m["sequencerAddr"]
+	return exists
 }
 
 // verifyBlockBody verifies that the block body is valid. This means checking:

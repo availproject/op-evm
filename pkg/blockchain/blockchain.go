@@ -768,6 +768,9 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 	return nil
 }
 
+// isBeginDisputeResolutionTx checks if the given transaction represents a BeginDisputeResolution
+// function call in the Staking contract.
+// It returns true if the transaction is a BeginDisputeResolution call and false otherwise.
 func isBeginDisputeResolutionTx(tx *types.Transaction) bool {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
 	if !ok {

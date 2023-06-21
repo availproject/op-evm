@@ -8,26 +8,47 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
+// DisputeResolution defines the methods required for interacting
+// with the dispute resolution smart contract. It provides functionality
+// for querying and manipulating the contract's state.
 type DisputeResolution interface {
+	// Get retrieves the addresses of nodes of the given node type
+	// that are currently under dispute.
 	Get(nodeType NodeType) ([]types.Address, error)
+
+	// Contains checks if a given address is in dispute for a specific node type.
 	Contains(addr types.Address, nodeType NodeType) (bool, error)
-	GetSequencerAddr(addr types.Address) (types.Address, error)
-	GetWatchtowerAddr(addr types.Address) (types.Address, error)
+
+	// GetSequencerAddr gets the address of a sequencer that's under dispute
+	// for a given watchtower address.
+	GetSequencerAddr(watchtowerAddr types.Address) (types.Address, error)
+
+	// GetWatchtowerAddr gets the address of a watchtower that's under dispute
+	// for a given sequencer address.
+	GetWatchtowerAddr(sequencerAddr types.Address) (types.Address, error)
+
+	// Begin initiates a dispute resolution process for a node with a specific address.
+	// The process is signed with the provided private key.
 	Begin(probationAddr types.Address, signKey *ecdsa.PrivateKey) error
+
+	// End finalizes a dispute resolution process for a node with a specific address.
+	// The process is signed with the provided private key.
 	End(probationAddr types.Address, signKey *ecdsa.PrivateKey) error
 }
 
+// disputeResolution implements the DisputeResolution interface.
+// It contains the components required to interact with the smart contract.
 type disputeResolution struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
@@ -35,6 +56,23 @@ type disputeResolution struct {
 	sender     Sender
 }
 
+// NewDisputeResolution creates a new instance of disputeResolution with the
+// provided blockchain, executor, sender, and logger.
+//
+// Parameters:
+//
+//	blockchain - The blockchain instance.
+//	executor - The executor instance.
+//	sender - The sender instance.
+//	logger - The logger instance.
+//
+// Returns:
+//
+//	A new instance of disputeResolution.
+//
+// Example:
+//
+//	dr := NewDisputeResolution(blockchain, executor, sender, logger)
 func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Executor, sender Sender, logger hclog.Logger) DisputeResolution {
 	return &disputeResolution{
 		blockchain: blockchain,
@@ -44,6 +82,25 @@ func NewDisputeResolution(blockchain *blockchain.Blockchain, executor *state.Exe
 	}
 }
 
+// Get is a method on the disputeResolution structure that retrieves the
+// addresses of nodes of the given node type that are currently under dispute.
+// The nodes types are sequencer and watchtower.
+//
+// Parameters:
+//
+//	nodeType - The type of the node (sequencer or watchtower).
+//
+// Returns:
+//
+//	An array of addresses that are under dispute.
+//	An error if there was an issue retrieving the addresses.
+//
+// Example:
+//
+//	addresses, err := dr.Get(Sequencer)
+//	if err != nil {
+//	  log.Fatalf("failed to retrieve addresses: %s", err)
+//	}
 func (dr *disputeResolution) Get(nodeType NodeType) ([]types.Address, error) {
 	parent := dr.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -74,20 +131,37 @@ func (dr *disputeResolution) Get(nodeType NodeType) ([]types.Address, error) {
 		if err != nil {
 			return nil, err
 		}
-		dr.logger.Info("GOT DISPUTED SEQUENCERS", "RETURN", probationAddrs)
 		return probationAddrs, nil
 	case WatchTower:
 		probationAddrs, err := QueryDisputedWatchtowers(transition, gasLimit, minerAddress)
 		if err != nil {
 			return nil, err
 		}
-		dr.logger.Info("GOT DISPUTED WATCHTOWERS", "RETURN", probationAddrs)
 		return probationAddrs, nil
 	default:
 		return nil, fmt.Errorf("unsuported node type provided ':%s'", nodeType)
 	}
 }
 
+// Contains is a method on the disputeResolution structure that checks if a
+// given address is in dispute for a specific node type.
+//
+// Parameters:
+//
+//	addr - The address to check.
+//	nodeType - The type of the node (sequencer or watchtower).
+//
+// Returns:
+//
+//	A boolean indicating whether the address is in dispute.
+//	An error if there was an issue checking the address.
+//
+// Example:
+//
+//	isInDispute, err := dr.Contains(addr, Sequencer)
+//	if err != nil {
+//	  log.Fatalf("failed to check address: %s", err)
+//	}
 func (dr *disputeResolution) Contains(addr types.Address, nodeType NodeType) (bool, error) {
 	addrs, err := dr.Get(nodeType)
 	if err != nil {
@@ -103,11 +177,29 @@ func (dr *disputeResolution) Contains(addr types.Address, nodeType NodeType) (bo
 	return false, nil
 }
 
+// GetSequencerAddr is a method on the disputeResolution structure that gets
+// the address of a sequencer that's under dispute for a given watchtower address.
+//
+// Parameters:
+//
+//	watchtowerAddr - The address of the watchtower.
+//
+// Returns:
+//
+//	The address of the disputed sequencer.
+//	An error if there was an issue retrieving the address.
+//
+// Example:
+//
+//	sequencerAddr, err := dr.GetSequencerAddr(watchtowerAddr)
+//	if err != nil {
+//	  log.Fatalf("failed to retrieve sequencer address: %s", err)
+//	}
 func (dr *disputeResolution) GetSequencerAddr(watchtowerAddr types.Address) (types.Address, error) {
 	parent := dr.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
 
-	dr.logger.Info("Got addresses", "Miner", minerAddress.String(), "Watchtower", watchtowerAddr.String())
+	dr.logger.Info("Got addresses", "miner", minerAddress.String(), "watchtower", watchtowerAddr.String())
 
 	header := &types.Header{
 		ParentHash: parent.Hash,
@@ -137,6 +229,24 @@ func (dr *disputeResolution) GetSequencerAddr(watchtowerAddr types.Address) (typ
 	return sequencerAddr, nil
 }
 
+// GetWatchtowerAddr is a method on the disputeResolution structure that gets
+// the address of a watchtower that's under dispute for a given sequencer address.
+//
+// Parameters:
+//
+//	sequencerAddr - The address of the sequencer.
+//
+// Returns:
+//
+//	The address of the disputed watchtower.
+//	An error if there was an issue retrieving the address.
+//
+// Example:
+//
+//	watchtowerAddr, err := dr.GetWatchtowerAddr(sequencerAddr)
+//	if err != nil {
+//	  log.Fatalf("failed to retrieve watchtower address: %s", err)
+//	}
 func (dr *disputeResolution) GetWatchtowerAddr(sequencerAddr types.Address) (types.Address, error) {
 	parent := dr.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -169,6 +279,25 @@ func (dr *disputeResolution) GetWatchtowerAddr(sequencerAddr types.Address) (typ
 	return watchtowerAddr, nil
 }
 
+// Begin is a method on the disputeResolution structure that initiates
+// a dispute resolution process for a node with a specific address.
+// The process is signed with the provided private key.
+//
+// Parameters:
+//
+//	probationAddr - The address of the node under dispute.
+//	signKey - The private key used to sign the process.
+//
+// Returns:
+//
+//	An error if there was an issue initiating the process.
+//
+// Example:
+//
+//	err := dr.Begin(probationAddr, signKey)
+//	if err != nil {
+//	  log.Fatalf("failed to initiate dispute resolution process: %s", err)
+//	}
 func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(dr.blockchain, dr.executor, dr.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -209,6 +338,25 @@ func (dr *disputeResolution) Begin(probationAddr types.Address, signKey *ecdsa.P
 	return nil
 }
 
+// End is a method on the disputeResolution structure that finalizes
+// a dispute resolution process for a node with a specific address.
+// The process is signed with the provided private key.
+//
+// Parameters:
+//
+//	probationAddr - The address of the node under dispute.
+//	signKey - The private key used to sign the process.
+//
+// Returns:
+//
+//	An error if there was an issue finalizing the process.
+//
+// Example:
+//
+//	err := dr.End(probationAddr, signKey)
+//	if err != nil {
+//	  log.Fatalf("failed to finalize dispute resolution process: %s", err)
+//	}
 func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(dr.blockchain, dr.executor, dr.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -246,6 +394,32 @@ func (dr *disputeResolution) End(probationAddr types.Address, signKey *ecdsa.Pri
 	return nil
 }
 
+// BeginDisputeResolutionTx constructs a transaction to initiate the dispute resolution process on the Staking contract.
+//
+// It takes in the initiator's address, the probation address and a gas limit.
+//
+// The function generates a selector for the BeginDisputeResolution method from the Staking contract ABI.
+// Then, it encodes the probation address as an input for this method and includes this data in the newly created transaction.
+//
+// This transaction can be submitted to the network to initiate the dispute resolution process.
+//
+// Parameters:
+//
+//	from - The address of the transaction initiator.
+//	probationAddr - The address of the probation sequencer.
+//	gasLimit - The gas limit for the transaction.
+//
+// Returns:
+//
+//	A pointer to the newly created transaction.
+//	An error if there was an issue creating the transaction.
+//
+// Example:
+//
+//	tx, err := BeginDisputeResolutionTx(fromAddress, probationAddress, 50000)
+//	if err != nil {
+//	  log.Fatalf("failed to create dispute resolution transaction: %s", err)
+//	}
 func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
 	if !ok {
@@ -273,6 +447,25 @@ func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, g
 	}, nil
 }
 
+// IsBeginDisputeResolutionTx checks if the given transaction is a dispute resolution initiation transaction.
+//
+// This is done by decoding the input data in the transaction and comparing it with the expected method selector and parameters.
+//
+// Parameters:
+//
+//	tx - The transaction to check.
+//
+// Returns:
+//
+//	true if the transaction is a dispute resolution initiation transaction, false otherwise.
+//	An error if there was an issue checking the transaction.
+//
+// Example:
+//
+//	isDisputeTx, err := IsBeginDisputeResolutionTx(tx)
+//	if err != nil {
+//	  log.Fatalf("failed to check dispute resolution transaction: %s", err)
+//	}
 func IsBeginDisputeResolutionTx(tx *types.Transaction) (bool, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
 	if !ok {
@@ -309,6 +502,27 @@ func IsBeginDisputeResolutionTx(tx *types.Transaction) (bool, error) {
 	return true, nil
 }
 
+// EndDisputeResolutionTx constructs a transaction to conclude the dispute resolution process on the Staking contract.
+//
+// Similarly to BeginDisputeResolutionTx, it creates a transaction which includes the EndDisputeResolution method selector and the encoded input parameters.
+//
+// Parameters:
+//
+//	from - The address of the transaction initiator.
+//	probationAddr - The address of the probation sequencer.
+//	gasLimit - The gas limit for the transaction.
+//
+// Returns:
+//
+//	A pointer to the newly created transaction.
+//	An error if there was an issue creating the transaction.
+//
+// Example:
+//
+//	tx, err := EndDisputeResolutionTx(fromAddress, probationAddress, 50000)
+//	if err != nil {
+//	  log.Fatalf("failed to create dispute resolution conclusion transaction: %s", err)
+//	}
 func EndDisputeResolutionTx(from types.Address, probationAddr types.Address, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["EndDisputeResolution"]
 	if !ok {
@@ -336,6 +550,28 @@ func EndDisputeResolutionTx(from types.Address, probationAddr types.Address, gas
 	}, nil
 }
 
+// QueryDisputedSequencerAddr calls the GetDisputedSequencerAddrs method on the Staking contract.
+//
+// It sends a transaction to query the contract and returns the result.
+//
+// Parameters:
+//
+//	t - The state transition object.
+//	gasLimit - The gas limit for the transaction.
+//	from - The address of the query initiator.
+//	watchtowerAddr - The address of the watchtower.
+//
+// Returns:
+//
+//	The disputed sequencer address.
+//	An error if there was an issue querying the address.
+//
+// Example:
+//
+//	disputedSequencer, err := QueryDisputedSequencerAddr(transition, 50000, fromAddress, watchtowerAddress)
+//	if err != nil {
+//	  log.Fatalf("failed to query disputed sequencer address: %s", err)
+//	}
 func QueryDisputedSequencerAddr(t *state.Transition, gasLimit uint64, from types.Address, watchtowerAddr types.Address) (types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetDisputedSequencerAddrs"]
 	if !ok {
@@ -384,6 +620,28 @@ func QueryDisputedSequencerAddr(t *state.Transition, gasLimit uint64, from types
 	return types.Address(address), nil
 }
 
+// QueryDisputedWatchtowerAddr calls the GetDisputedWatchtowerAddr method on the Staking contract.
+//
+// It sends a transaction to query the contract and returns the result.
+//
+// Parameters:
+//
+//	t - The state transition object.
+//	gasLimit - The gas limit for the transaction.
+//	from - The address of the query initiator.
+//	sequencerAddr - The address of the sequencer.
+//
+// Returns:
+//
+//	The disputed watchtower address.
+//	An error if there was an issue querying the address.
+//
+// Example:
+//
+//	disputedWatchtower, err := QueryDisputedWatchtowerAddr(transition, 50000, fromAddress, sequencerAddress)
+//	if err != nil {
+//	  log.Fatalf("failed to query disputed watchtower address: %s", err)
+//	}
 func QueryDisputedWatchtowerAddr(t *state.Transition, gasLimit uint64, from types.Address, sequencerAddr types.Address) (types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetDisputedWatchtowerAddr"]
 	if !ok {
@@ -432,6 +690,27 @@ func QueryDisputedWatchtowerAddr(t *state.Transition, gasLimit uint64, from type
 	return types.Address(address), nil
 }
 
+// QueryDisputedWatchtowers calls the GetCurrentDisputeWatchtowers method on the Staking contract.
+//
+// It sends a transaction to query the contract and returns the result.
+//
+// Parameters:
+//
+//	t - The state transition object.
+//	gasLimit - The gas limit for the transaction.
+//	from - The address of the query initiator.
+//
+// Returns:
+//
+//	An array of disputed watchtower addresses.
+//	An error if there was an issue querying the addresses.
+//
+// Example:
+//
+//	disputedWatchtowers, err := QueryDisputedWatchtowers(transition, 50000, fromAddress)
+//	if err != nil {
+//	  log.Fatalf("failed to query disputed watchtower addresses: %s", err)
+//	}
 func QueryDisputedWatchtowers(t *state.Transition, gasLimit uint64, from types.Address) ([]types.Address, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetCurrentDisputeWatchtowers"]
 	if !ok {

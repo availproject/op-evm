@@ -12,12 +12,15 @@ const (
 	// BlobMagic is required to be present in a `Batch` read from Avail.
 	BlobMagic = byte(0b10101010)
 
-	// MaxBlobSize definex the maximum length for stored data in blob.
+	// MaxBlobSize defines the maximum length for stored data in a blob.
 	MaxBlobSize = 1 << 24 // 2^24 = 16MB
 )
 
 var (
-	ErrDataTooLong      = errors.New("data length exceeds maximum limit")
+	// ErrDataTooLong is the error returned when the data length exceeds the maximum limit.
+	ErrDataTooLong = errors.New("data length exceeds maximum limit")
+
+	// ErrInvalidBlobMagic is the error returned when the blob magic byte is invalid.
 	ErrInvalidBlobMagic = errors.New("invalid blob magic")
 )
 
@@ -27,6 +30,7 @@ type Blob struct {
 	Data  []byte
 }
 
+// Encode encodes the blob data into the provided scale.Encoder.
 func (b *Blob) Encode(e scale.Encoder) error {
 	var err error
 
@@ -56,6 +60,7 @@ func (b *Blob) Encode(e scale.Encoder) error {
 	return nil
 }
 
+// Decode decodes the blob data from the provided scale.Decoder.
 func (b *Blob) Decode(d scale.Decoder) error {
 	var err error
 

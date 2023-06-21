@@ -6,20 +6,36 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
 	"github.com/maticnetwork/avail-settlement/pkg/block"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/umbracle/ethgo/abi"
 )
 
+// WatchtowerRate is an interface for managing the minimum and maximum number of watchtowers.
 type WatchtowerRate interface {
+	// CurrentMinimum returns the current minimum number of watchtowers.
+	// It retrieves the value from the staking system and returns it as a *big.Int.
+	// An error is returned if the operation fails.
 	CurrentMinimum() (*big.Int, error)
+
+	// CurrentMaximum returns the current maximum number of watchtowers.
+	// It retrieves the value from the staking system and returns it as a *big.Int.
+	// An error is returned if the operation fails.
 	CurrentMaximum() (*big.Int, error)
+
+	// SetMinimum sets the minimum number of watchtowers.
+	// It takes the new minimum value and a signing key as parameters.
+	// An error is returned if the operation fails.
 	SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error
+
+	// SetMaximum sets the maximum number of watchtowers.
+	// It takes the new maximum value and a signing key as parameters.
+	// An error is returned if the operation fails.
 	SetMaximum(newMax *big.Int, signKey *ecdsa.PrivateKey) error
 }
 
@@ -29,6 +45,7 @@ type watchtowerRate struct {
 	logger     hclog.Logger
 }
 
+// NewWatchtowerRater creates a new instance of the WatchtowerRate interface.
 func NewWatchtowerRater(blockchain *blockchain.Blockchain, executor *state.Executor, logger hclog.Logger) WatchtowerRate {
 	return &watchtowerRate{
 		blockchain: blockchain,
@@ -37,6 +54,9 @@ func NewWatchtowerRater(blockchain *blockchain.Blockchain, executor *state.Execu
 	}
 }
 
+// SetMinimum sets the minimum number of watchtowers.
+// It takes the new minimum value and a signing key as parameters.
+// An error is returned if the operation fails.
 func (st *watchtowerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -66,6 +86,9 @@ func (st *watchtowerRate) SetMinimum(newMin *big.Int, signKey *ecdsa.PrivateKey)
 	return nil
 }
 
+// SetMaximum sets the maximum number of watchtowers.
+// It takes the new maximum value and a signing key as parameters.
+// An error is returned if the operation fails.
 func (st *watchtowerRate) SetMaximum(newMax *big.Int, signKey *ecdsa.PrivateKey) error {
 	builder := block.NewBlockBuilderFactory(st.blockchain, st.executor, st.logger)
 	blk, err := builder.FromBlockchainHead()
@@ -95,6 +118,9 @@ func (st *watchtowerRate) SetMaximum(newMax *big.Int, signKey *ecdsa.PrivateKey)
 	return nil
 }
 
+// CurrentMinimum returns the current minimum number of watchtowers.
+// It retrieves the value from the staking system and returns it as a *big.Int.
+// An error is returned if the operation fails.
 func (st *watchtowerRate) CurrentMinimum() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -122,6 +148,9 @@ func (st *watchtowerRate) CurrentMinimum() (*big.Int, error) {
 	return threshold, nil
 }
 
+// CurrentMaximum returns the current maximum number of watchtowers.
+// It retrieves the value from the staking system and returns it as a *big.Int.
+// An error is returned if the operation fails.
 func (st *watchtowerRate) CurrentMaximum() (*big.Int, error) {
 	parent := st.blockchain.Header()
 	minerAddress := types.BytesToAddress(parent.Miner)
@@ -149,6 +178,9 @@ func (st *watchtowerRate) CurrentMaximum() (*big.Int, error) {
 	return threshold, nil
 }
 
+// SetMinimumWatchtowersTx creates a transaction to set the minimum number of watchtowers.
+// It takes the sender address, the new minimum value, and the gas limit as parameters.
+// The transaction is returned or an error if it fails.
 func SetMinimumWatchtowersTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetMinNumWatchtowers"]
 	if !ok {
@@ -176,6 +208,9 @@ func SetMinimumWatchtowersTx(from types.Address, amount *big.Int, gasLimit uint6
 	}, nil
 }
 
+// GetMinimumWatchtowersTx retrieves the minimum number of watchtowers from the staking system.
+// It takes a state transition, gas limit, and sender address as parameters.
+// The minimum number of watchtowers is returned as a *big.Int or an error if the operation fails.
 func GetMinimumWatchtowersTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetMinNumWatchtowers"]
 	if !ok {
@@ -206,6 +241,9 @@ func GetMinimumWatchtowersTx(t *state.Transition, gasLimit uint64, from types.Ad
 	return toReturn, nil
 }
 
+// SetMaximumWatchtowersTx creates a transaction to set the maximum number of watchtowers.
+// It takes the sender address, the new maximum value, and the gas limit as parameters.
+// The transaction is returned or an error if it fails.
 func SetMaximumWatchtowersTx(from types.Address, amount *big.Int, gasLimit uint64) (*types.Transaction, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["SetMaxNumWatchtowers"]
 	if !ok {
@@ -233,6 +271,9 @@ func SetMaximumWatchtowersTx(from types.Address, amount *big.Int, gasLimit uint6
 	}, nil
 }
 
+// GetMaximumWatchtowersTx retrieves the maximum number of watchtowers from the staking system.
+// It takes a state transition, gas limit, and sender address as parameters.
+// The maximum number of watchtowers is returned as a *big.Int or an error if the operation fails.
 func GetMaximumWatchtowersTx(t *state.Transition, gasLimit uint64, from types.Address) (*big.Int, error) {
 	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["GetMaxNumWatchtowers"]
 	if !ok {

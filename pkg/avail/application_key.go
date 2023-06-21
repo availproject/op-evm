@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	// ApplicationKey is the App Key that distincts Avail Settlement Layer
-	// data in Avail.
+	// ApplicationKey is the App Key that distincts Avail Settlement Layer data in Avail.
 	ApplicationKey = "avail-settlement"
 
-	// CallCreateApplicationKey is the RPC API call for creating new AppID on Avail.
+	// CallCreateApplicationKey is the RPC API call for creating a new AppID on Avail.
 	CallCreateApplicationKey = "DataAvailability.create_application_key"
 )
 
@@ -22,9 +21,13 @@ var (
 	// DefaultAppID is the Avail application ID.
 	DefaultAppID = types.NewUCompactFromUInt(0)
 
+	// ErrAppIDNotFound is the error returned when the AppID is not found.
 	ErrAppIDNotFound = errors.New("AppID not found")
 )
 
+// EnsureApplicationKeyExists checks if the application key exists on the blockchain. If it doesn't exist, it creates a new application key.
+// It takes a client, the application key string, and the signing key pair.
+// It returns the AppID and an error if there is an issue.
 func EnsureApplicationKeyExists(client Client, applicationKey string, signingKeyPair signature.KeyringPair) (types.UCompact, error) {
 	appID, err := QueryAppID(client, applicationKey)
 	if errors.Is(err, ErrAppIDNotFound) {
@@ -39,6 +42,9 @@ func EnsureApplicationKeyExists(client Client, applicationKey string, signingKey
 	return appID, nil
 }
 
+// QueryAppID retrieves the AppID associated with the application key.
+// It takes a client and the application key string.
+// It returns the AppID and an error if there is an issue.
 func QueryAppID(client Client, applicationKey string) (types.UCompact, error) {
 	api, err := instance(client)
 	if err != nil {
@@ -78,6 +84,9 @@ func QueryAppID(client Client, applicationKey string) (types.UCompact, error) {
 	}
 }
 
+// CreateApplicationKey creates a new application key on the blockchain.
+// It takes a client, the application key string, and the signing key pair.
+// It returns the AppID and an error if there is an issue.
 func CreateApplicationKey(client Client, applicationKey string, signingKeyPair signature.KeyringPair) (types.UCompact, error) {
 	api, err := instance(client)
 	if err != nil {

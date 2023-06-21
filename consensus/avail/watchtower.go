@@ -13,6 +13,19 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+// runWatchTower is a method of the Avail structure that continuously monitors
+// and verifies the blockchain for the Avail system. It utilizes the watchtower concept
+// for blockchain monitoring and fraud detection. It operates until the node is closed.
+//
+// activeParticipantsQuerier is used to determine the active participants in the network.
+//
+// currentNodeSyncIndex is the blockchain index from where to start watching the blocks.
+//
+// myAccount is the ethereum account of the node.
+//
+// signKey is the private key used for signing the transactions.
+//
+// This function panics if it fails to find the avail call index.
 func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipants, currentNodeSyncIndex uint64, myAccount accounts.Account, signKey *keystore.Key) {
 	logger := d.logger.Named("watchtower")
 	watchTower := watchtower.New(d.blockchain, d.executor, d.txpool, logger, types.Address(myAccount.Address), signKey.PrivateKey)
@@ -51,7 +64,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 				continue
 			}
 
-			blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
+			blks, err := avail.BlockFromAvail(availBlk, d.availAppID, callIdx, d.logger)
 			if err != nil {
 				logger.Error("cannot extract Edge blocks from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
 				continue

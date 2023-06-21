@@ -21,7 +21,6 @@ data "cloudinit_config" "cloud_init" {
       user                            = local.user
       region                          = data.aws_region.current.name
       avail_settlement_artifact_url   = var.avail_settlement_artifact_url
-      accounts_artifact_url           = var.accounts_artifact_url
       config_yaml_base64              = base64encode(templatefile("${path.module}/templates/config.yaml", {
         workspace    = local.workspace
         grpc_port    = var.grpc_port

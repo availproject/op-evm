@@ -4,25 +4,30 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/hashicorp/go-hclog"
+	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
+// NodeType represents a type of node, either Sequencer or Watchtower.
 type NodeType string
 
+// These constants represent the different types of nodes.
 const (
 	Sequencer  NodeType = "sequencer"
 	WatchTower NodeType = "watchtower"
 )
 
+// Node interface represents the staking-related operations a node can perform.
 type Node interface {
 	ShouldStake(pkey *ecdsa.PrivateKey) bool
 	Stake(amount *big.Int, pkey *ecdsa.PrivateKey) error
 	UnStake(pkey *ecdsa.PrivateKey) error
 }
 
+// node structure represents a specific node on the network, containing
+// blockchain, executor, logger, nodeType and sender instances.
 type node struct {
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
@@ -31,6 +36,16 @@ type node struct {
 	sender     Sender
 }
 
+// ShouldStake is a method on the node structure that determines if the node should stake.
+// The decision is based on whether the node is already staked.
+//
+// Parameters:
+//
+//	pkey - The private key of the node.
+//
+// Returns:
+//
+//	A boolean indicating whether the node should stake.
 func (n *node) ShouldStake(pkey *ecdsa.PrivateKey) bool {
 	participantsQuerier := NewActiveParticipantsQuerier(n.blockchain, n.executor, n.logger)
 
@@ -46,6 +61,17 @@ func (n *node) ShouldStake(pkey *ecdsa.PrivateKey) bool {
 	return !staked
 }
 
+// Stake is a method on the node structure that stakes a specific amount for the node.
+// The staking transaction is signed with the provided private key.
+//
+// Parameters:
+//
+//	amount - The amount to stake.
+//	pkey - The private key used to sign the staking transaction.
+//
+// Returns:
+//
+//	An error if there was an issue staking the amount.
 func (n *node) Stake(amount *big.Int, pkey *ecdsa.PrivateKey) error {
 	pk := pkey.Public().(*ecdsa.PublicKey)
 	address := edge_crypto.PubKeyToAddress(pk)
@@ -56,6 +82,16 @@ func (n *node) Stake(amount *big.Int, pkey *ecdsa.PrivateKey) error {
 	)
 }
 
+// UnStake is a method on the node structure that unstakes the node.
+// The unstaking transaction is signed with the provided private key.
+//
+// Parameters:
+//
+//	pkey - The private key used to sign the unstaking transaction.
+//
+// Returns:
+//
+//	An error if there was an issue unstaking.
 func (n *node) UnStake(pkey *ecdsa.PrivateKey) error {
 	pk := pkey.Public().(*ecdsa.PublicKey)
 	address := edge_crypto.PubKeyToAddress(pk)
@@ -66,6 +102,24 @@ func (n *node) UnStake(pkey *ecdsa.PrivateKey) error {
 	)
 }
 
+// NewNode creates a new instance of node with the provided blockchain, executor,
+// sender, logger, and node type.
+//
+// Parameters:
+//
+//	blockchain - The blockchain instance.
+//	executor - The executor instance.
+//	sender - The sender instance.
+//	logger - The logger instance.
+//	nodeType - The type of the node (sequencer or watchtower).
+//
+// Returns:
+//
+//	A new instance of node.
+//
+// Example:
+//
+//	n := NewNode(blockchain, executor, sender, logger, Sequencer)
 func NewNode(blockchain *blockchain.Blockchain, executor *state.Executor, sender Sender, logger hclog.Logger, nodeType NodeType) Node {
 	return &node{
 		blockchain: blockchain,

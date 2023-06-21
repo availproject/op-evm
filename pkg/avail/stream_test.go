@@ -12,7 +12,7 @@ func TestStreamBlocksCorrectSequence(t *testing.T) {
 	t.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
 
 	offset := 1
-	availClient, err := NewClient("ws://127.0.0.1:9944/v1/json-rpc")
+	availClient, err := NewClient("ws://127.0.0.1:9944/v1/json-rpc", hclog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}

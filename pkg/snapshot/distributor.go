@@ -17,19 +17,22 @@ const (
 	pendingSnapshotQueueLen = 64
 )
 
+// Distributor is responsible for distributing snapshots among network peers.
 type Distributor interface {
 	Receive() <-chan *Snapshot
 	Send(s *Snapshot) error
-
 	Close() error
 }
 
+// distributor is an implementation of the Distributor interface.
 type distributor struct {
 	logger     hclog.Logger
 	snapshotCh chan *Snapshot
 	topic      *network.Topic
 }
 
+// NewDistributor creates a new distributor instance that uses the given logger and network server.
+// It subscribes to the gossip topic for snapshot distribution.
 func NewDistributor(logger hclog.Logger, network *network.Server) (Distributor, error) {
 	topic, err := network.NewTopic(topicNameV1, &proto.StateSnapshot{})
 	if err != nil {
@@ -51,6 +54,7 @@ func NewDistributor(logger hclog.Logger, network *network.Server) (Distributor, 
 	return d, nil
 }
 
+// handleIncomingSnapshot handles incoming snapshots from network peers.
 func (d *distributor) handleIncomingSnapshot(obj interface{}, from peer.ID) {
 	d.logger.Debug("received state snapshot", "peer", from.Pretty())
 
@@ -96,10 +100,12 @@ func (d *distributor) handleIncomingSnapshot(obj interface{}, from peer.ID) {
 	d.snapshotCh <- snapshot
 }
 
+// Receive returns the channel for receiving incoming snapshots.
 func (d *distributor) Receive() <-chan *Snapshot {
 	return d.snapshotCh
 }
 
+// Send sends the given snapshot to network peers.
 func (d *distributor) Send(s *Snapshot) error {
 	snpshot := &proto.StateSnapshot{
 		BlockNumber: s.BlockNumber,
@@ -120,8 +126,8 @@ func (d *distributor) Send(s *Snapshot) error {
 	return d.topic.Publish(snpshot)
 }
 
+// Close closes the distributor and unsubscribes from the gossip topic.
 func (d *distributor) Close() error {
 	d.topic.Close()
-
 	return nil
 }

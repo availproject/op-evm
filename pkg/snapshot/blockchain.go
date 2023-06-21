@@ -1,3 +1,5 @@
+// Package snapshot provides functionality for managing snapshots of a blockchain key-value storage.
+// It includes an interface for creating and applying snapshots, as well as an implementation using leveldb.
 package snapshot
 
 import (
@@ -7,28 +9,37 @@ import (
 	"github.com/vedhavyas/go-subkey/scale"
 )
 
+// BlockchainSnapshot represents a snapshot of a blockchain key-value storage.
 type BlockchainSnapshot struct {
 	Keys   [][]byte
 	Values [][]byte
 }
 
+// Encode encodes the BlockchainSnapshot using the provided scale.Encoder.
 func (bs *BlockchainSnapshot) Encode(e scale.Encoder) error {
 	return e.Encode(bs)
 }
 
+// Decode decodes the BlockchainSnapshot using the provided scale.Decoder.
 func (bs *BlockchainSnapshot) Decode(d scale.Decoder) error {
 	return d.Decode(bs)
 }
 
+// BlockchainKVSnapshotter is an interface that extends storage.KV and provides additional snapshot-related functionality.
 type BlockchainKVSnapshotter interface {
 	storage.KV
 
+	// Begin starts a new transaction to create a snapshot.
 	Begin()
+
+	// End finalizes the transaction and returns the created snapshot.
 	End() *BlockchainSnapshot
+
+	// Apply applies the changes from the given snapshot to the underlying key-value storage.
 	Apply(snapshot *BlockchainSnapshot) error
 }
 
-// blockchainKVStorage is the leveldb implementation of the kv storage
+// blockchainKVStorage is the leveldb implementation of the kv storage.
 type blockchainKVStorage struct {
 	db storage.KV
 
@@ -36,6 +47,7 @@ type blockchainKVStorage struct {
 	changes map[string][]byte
 }
 
+// Begin starts a new transaction to create a snapshot.
 func (bs *blockchainKVStorage) Begin() {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
@@ -43,6 +55,7 @@ func (bs *blockchainKVStorage) Begin() {
 	bs.changes = make(map[string][]byte)
 }
 
+// End finalizes the transaction and returns the created snapshot.
 func (bs *blockchainKVStorage) End() *BlockchainSnapshot {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
@@ -64,6 +77,7 @@ func (bs *blockchainKVStorage) End() *BlockchainSnapshot {
 	return ret
 }
 
+// Apply applies the changes from the given snapshot to the underlying key-value storage.
 func (bs *blockchainKVStorage) Apply(snapshot *BlockchainSnapshot) error {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
@@ -78,6 +92,7 @@ func (bs *blockchainKVStorage) Apply(snapshot *BlockchainSnapshot) error {
 	return nil
 }
 
+// Close closes the underlying key-value storage.
 func (bs *blockchainKVStorage) Close() error {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
@@ -85,6 +100,7 @@ func (bs *blockchainKVStorage) Close() error {
 	return bs.db.Close()
 }
 
+// Set sets the value of the given key in the underlying key-value storage.
 func (bs *blockchainKVStorage) Set(p, v []byte) error {
 	bs.mutex.Lock()
 	defer bs.mutex.Unlock()
@@ -96,6 +112,7 @@ func (bs *blockchainKVStorage) Set(p, v []byte) error {
 	return bs.db.Set(p, v)
 }
 
+// Get retrieves the value associated with the given key from the underlying key-value storage.
 func (bs *blockchainKVStorage) Get(p []byte) ([]byte, bool, error) {
 	data, found, err := bs.db.Get(p)
 	if err != nil {

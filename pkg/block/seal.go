@@ -9,8 +9,8 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-// WriteSeal signs the block and writes serialized `ValidatorExtra` into
-// block's `ExtraData`.
+// WriteSeal signs the block and writes serialized `ValidatorExtra` into the block's `ExtraData`.
+// It takes the private key and the header, and returns the updated header with the seal and an error if there is an issue.
 func WriteSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
 	seal, err := signSealImpl(prv, h)
@@ -32,6 +32,8 @@ func WriteSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	return h, nil
 }
 
+// signSealImpl signs the header using the private key and returns the seal.
+// It takes the private key and the header, and returns the seal as a byte slice and an error if there is an issue.
 func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	hash, err := calculateHeaderHash(h)
 	if err != nil {
@@ -48,6 +50,8 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header) ([]byte, error) {
 	return seal, nil
 }
 
+// calculateHeaderHash calculates the hash of the header.
+// It takes the header and returns the hash as a byte slice and an error if there is an issue.
 func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	h = h.Copy() // make a copy since we update the extra field
 
@@ -89,6 +93,8 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	return buf, nil
 }
 
+// AddressRecoverFromHeader recovers the address from the header seal.
+// It takes the header and returns the recovered address and an error if there is an issue.
 func AddressRecoverFromHeader(h *types.Header) (types.Address, error) {
 	// get the extra part that contains the seal
 	extra, err := getValidatorExtra(h)
@@ -105,6 +111,8 @@ func AddressRecoverFromHeader(h *types.Header) (types.Address, error) {
 	return addressRecoverImpl(extra.Seal, msg)
 }
 
+// addressRecoverImpl recovers the address from the signature and message.
+// It takes the signature as a byte slice, the message as a byte slice, and returns the recovered address and an error if there is an issue.
 func addressRecoverImpl(sig, msg []byte) (types.Address, error) {
 	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(msg))
 	if err != nil {

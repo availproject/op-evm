@@ -134,7 +134,7 @@ func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPat
 		si.config.Chain.Bootnodes = []string{bootnodeAddr}
 		si.config.Network.Chain.Bootnodes = []string{bootnodeAddr}
 
-		srv, err := startNode(si.config, availAddr, si.accountPath, si.fraudAddr, si.nodeType)
+		srv, err := startNode(logger, si.config, availAddr, si.accountPath, si.fraudAddr, si.nodeType)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +263,7 @@ func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (*pkg_co
 
 // startNode starts a devnet node based on the provided config, Avail address, account path, fraud listener address, and node type.
 // It returns the started server instance.
-func startNode(cfg *edge_server.Config, availAddr, accountPath, fraudListenerAddr string, nodeType consensus.MechanismType) (*server.Server, error) {
+func startNode(logger hclog.Logger, cfg *edge_server.Config, availAddr, accountPath, fraudListenerAddr string, nodeType consensus.MechanismType) (*server.Server, error) {
 	var bootnode bool
 	if nodeType == consensus.BootstrapSequencer {
 		bootnode = true
@@ -274,7 +274,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath, fraudListenerAdd
 		log.Fatalf("failed to read Avail account from %q: %s\n", accountPath, err)
 	}
 
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, logger)
 	if err != nil {
 		log.Fatalf("failed to create Avail client: %s\n", err)
 	}
@@ -292,7 +292,7 @@ func startNode(cfg *edge_server.Config, availAddr, accountPath, fraudListenerAdd
 		AvailClient:       availClient,
 		AvailSender:       availSender,
 		AccountFilePath:   accountPath,
-		FraudListenerAddr: "",
+		FraudListenerAddr: fraudListenerAddr,
 		NodeType:          string(nodeType),
 		AvailAppID:        appID,
 	}
@@ -397,7 +397,7 @@ func createAvailAccounts(logger hclog.Logger, availAddr, accountPath string, nod
 
 	var accountWg sync.WaitGroup
 
-	availClient, err := avail.NewClient(availAddr)
+	availClient, err := avail.NewClient(availAddr, logger)
 	if err != nil {
 		return err
 	}

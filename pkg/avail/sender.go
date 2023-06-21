@@ -15,21 +15,26 @@ const (
 	CallSubmitData = "DataAvailability.submit_data"
 )
 
-// Sender provides interface for sending blocks to Avail.
+// Sender is an interface for sending blocks to Avail.
 type Sender interface {
+	// Send sends a block to Avail without waiting for any status response.
 	Send(blk *edgetypes.Block) error
+	// SendAndWaitForStatus sends a block to Avail and waits for the specified extrinsic status.
 	SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error
 }
 
-// Result contains the final result of block data submission.
+// Result represents the final result of block data submission.
 type Result struct{}
 
+// blackholeSender is an implementation of Sender that ignores sent blocks.
 type blackholeSender struct{}
 
+// Send ignores the sent block.
 func (t *blackholeSender) Send(blk *edgetypes.Block) error {
 	return nil
 }
 
+// SendAndWaitForStatus ignores the sent block and the specified status.
 func (t *blackholeSender) SendAndWaitForStatus(blk *edgetypes.Block, status types.ExtrinsicStatus) error {
 	return nil
 }
@@ -40,6 +45,7 @@ func NewBlackholeSender() Sender {
 	return &blackholeSender{}
 }
 
+// sender is an implementation of Sender for Avail block data submission.
 type sender struct {
 	appID          types.UCompact
 	client         Client
@@ -47,7 +53,9 @@ type sender struct {
 	nextNonce      uint64
 }
 
-// NewSender constructs an Avail block data sender.
+// NewSender constructs a block data sender for Avail.
+// It takes a Client instance, appID of type types.UCompact, and a signingKeyPair of type signature.KeyringPair.
+// It returns a Sender instance.
 func NewSender(client Client, appID types.UCompact, signingKeyPair signature.KeyringPair) Sender {
 	return &sender{
 		appID:          appID,
@@ -57,6 +65,8 @@ func NewSender(client Client, appID types.UCompact, signingKeyPair signature.Key
 }
 
 // Send submits data to Avail without waiting for any status response.
+// It takes a blk parameter of type *edgetypes.Block.
+// It returns an error if there was a problem sending the data.
 func (s *sender) Send(blk *edgetypes.Block) error {
 	api, err := instance(s.client)
 	if err != nil {
@@ -76,7 +86,9 @@ func (s *sender) Send(blk *edgetypes.Block) error {
 	return nil
 }
 
-// SendAndWaitForStatus submits data to Avail and does not wait for the future blocks
+// SendAndWaitForStatus submits data to Avail and does not wait for the future blocks.
+// It takes blk parameter of type *edgetypes.Block and dstatus parameter of type types.ExtrinsicStatus.
+// It returns an error if there was a problem sending the data or if the specified status expectation is not supported.
 func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.ExtrinsicStatus) error {
 	// Only these three are supported for now.
 	// NOTE: If adding new types here, handle them correspondingly in the end of
@@ -129,6 +141,9 @@ func (s *sender) SendAndWaitForStatus(blk *edgetypes.Block, dstatus types.Extrin
 	}
 }
 
+// prepareExtrinsicForSend prepares the extrinsic for sending the block data.
+// It takes api parameter of type *gsrpc.SubstrateAPI and blk parameter of type *edgetypes.Block.
+// It returns a types.Extrinsic and an error if there was a problem preparing the extrinsic.
 func (s *sender) prepareExtrinsicForSend(api *gsrpc.SubstrateAPI, blk *edgetypes.Block) (types.Extrinsic, error) {
 	meta, err := api.RPC.State.GetMetadataLatest()
 	if err != nil {

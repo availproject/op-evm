@@ -9,23 +9,28 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// BlockStream represents a stream of Avail blocks.
 type BlockStream interface {
+	// Chan returns the channel on which the signed blocks are received.
 	Chan() <-chan *types.SignedBlock
+
+	// Close closes the block stream.
 	Close()
 }
 
+// blockStream implements the BlockStream interface.
 type blockStream struct {
 	closed  *atomic.Bool
 	closeCh chan struct{}
-
-	dataCh chan *types.SignedBlock
-
-	api    *gsrpc.SubstrateAPI
-	logger hclog.Logger
-
-	offset uint64
+	dataCh  chan *types.SignedBlock
+	api     *gsrpc.SubstrateAPI
+	logger  hclog.Logger
+	offset  uint64
 }
 
+// newBlockStream creates a new block stream.
+// It takes a client of type Client, a logger of type hclog.Logger, and an offset of type uint64.
+// It returns a BlockStream instance.
 func newBlockStream(client Client, logger hclog.Logger, offset uint64) BlockStream {
 	api, err := instance(client)
 	if err != nil {
@@ -46,16 +51,19 @@ func newBlockStream(client Client, logger hclog.Logger, offset uint64) BlockStre
 	return bs
 }
 
+// Close closes the block stream.
 func (bs *blockStream) Close() {
 	if bs.closed.CompareAndSwap(false, true) {
 		close(bs.closeCh)
 	}
 }
 
+// Chan returns the channel on which the signed blocks are received.
 func (bs *blockStream) Chan() <-chan *types.SignedBlock {
 	return bs.dataCh
 }
 
+// watch continuously watches for new blocks and sends them to the data channel.
 func (bs *blockStream) watch() {
 	hdr, err := bs.api.RPC.Chain.GetHeaderLatest()
 	if err != nil {
@@ -140,6 +148,8 @@ func (bs *blockStream) watch() {
 	}
 }
 
+// catchUp catches up the blocks from the given offset to the given target offset.
+// It returns an error if the catch-up fails.
 func (bs *blockStream) catchUp(fromOffset, toOffset uint64) (err error) {
 	// Have we reached the HEAD?
 	for i := fromOffset; i <= toOffset; i++ {

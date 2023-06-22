@@ -76,7 +76,7 @@ unzip sessionmanager-bundle.zip
 sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
 ```
 
-### Getting the Private Key from Terraform:
+### Getting the Private Key from Terraform
 1. Retrieve the private key from Terraform by running the command `terraform output --raw ssh_pk > key.pem`.
 2. Set the correct permissions for the private key file using `chmod 600 key.pem`.
 
@@ -90,7 +90,7 @@ sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/
 3. Save the changes and set the correct permissions for the `~/.ssh/config` file using `chmod 600 ~/.ssh/config`.
 4. Connect to the instance using SSH with the following command (replace `[INSTANCE-ID]` with the actual instance ID):
 
-### For more information, refer to the following resources:
+### For more information, refer to the following resources
 - [AWS Session Manager Plugin Installation Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
 - [AWS Session Manager Troubleshooting Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-troubleshooting.html#plugin-not-found)
 - [AWS Session Manager Getting Started Guide](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-getting-started.html)

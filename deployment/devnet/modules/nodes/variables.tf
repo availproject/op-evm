@@ -18,11 +18,6 @@ variable "jsonrpc_port" {
   type        = number
 }
 
-variable "s3_bucket_genesis_name" {
-  description = "Genesis bucket name"
-  type = string
-}
-
 variable "nodes_secrets_ssm_parameter_path" {
   description = "AWS System manager parameter path for creating the path to store the secrets"
   type        = string
@@ -63,11 +58,6 @@ variable "avail_addr" {
   type = string
 }
 
-variable "genesis_init_lambda_name" {
-  description = "The name of the lambda function to initialize genesis.json"
-  type = string
-}
-
 variable "iam_profile_name" {
   description = "IAM profile name"
   type = string
@@ -95,5 +85,10 @@ variable "p2p_port" {
 
 variable "key_name" {
   description = "AWS ssh public key name"
+  type = string
+}
+
+variable "genesis_json" {
+  description = "genesis.json configuration file contents"
   type = string
 }

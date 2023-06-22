@@ -398,7 +398,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.Ac
 
 			sw.logger.Debug("writing a new block", "sequencer_addr", myAccount.Address)
 
-			if err := sw.writeBlock(myAccount, signKey); err != nil {
+			if err := sw.writeBlock(fraudResolver, myAccount, signKey); err != nil {
 				sw.logger.Error("failed to mine block", "error", err)
 			}
 
@@ -413,7 +413,7 @@ func (sw *SequencerWorker) runWriteBlocksLoop(activeSequencersQuerier staking.Ac
 // It generates a new block based on transactions from the pool, and writes the block to the blockchain.
 // It also distributes the snapshot of the block to other sequencers over P2P.
 // It returns an error if one occurs during the process.
-func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keystore.Key) error {
+func (sw *SequencerWorker) writeBlock(fraudResolver *Fraud, myAccount accounts.Account, signKey *keystore.Key) error {
 	parent := sw.blockchain.Header()
 
 	header := &types.Header{
@@ -461,7 +461,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 		return err
 	}
 
-	txns := sw.writeTransactions(gasLimit, transition)
+	txns := sw.writeTransactions(fraudResolver, gasLimit, transition)
 
 	// XXX: Following fraud function is only called when the fraud server is
 	// actively listening and the fraud has been primed by making corresponding
@@ -566,7 +566,7 @@ func (sw *SequencerWorker) writeBlock(myAccount accounts.Account, signKey *keyst
 // writeTransactions writes transactions.
 // It gets transactions from the transaction pool, and writes the transactions to a state transition.
 // It returns a slice of successful transactions that have been written without errors.
-func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (sw *SequencerWorker) writeTransactions(fraudResolver *Fraud, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
 	sw.txpool.Prepare(sw.txpool.GetBaseFee())
@@ -574,6 +574,19 @@ func (sw *SequencerWorker) writeTransactions(gasLimit uint64, transition transit
 	for {
 		tx := sw.txpool.Peek()
 		if tx == nil {
+			break
+		}
+
+		if fraudResolver.IsChainDisabled() {
+			sw.logger.Debug("chain is now disabled; stopping block production")
+			break
+		}
+
+		// returned err is omitted below since it's used for debugging purposes and is
+		// therefore not useful in this context.
+		isFraudProofInProgress, _ := staking.IsBeginDisputeResolutionTx(tx)
+		if isFraudProofInProgress {
+			sw.logger.Debug("sequencer found begin dispute resolution tx; stopping block production")
 			break
 		}
 

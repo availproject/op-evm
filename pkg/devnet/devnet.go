@@ -461,14 +461,13 @@ func createAvailAccount(logger hclog.Logger, availClient avail.Client, accountPa
 	}
 
 	if _, err := avail.QueryAppID(availClient, avail.ApplicationKey); err != nil {
-		if err == avail.ErrAppIDNotFound {
-			_, err = avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
-			if err != nil {
-				return err
-			}
+		if !errors.Is(err, avail.ErrAppIDNotFound) {
+			return err
 		}
-
-		return err
+		_, err = avail.EnsureApplicationKeyExists(availClient, avail.ApplicationKey, availAccount)
+		if err != nil {
+			return err
+		}
 	}
 
 	logger.Info("Successfully deposited", "avl", 15, "to", availAccount.Address)

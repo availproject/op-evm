@@ -45,9 +45,10 @@ func (fs *FraudServer) PrimeFraud() {
 // ListenAndServe starts the FraudServer and listens for incoming HTTP requests on the specified address.
 // It sets up a HTTP handler at "/fraud/prime" to prime the fraud detection operation for the next invocation.
 func (fs *FraudServer) ListenAndServe(addr string) error {
-	http.HandleFunc("/fraud/prime", func(w http.ResponseWriter, _ *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/fraud/prime", func(w http.ResponseWriter, _ *http.Request) {
 		fs.PrimeFraud()
 		w.WriteHeader(http.StatusAccepted)
 	})
-	return http.ListenAndServe(addr, nil)
+	return http.ListenAndServe(addr, mux)
 }

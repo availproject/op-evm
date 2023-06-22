@@ -46,7 +46,7 @@
                 "mechanisms": [
                     "bootstrap-sequencer",
                     "sequencer",
-                    "validator"
+                    "watchtower"
                 ]
             }
         },

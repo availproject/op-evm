@@ -58,12 +58,12 @@ Testing fraudproof processing is relatively straightforward. Sequencer implement
 ### To test fraudproof, perform following actions:
 
 1. Run at least one sequencer with fraud server enabled
-  1.1. To do this, run sequencer with `--fraud-srv-listen-addr "<address>:<port>"` (e.g.: `avail-settlement server --fraud-srv-listen-addr ":9990"`)
+   - To do this, run sequencer with `--fraud-srv-listen-addr "<address>:<port>"` (e.g.: `avail-settlement server --fraud-srv-listen-addr ":9990"`)
 2. Run at least one watchtower that has staked
 3. Optionally `tail` Settlement Layer blocks from Avail to easily see the process:
-  3.1. Run `avail-settlement tail --jsonrpc-addr "<sequencer's JSON-RPC address>"`
+   - Run `avail-settlement tail --jsonrpc-addr "<sequencer's JSON-RPC address>"`
 4. Make an HTTP request to fraud server:
-  4.1. e.g. `curl http://localhost:9990/fraud/prime`
+   - e.g. `curl http://localhost:9990/fraud/prime`
 
 The "malicius" sequencer will try to inject a begin dispute resolution transaction into the block, without chain inclusion, and watchtower will catch this and slash the sequencer.
 

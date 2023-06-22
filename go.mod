@@ -17,6 +17,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/hashicorp/hcl v1.0.0
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/juju/ansiterm v1.0.0
 	github.com/libp2p/go-libp2p v0.25.0
 	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.9.0
@@ -121,7 +122,6 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.1 // indirect
 	github.com/koron/go-ssdp v0.0.3 // indirect

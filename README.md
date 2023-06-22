@@ -51,6 +51,24 @@ To get started with Avail, follow these steps:
 
 For detailed instructions on installation, configuration, and usage, refer to the TODO.
 
+## Testing Fraudproof
+
+Testing fraudproof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraudproof block, which leads to dispute resolution process.
+
+### To test fraudproof, perform following actions:
+
+1. Run at least one sequencer with fraud server enabled
+   - To do this, run sequencer with `--fraud-srv-listen-addr "<address>:<port>"` (e.g.: `avail-settlement server --fraud-srv-listen-addr ":9990"`)
+2. Run at least one watchtower that has staked
+3. Optionally `tail` Settlement Layer blocks from Avail to easily see the process:
+   - Run `avail-settlement tail --jsonrpc-addr "<sequencer's JSON-RPC address>"`
+4. Make an HTTP request to fraud server:
+   - e.g. `curl http://localhost:9990/fraud/prime`
+
+The "malicius" sequencer will try to inject a begin dispute resolution transaction into the block, without chain inclusion, and watchtower will catch this and slash the sequencer.
+
+Everytime the "malicious" sequencer has produced one fraudulent block, it will resume normal operation, until the fraud server has been _primed_ again.
+
 ## Contributing
 
 We welcome contributions to the Avail project. If you find any issues, have suggestions for improvements, or would like to contribute new features, please open a GitHub issue or submit a pull request.

@@ -22,7 +22,7 @@ jobs:
         with:
           go-version: 1.19
       - name: Build all go binaries
-        run: make build-all GOOS=linux GOARCH=arm64
+        run: make build GOOS=linux GOARCH=arm64
       - name: Add avail-settlement binary to zip archive
         run: zip -j avail-settlement-linux-arm64.zip avail-settlement
 

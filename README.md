@@ -1,6 +1,6 @@
 # Optimistic EVM Rollup
 
-OpEVM is a blockchain settlement system designed for efficient and secure transaction processing. It provides a decentralized infrastructure for settlement and enables high-throughput, low-latency transaction processing on the blockchain. OpEVM is built on top of the Polygon and Avail networks, extending Polygon Edge and offers advanced features for block validation, fraudproof detection, and transaction verification.
+OpEVM is a blockchain settlement system designed for efficient and secure transaction processing. It provides a decentralized infrastructure for settlement and enables high-throughput, low-latency transaction processing on the blockchain. OpEVM is built on top of the Avail network, extending [Polygon Edge](https://github.com/0xPolygon/polygon-edge) and offers advanced features for block validation, fraudproof detection, and transaction verification.
 
 ## Features
 

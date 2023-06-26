@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/availproject/op-evm/pkg/avail"
+	"github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/staking"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func getGenesisBasePath() string {

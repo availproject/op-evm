@@ -9,8 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/blockchain"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 

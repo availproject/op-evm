@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
+	"github.com/availproject/op-evm/consensus/avail"
 	"github.com/multiformats/go-multiaddr"
 )
 

@@ -18,10 +18,10 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/blockchain"
+	"github.com/availproject/op-evm/pkg/common"
 	geth_crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
 )
 
 // FaucetAccount and FaucetSignKey are used as a pair for an account with a plentiful balance for test purposes.

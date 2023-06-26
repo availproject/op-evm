@@ -25,14 +25,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	edge_server "github.com/0xPolygon/polygon-edge/server"
+	consensus "github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/avail"
+	"github.com/availproject/op-evm/pkg/common"
+	pkg_config "github.com/availproject/op-evm/pkg/config"
+	"github.com/availproject/op-evm/server"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	pkg_config "github.com/maticnetwork/avail-settlement/pkg/config"
-	"github.com/maticnetwork/avail-settlement/server"
 )
 
 //go:embed genesis.json

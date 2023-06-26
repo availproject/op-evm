@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
+	"github.com/availproject/op-evm/pkg/avail"
 )
 
 const (

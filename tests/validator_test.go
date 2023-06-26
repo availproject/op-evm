@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/consensus/avail/validator"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/staking"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func getGenesisBasePath() string {

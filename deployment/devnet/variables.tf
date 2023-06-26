@@ -31,11 +31,11 @@ variable "github_owner" {
 variable "github_repository" {
   description = "Github repository name to download the artifacts from"
   type        = string
-  default     = "avail-settlement"
+  default     = "op-evm"
 }
 
 variable "release" {
-  description = "The avail settlement release (will match a tag from the github.com/availproject/avail-settlement repository)"
+  description = "The avail settlement release (will match a tag from the github.com/availproject/op-evm repository)"
   type        = string
 }
 
@@ -45,10 +45,10 @@ variable "github_token" {
   sensitive   = true
 }
 
-variable "avail_settlement_artifact_name" {
-  description = "The artifact name for `avail-settlement` binary"
+variable "op_evm_artifact_name" {
+  description = "The artifact name for `op-evm` binary"
   type        = string
-  default     = "avail-settlement-linux-arm64.zip"
+  default     = "op-evm-linux-arm64.zip"
 }
 
 variable "deployment_name" {
@@ -72,7 +72,7 @@ variable "base_ami" {
 variable "devnet_key_name" {
   description = "The name that we want to use for the ssh key pair"
   type        = string
-  default     = "2023-02-21-avail-settlement-devnet"
+  default     = "2023-02-21-op-evm-devnet"
 }
 
 variable "region" {

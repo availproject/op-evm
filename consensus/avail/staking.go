@@ -10,9 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/staking"
 )
 
 // ensureStaked verifies whether a node is staked in the network.

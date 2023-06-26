@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/devnet"
+	"github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/devnet"
 )
 
 // nolint:unused

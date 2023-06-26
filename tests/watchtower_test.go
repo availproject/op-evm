@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/consensus/avail/watchtower"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/staking"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
 

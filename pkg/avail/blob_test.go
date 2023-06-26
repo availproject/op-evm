@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func Test_BlobEncoding(t *testing.T) {

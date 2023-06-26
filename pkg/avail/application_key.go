@@ -11,7 +11,7 @@ import (
 
 const (
 	// ApplicationKey is the App Key that distincts Avail Settlement Layer data in Avail.
-	ApplicationKey = "avail-settlement"
+	ApplicationKey = "op-evm"
 
 	// CallCreateApplicationKey is the RPC API call for creating a new AppID on Avail.
 	CallCreateApplicationKey = "DataAvailability.create_application_key"

@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	commontoken "github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
-	commontoken "github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
 

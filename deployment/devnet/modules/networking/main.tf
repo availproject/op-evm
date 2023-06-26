@@ -94,7 +94,7 @@ resource "aws_route_table_association" "private" {
 }
 
 resource "aws_route53_zone" "private_zone" {
-  name          = "${var.deployment_name}.avail-settlement.private"
+  name          = "${var.deployment_name}.op-evm.private"
   force_destroy = true
   vpc {
     vpc_id = aws_vpc.devnet.id

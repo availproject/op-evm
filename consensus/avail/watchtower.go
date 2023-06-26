@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/consensus/avail/watchtower"
+	"github.com/availproject/op-evm/pkg/avail"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/staking"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/watchtower"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 // runWatchTower is a method of the Avail structure that continuously monitors

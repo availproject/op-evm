@@ -92,7 +92,7 @@ module "bootnode" {
 
   p2p_port                         = var.p2p_port
   deployment_name                  = var.deployment_name
-  avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
+  op_evm_artifact_url    = local.artifact_url[var.op_evm_artifact_name]
   base_ami                         = var.base_ami
   base_instance_type               = var.base_instance_type
   github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path
@@ -122,7 +122,7 @@ module "nodes" {
   node_count                       = each.value
   p2p_port                         = var.p2p_port
   deployment_name                  = var.deployment_name
-  avail_settlement_artifact_url    = local.artifact_url[var.avail_settlement_artifact_name]
+  op_evm_artifact_url    = local.artifact_url[var.op_evm_artifact_name]
   base_ami                         = var.base_ami
   base_instance_type               = var.base_instance_type
   github_token_ssm_parameter_path  = local.github_token_ssm_parameter_path

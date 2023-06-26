@@ -19,7 +19,7 @@ data "cloudinit_config" "cloud_init" {
       github_token_ssm_parameter_path = var.github_token_ssm_parameter_path
       user                            = local.user
       region                          = data.aws_region.current.name
-      avail_settlement_artifact_url   = var.avail_settlement_artifact_url
+      op_evm_artifact_url   = var.op_evm_artifact_url
       config_yaml_base64              = base64encode(templatefile("${path.module}/templates/config.yaml", {
         workspace    = local.workspace
         grpc_port    = var.grpc_port
@@ -32,7 +32,7 @@ data "cloudinit_config" "cloud_init" {
         region                           = data.aws_region.current.name
         nodes_secrets_ssm_parameter_path = var.nodes_secrets_ssm_parameter_path
       }))
-      avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/op-evm.service", {
+      op_evm_service_base64 = base64encode(templatefile("${path.module}/templates/op-evm.service", {
         workspace  = local.workspace
         avail_addr = var.avail_addr
         user       = local.user

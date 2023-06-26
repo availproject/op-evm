@@ -45,7 +45,7 @@ variable "github_token" {
   sensitive   = true
 }
 
-variable "avail_settlement_artifact_name" {
+variable "op_evm_artifact_name" {
   description = "The artifact name for `op-evm` binary"
   type        = string
   default     = "op-evm-linux-arm64.zip"

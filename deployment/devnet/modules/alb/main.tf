@@ -1,4 +1,4 @@
-resource "aws_lb" "avail_settlement_nodes" {
+resource "aws_lb" "op_evm_nodes" {
   name               = "avl-sl-lb-${var.deployment_name}"
   load_balancer_type = "network"
   internal           = false
@@ -6,7 +6,7 @@ resource "aws_lb" "avail_settlement_nodes" {
 }
 
 resource "aws_lb_listener" "grpc_listener" {
-  load_balancer_arn = aws_lb.avail_settlement_nodes.arn
+  load_balancer_arn = aws_lb.op_evm_nodes.arn
   port              = var.grpc_port
   protocol          = "TCP"
 
@@ -25,7 +25,7 @@ resource "aws_lb_target_group" "grpc_tg" {
 }
 
 resource "aws_lb_listener" "jsonrpc_listener" {
-  load_balancer_arn = aws_lb.avail_settlement_nodes.arn
+  load_balancer_arn = aws_lb.op_evm_nodes.arn
   port              = var.jsonrpc_port
   protocol          = "TCP"
 
@@ -44,7 +44,7 @@ resource "aws_lb_target_group" "jsonrpc_tg" {
 }
 
 resource "aws_lb_listener" "p2p_listener" {
-  load_balancer_arn = aws_lb.avail_settlement_nodes.arn
+  load_balancer_arn = aws_lb.op_evm_nodes.arn
   port              = var.p2p_port
   protocol          = "TCP"
 

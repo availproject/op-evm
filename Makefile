@@ -7,7 +7,7 @@ protoc:
 
 .PHONY: run-benchmarks
 run-benchmarks:
-	go test ./tests -bench=. -run ^$$
+	go test -v=1 ./tests -bench=. -run ^$$
 
 .PHONY: build
 build:

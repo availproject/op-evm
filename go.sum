@@ -63,8 +63,8 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/armon/go-metrics v0.4.1 h1:hR91U9KYmb6bLBYLQjyM+3j+rcd/UhE+G78SFnF8gJA=
 github.com/armon/go-metrics v0.4.1/go.mod h1:E6amYzXo6aW1tqzoZGT755KkbgrJsSdpwZ+3JqfkOG4=
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
-github.com/availproject/op-evm-contracts v0.0.1-alpha1 h1:0UrrTOnU69/qfkyxPSLzXiV+MX1H27dhEvgD8tHMqvI=
-github.com/availproject/op-evm-contracts v0.0.1-alpha1/go.mod h1:sa3N0EsCc+rCSG+vWw29aP4YFBBa+cb2eEUUIeaZxhw=
+github.com/availproject/op-evm-contracts v0.0.1-alpha2 h1:11CZ7Jw4bEgdOB/mEHHd2vNh5uV5E5gbkj3tS4YCi/8=
+github.com/availproject/op-evm-contracts v0.0.1-alpha2/go.mod h1:sa3N0EsCc+rCSG+vWw29aP4YFBBa+cb2eEUUIeaZxhw=
 github.com/aws/aws-sdk-go v1.44.61 h1:NcpLSS3Z0MiVQIYugx4I40vSIEEAXT0baO684ExNRco=
 github.com/aws/aws-sdk-go v1.44.61/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=

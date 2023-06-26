@@ -2,30 +2,31 @@ package tests
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"flag"
-	"math/big"
-	"net/netip"
-	"testing"
-
-	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
+	"math/big"
+	"math/rand"
+	"net/netip"
+	"testing"
 
 	"github.com/availproject/op-evm-contracts/testing/pkg/testtoken"
 	"github.com/availproject/op-evm/consensus/avail"
 	"github.com/availproject/op-evm/pkg/devnet"
 )
 
-const walletsDir = "../data/wallets"
+// privateKeyBytes faucet account private key
+const privateKeyBytes = "e29fc399e151b829ca68ba811108965aeec52c21f2ac1744cb28f203231dc085"
 
 func Benchmark_SendingTransactions(b *testing.B) {
-	b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
+	//b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 
-	ks := keystore.NewKeyStore(walletsDir, keystore.StandardScryptN, keystore.StandardScryptP)
 	addr, err := netip.ParseAddr(*bindInterface)
 	if err != nil {
 		b.Fatal(err)
@@ -38,8 +39,6 @@ func Benchmark_SendingTransactions(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		// Shutdown all nodes once test finishes.
-		b.Cleanup(ctx.StopAll)
 
 		b.Log("nodes started")
 
@@ -56,16 +55,27 @@ func Benchmark_SendingTransactions(b *testing.B) {
 
 	waitForPeers(b, ethClient, 3)
 
-	accs := ks.Accounts()
-	ownerAccount := accs[0]
 	chainID, err := ethClient.ChainID(context.Background())
 	if err != nil {
 		b.Fatal(err)
 	}
-	auth, err := authOpts(ethClient, chainID, ks, ownerAccount)
+
+	privatekey, err := crypto.BytesToECDSAPrivateKey([]byte(privateKeyBytes))
 	if err != nil {
 		b.Fatal(err)
 	}
+	address := common.Address(crypto.PubKeyToAddress(privatekey.Public().(*ecdsa.PublicKey)))
+
+	nonce, err := ethClient.PendingNonceAt(context.Background(), address)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	auth, err := authOpts(ethClient, chainID, privatekey)
+	if err != nil {
+		b.Fatal(err)
+	}
+	auth.Nonce = big.NewInt(0).SetUint64(nonce + 1)
 	_, _, testToken, err := testtoken.DeployTesttoken(auth, ethClient)
 	if err != nil {
 		b.Fatal(err)
@@ -73,7 +83,7 @@ func Benchmark_SendingTransactions(b *testing.B) {
 
 	b.Run("TestToken.mint", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err = testToken.Mint(auth, ownerAccount.Address, big.NewInt(1))
+			_, err = testToken.Mint(auth, address, big.NewInt(rand.Int63n(10000000)+1))
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -82,29 +92,12 @@ func Benchmark_SendingTransactions(b *testing.B) {
 }
 
 // nolint:unused
-func authOpts(client *ethclient.Client, chainID *big.Int, ks *keystore.KeyStore, fromAccount accounts.Account) (*bind.TransactOpts, error) {
+func authOpts(client *ethclient.Client, chainID *big.Int, privatekey *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, err
 	}
-
-	passpharse := "secret"
-	err = ks.Unlock(fromAccount, passpharse)
-	if err != nil {
-		return nil, err
-	}
-
-	keyjson, err := ks.Export(fromAccount, passpharse, passpharse)
-	if err != nil {
-		return nil, err
-	}
-
-	privatekey, err := keystore.DecryptKey(keyjson, passpharse)
-	if err != nil {
-		return nil, err
-	}
-
-	auth, err := bind.NewKeyedTransactorWithChainID(privatekey.PrivateKey, chainID)
+	auth, err := bind.NewKeyedTransactorWithChainID(privatekey, chainID)
 	if err != nil {
 		return nil, err
 	}

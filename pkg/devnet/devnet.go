@@ -248,7 +248,7 @@ func configureNode(pa *PortAllocator, nodeType consensus.MechanismType) (*pkg_co
 			DataDir:            rawConfig.DataDir,
 			Seal:               true, // Seal enables TxPool P2P gossiping
 			PriceLimit:         rawConfig.TxPool.PriceLimit,
-			MaxAccountEnqueued: 128,
+			MaxAccountEnqueued: 2048,
 			MaxSlots:           rawConfig.TxPool.MaxSlots,
 			SecretsManager:     nil,
 			RestoreFile:        nil,

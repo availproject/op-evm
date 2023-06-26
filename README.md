@@ -34,7 +34,13 @@ The Staking component handles the staking mechanisms within OpEVM. It manages st
 
 ## Getting Started
 
-For detailed instructions on installation, configuration, and usage, refer to the [DEPLOYMENT](/docs/demo.md).
+### Demo Deployment
+
+For detailed instructions on installation, configuration, and usage, refer to the [DEMO DEPLOYMENT](/docs/demo-deployment.md).
+
+### Devnet/Testnet Deployment
+
+To deploy a devnet or a testnet in AWS using terraform follow the instructions [here](/deployment/readme.md).
 
 ## Testing Fraudproof
 

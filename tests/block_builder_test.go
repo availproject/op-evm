@@ -10,13 +10,13 @@ import (
 
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/staking"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 	"github.com/test-go/testify/assert"
 )
 

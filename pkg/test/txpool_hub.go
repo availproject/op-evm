@@ -6,7 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
+	"github.com/availproject/op-evm/pkg/blockchain"
 )
 
 // txpoolHub is a struct that holds a state and a Blockchain instance.

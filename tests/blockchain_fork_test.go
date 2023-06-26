@@ -10,13 +10,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/blockchain"
+	"github.com/availproject/op-evm/pkg/common"
+	"github.com/availproject/op-evm/pkg/staking"
+	"github.com/availproject/op-evm/pkg/test"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
-	"github.com/maticnetwork/avail-settlement/pkg/common"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/test"
 )
 
 func Test_ForkBlockchain(t *testing.T) {

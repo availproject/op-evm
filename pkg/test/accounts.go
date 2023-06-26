@@ -12,8 +12,8 @@ import (
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/blockchain"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
 // NewAccount is a test helper function that creates a new account with a private key and returns its address and private key.

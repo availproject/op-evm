@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
+	"github.com/availproject/op-evm/pkg/blockchain"
 )
 
 // GetHeadBlock retrieves the head block from the provided blockchain instance.

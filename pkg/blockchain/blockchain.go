@@ -16,8 +16,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
-	staking_contract "github.com/maticnetwork/avail-settlement-contracts/staking/pkg/staking"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
+	staking_contract "github.com/availproject/avail-settlement-contracts/staking/pkg/staking"
+	"github.com/availproject/op-evm/pkg/block"
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/hashicorp/go-hclog"

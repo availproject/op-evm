@@ -6,8 +6,8 @@ import (
 
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/availproject/op-evm/pkg/blockchain"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 )
 
 // NodeType represents a type of node, either Sequencer or Watchtower.

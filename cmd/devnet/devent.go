@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/cobra"
 	"net/netip"
 
-	"github.com/maticnetwork/avail-settlement/cmd/server"
-	"github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/devnet"
+	"github.com/availproject/op-evm/cmd/server"
+	"github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/devnet"
 )
 
 func GetCommand() *cobra.Command {

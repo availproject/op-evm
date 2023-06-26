@@ -3,9 +3,9 @@ package snapshot
 import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/snapshot/proto"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/maticnetwork/avail-settlement/pkg/snapshot/proto"
 )
 
 const (

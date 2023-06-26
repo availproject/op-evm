@@ -10,10 +10,10 @@ import (
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/spf13/cobra"
 
-	consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/config"
-	"github.com/maticnetwork/avail-settlement/server"
+	consensus "github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/avail"
+	"github.com/availproject/op-evm/pkg/config"
+	"github.com/availproject/op-evm/server"
 )
 
 // GetCommand returns a Cobra command for running the settlement layer server.

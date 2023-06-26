@@ -1,9 +1,9 @@
 package avail
 
 import (
+	"github.com/availproject/op-evm/consensus/avail/validator"
+	"github.com/availproject/op-evm/pkg/avail"
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
 )
 
 // getNextAvailBlockNumber determines the next Avail block number to be processed.

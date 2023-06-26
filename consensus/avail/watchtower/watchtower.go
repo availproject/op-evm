@@ -9,10 +9,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/blockchain"
+	"github.com/availproject/op-evm/pkg/staking"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
 var (

@@ -84,4 +84,4 @@ data/test-accounts/*
 deployment/nets/private
 
 cmd/server/server
-avail-settlement
+op-evm

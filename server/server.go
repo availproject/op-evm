@@ -15,8 +15,8 @@ import (
 
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/server"
-	avail_consensus "github.com/maticnetwork/avail-settlement/consensus/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/snapshot"
+	avail_consensus "github.com/availproject/op-evm/consensus/avail"
+	"github.com/availproject/op-evm/pkg/snapshot"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -38,8 +38,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validate"
+	"github.com/availproject/op-evm/pkg/blockchain"
 	"github.com/hashicorp/go-hclog"
-	"github.com/maticnetwork/avail-settlement/pkg/blockchain"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"

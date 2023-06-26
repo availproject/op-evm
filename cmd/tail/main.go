@@ -12,9 +12,9 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 
-	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
-	"github.com/maticnetwork/avail-settlement/pkg/staking"
+	"github.com/availproject/op-evm/pkg/avail"
+	"github.com/availproject/op-evm/pkg/block"
+	"github.com/availproject/op-evm/pkg/staking"
 )
 
 func GetCommand() *cobra.Command {

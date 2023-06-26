@@ -134,8 +134,6 @@ func (asq *activeParticipantsQuerier) Get(nodeType NodeType) ([]types.Address, e
 // It takes the addr parameter, which represents the address to check, and the nodeType parameter, which represents the type of node (Sequencer or WatchTower).
 // It returns a boolean value indicating whether the address is found and an error if the operation fails.
 func (asq *activeParticipantsQuerier) Contains(addr types.Address, nodeType NodeType) (bool, error) {
-	asq.logger.Debug("WHAT IS THE NODE TYPE: %s", strings.ToLower(string(nodeType)))
-
 	addrs, err := asq.Get(nodeType)
 	if err != nil {
 		return false, err

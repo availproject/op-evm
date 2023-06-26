@@ -38,7 +38,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 		panic(err)
 	}
 
-	logger.Info("watchtower started")
+	logger.Info("Watchtower started")
 
 	for {
 		select {
@@ -57,10 +57,11 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 		blksLoop:
 			for _, blk := range blks {
+				d.logger.Debug("About to process block...", "block_number", blk.Header.Number, "hash", blk.Header.Hash.String(), "txns", len(blk.Transactions))
+
 				// Regardless of if block is malicious or not, apply it to the chain
 				if err := watchTower.Apply(blk); err != nil {
 					logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-					continue blksLoop
 				}
 
 				// Periodically verify that we are staked, before proceeding with watchtower

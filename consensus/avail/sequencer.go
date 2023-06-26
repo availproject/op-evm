@@ -218,7 +218,6 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		// logic. In the unexpected case of being slashed and dropping below the
 		// required sequencer staking threshold, we must stop processing, because
 		// otherwise we just get slashed more.
-		sw.logger.Debug("AM I EXECUTING IT HERE AND WHAT IS THE NODE TYPE", "NODETYPE", string(sw.nodeType))
 		sequencerStaked, sequencerError := activeSequencersQuerier.Contains(sw.nodeAddr)
 		if sequencerError != nil {
 			sw.logger.Error("failed to check if my account is among active staked sequencers; cannot continue", "error", sequencerError)

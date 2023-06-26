@@ -10,12 +10,6 @@ protoc:
 run-benchmarks:
 	go test ./tests -bench=. -run ^$$
 
-.PHONY: bootstrap-secrets
-bootstrap-secrets: build
-	./op-evm secrets init --insecure --data-dir ./data/avail-bootnode-1
-	./op-evm secrets init --insecure --data-dir ./data/avail-node-1
-	./op-evm secrets init --insecure --data-dir ./data/avail-node-2
-
 .PHONY: build-staking-contract
 build-staking-contract:
 	cd $(STAKING_CONTRACT_PATH) && make build

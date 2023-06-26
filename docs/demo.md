@@ -55,11 +55,11 @@ To set up a local DevNet, follow these steps:
 2. Save the generated token as the G_TOKEN environment variable.
 3. Run the following commands to download the Avail Settlement Layer binary, unzip it, and start a DevNet:
 ```shell
-ASSET_ID=$(curl -H "Authorization: token $G_TOKEN" https://api.github.com/repos/availproject/avail-settlement/releases/tags/v0.0.0-test5 | jq '.assets[] | select(.name == "avail-settlement-linux-arm64.zip") | .id')
-curl -LJO -H "Authorization: token $G_TOKEN" -H 'Accept: application/octet-stream' https://api.github.com/repos/availproject/avail-settlement/releases/assets/$ASSET_ID
-unzip avail-settlement-linux-arm64.zip
+ASSET_ID=$(curl -H "Authorization: token $G_TOKEN" https://api.github.com/repos/availproject/op-evm/releases/tags/v0.0.0-test5 | jq '.assets[] | select(.name == "op-evm-linux-arm64.zip") | .id')
+curl -LJO -H "Authorization: token $G_TOKEN" -H 'Accept: application/octet-stream' https://api.github.com/repos/availproject/op-evm/releases/assets/$ASSET_ID
+unzip op-evm-linux-arm64.zip
 mkdir -p data/test-accounts
-./avail-settlement devnet
+./op-evm devnet
 ```
 
 You should see logs similar to this:
@@ -112,7 +112,7 @@ To export the private key from your MetaMask wallet, follow these steps:
 
 1. Clone the Avail settlement contracts repository:
 ```shell
-git clone https://$G_TOKEN@github.com/availproject/op-evm-contracts.git
+git clone https://$G_TOKEN@github.com/availproject/avail-settlement-contracts.git
 cd avail-settlement-contracts/testing
 ```
 2. Install dependencies and copy the environment file:

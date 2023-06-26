@@ -2,7 +2,6 @@ package staking
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"sort"
 
@@ -72,6 +71,5 @@ func (rasq *randomizedActiveSequencersQuerier) Get() ([]types.Address, error) {
 // It delegates the check to the underlying querier and returns the result.
 // An error is returned if the operation fails.
 func (rasq *randomizedActiveSequencersQuerier) Contains(addr types.Address) (bool, error) {
-	fmt.Printf("AM I HERE AND WHAT TYPE AM I? type: %v \n", Sequencer)
 	return rasq.querier.Contains(addr, Sequencer)
 }

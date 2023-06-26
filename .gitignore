@@ -30,12 +30,6 @@ go.work
 
 ### VisualStudioCode ###
 .vscode/
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
 
 # Local History for Visual Studio Code
 .history/
@@ -48,40 +42,21 @@ go.work
 .history
 .ionide
 
-# Support for Project snippet scope
-.vscode/*.code-snippets
-
 # Ignore code-workspaces
 *.code-workspace
 
 # End of https://www.toptal.com/developers/gitignore/api/go,visualstudiocode
 
-
 # Common binaries
 server/server
 client/client
-tools/e2e/e2e
-tools/fraud/fraud
-tools/wallet/wallet
 data/avail-bootnode-1/blockchain/*
+data/avail-bootnode-1/trie/*
 data/avail-node-1/blockchain/*
-data/avail-node-2/blockchain/*
+data/avail-node-1/trie/*
 data/avail-watchtower-1/blockchain/*
 data/avail-watchtower-1/trie/*
-data/avail-bootnode-1/trie/*
-data/avail-bootnode-1/trie
-data/avail-watchtower-1/trie
-tools/staking/staking
-tools/accounts/accounts
-
-# Testing account sequencer/watchtower secrets
-config/account-*
-
-node_modules
-contracts/stake/node_modules
 data/test-accounts/*
 .terraform
 deployment/nets/private
-
-cmd/server/server
 op-evm

@@ -1,4 +1,3 @@
-STAKING_CONTRACT_PATH=.$(pwd)/../op-emv-contracts/staking/
 GOOS=
 GOARCH=
 
@@ -9,10 +8,6 @@ protoc:
 .PHONY: run-benchmarks
 run-benchmarks:
 	go test ./tests -bench=. -run ^$$
-
-.PHONY: build-staking-contract
-build-staking-contract:
-	cd $(STAKING_CONTRACT_PATH) && make build
 
 .PHONY: build
 build:

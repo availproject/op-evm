@@ -38,7 +38,7 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 		panic(err)
 	}
 
-	logger.Info("watchtower started")
+	logger.Info("Watchtower started")
 
 	for {
 		select {
@@ -49,21 +49,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 			availBlockStream.Close()
 			return
 		case availBlk := <-availBlockStream.Chan():
-			// Periodically verify that we are staked, before proceeding with watchtower
-			// logic. In the unexpected case of being slashed and dropping below the
-			// required watchtower staking threshold, we must stop processing, because
-			// otherwise we just get slashed more.
-			watchtowerStaked, sequencerError := activeParticipantsQuerier.Contains(d.minerAddr, staking.WatchTower)
-			if sequencerError != nil {
-				d.logger.Error("failed to check if my account is among active staked watchtowers; cannot continue", "error", sequencerError)
-				continue
-			}
-
-			if !watchtowerStaked {
-				d.logger.Error("my account is not among active staked watchtower; cannot continue", "address", d.minerAddr.String())
-				continue
-			}
-
 			blks, err := avail.BlockFromAvail(availBlk, d.availAppID, callIdx, d.logger)
 			if err != nil {
 				logger.Error("cannot extract Edge blocks from Avail block", "block_number", availBlk.Block.Header.Number, "error", err)
@@ -72,8 +57,30 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 		blksLoop:
 			for _, blk := range blks {
+				d.logger.Debug("About to process block...", "block_number", blk.Header.Number, "hash", blk.Header.Hash.String(), "txns", len(blk.Transactions))
+
+				// Regardless of if block is malicious or not, apply it to the chain
+				if err := watchTower.Apply(blk); err != nil {
+					logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
+				}
+
+				// Periodically verify that we are staked, before proceeding with watchtower
+				// logic. In the unexpected case of being slashed and dropping below the
+				// required watchtower staking threshold, we must stop processing, because
+				// otherwise we just get slashed more.
+				watchtowerStaked, sequencerError := activeParticipantsQuerier.Contains(d.minerAddr, staking.WatchTower)
+				if sequencerError != nil {
+					d.logger.Error("failed to check if my account is among active staked watchtowers; cannot continue", "error", sequencerError)
+					continue blksLoop
+				}
+
+				if !watchtowerStaked {
+					d.logger.Error("my account is not among active staked watchtower; cannot continue", "address", d.minerAddr.String())
+					continue blksLoop
+				}
+
 				err = watchTower.Check(blk)
-				if err != nil { //  || blk.Number() == 4  - test the fraud
+				if err != nil {
 					// TODO: We should implement something like SafeCheck() to not return errors that should not
 					// result in creating fraud proofs for blocks/transactions that should not be checked.
 					if err != nil {
@@ -82,20 +89,13 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 						}
 					}
 
-					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-
-					// Skip processing of fraudproof block. It's not written to blockchain on sequencers
-					// either.
+					// Skip processing of fraudproof block. It's not written to blockchain on sequencers either.
 					_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
 					if exists {
-						continue
+						continue blksLoop
 					}
 
-					// Apply block into local blockchain, even if the block was "invalid/malicious", because
-					// otherwise the local blockchain wouldn't be consistent with the one on sequencers.
-					if err := watchTower.Apply(blk); err != nil {
-						logger.Error("failed to write block to blockchain prior constructing fraud proof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-					}
+					logger.Info("Block verification failed. constructing fraudproof", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
 
 					fp, err := watchTower.ConstructFraudproof(blk)
 					if err != nil {
@@ -113,14 +113,6 @@ func (d *Avail) runWatchTower(activeParticipantsQuerier staking.ActiveParticipan
 
 					logger.Info("Submitted fraudproof", "block_number", fp.Header.Number, "block_hash", fp.Header.Hash, "txns", len(fp.Transactions))
 					continue blksLoop
-				}
-
-				_, exists := block.GetExtraDataFraudProofTarget(blk.Header)
-				if !exists {
-					err = watchTower.Apply(blk)
-					if err != nil {
-						logger.Error("cannot apply block to blockchain", "block_number", blk.Header.Number, "block_hash", blk.Header.Hash, "error", err)
-					}
 				}
 			}
 		}

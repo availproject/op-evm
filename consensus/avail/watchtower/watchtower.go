@@ -88,7 +88,7 @@ func (wt *watchTower) Apply(blk *types.Block) error {
 	// the old transactions are removed
 	wt.txpool.ResetWithHeaders(blk.Header)
 
-	wt.logger.Info("Block committed to blockchain", "block_number", blk.Header.Number, "hash", blk.Header.Hash.String())
+	wt.logger.Info("Block committed to blockchain", "block_number", blk.Header.Number, "hash", blk.Header.Hash.String(), "txns", len(blk.Transactions))
 	wt.logger.Debug("Received block header", "block_header", blk.Header)
 	wt.logger.Debug("Received block transactions", "block_transactions", blk.Transactions)
 

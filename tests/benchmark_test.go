@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/availproject/avail-settlement-contracts/testing/pkg/testtoken"
 	"github.com/availproject/op-evm/consensus/avail"
 	"github.com/availproject/op-evm/pkg/devnet"
+	"github.com/maticnetwork/avail-settlement-contracts/testing/pkg/testtoken"
 )
 
 const walletsDir = "../data/wallets"

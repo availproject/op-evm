@@ -4,7 +4,7 @@ go 1.19
 
 replace (
 	github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-banerjee/go-substrate-rpc-client/v4 v4.0.12-avail-1.3
-	github.com/availproject/avail-settlement-contracts => ./third_party/avail-settlement-contracts
+	github.com/maticnetwork/avail-settlement-contracts => ./third_party/avail-settlement-contracts
 )
 
 require (
@@ -19,7 +19,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/juju/ansiterm v1.0.0
 	github.com/libp2p/go-libp2p v0.25.0
-	github.com/availproject/avail-settlement-contracts v0.0.0-00010101000000-000000000000
+	github.com/maticnetwork/avail-settlement-contracts v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/prometheus/client_golang v1.15.1
 	github.com/spf13/cobra v1.7.0

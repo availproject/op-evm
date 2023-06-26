@@ -112,7 +112,7 @@ To export the private key from your MetaMask wallet, follow these steps:
 
 1. Clone the Avail settlement contracts repository:
 ```shell
-git clone https://$G_TOKEN@github.com/availproject/avail-settlement-contracts.git
+git clone https://$G_TOKEN@github.com/maticnetwork/avail-settlement-contracts.git
 cd avail-settlement-contracts/testing
 ```
 2. Install dependencies and copy the environment file:

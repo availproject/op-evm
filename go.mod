@@ -7,7 +7,7 @@ replace github.com/centrifuge/go-substrate-rpc-client/v4 => github.com/prabal-ba
 require (
 	github.com/0xPolygon/polygon-edge v1.0.0-rc1
 	github.com/armon/go-metrics v0.4.1
-	github.com/availproject/op-evm-contracts v0.0.1-alpha1
+	github.com/availproject/op-evm-contracts v0.0.1-alpha2
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.3
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/google/go-cmp v0.5.9

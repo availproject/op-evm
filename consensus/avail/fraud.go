@@ -145,15 +145,23 @@ func (f *Fraud) ShouldStopProducingBlocks(activeParticipantsQuerier staking.Acti
 				break innerLoop
 			}
 
-			isWatchtower, err := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
-			if err != nil {
-				f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
-				continue
-			}
-
 			isBeginDisputeResolutionTx, err := staking.IsBeginDisputeResolutionTx(tx)
 			if err != nil {
 				f.logger.Debug("failure while checking if tx is type of begin dispute resolution", "error", err)
+				// Just a bit of the time to not break the CPU...
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
+			if !isBeginDisputeResolutionTx {
+				// Just a bit of the time to not break the CPU...
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
+			isWatchtower, err := activeParticipantsQuerier.Contains(tx.From, staking.WatchTower)
+			if err != nil {
+				f.logger.Debug("failure while checking if tx from is active watchtower", "error", err)
 				continue
 			}
 

@@ -1,11 +1,11 @@
 package staking
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	edge_crypto "github.com/0xPolygon/polygon-edge/crypto"
@@ -14,6 +14,7 @@ import (
 	staking_contract "github.com/availproject/op-evm-contracts/staking/pkg/staking"
 	"github.com/availproject/op-evm/pkg/block"
 	"github.com/availproject/op-evm/pkg/blockchain"
+	eth_abi "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -467,39 +468,23 @@ func BeginDisputeResolutionTx(from types.Address, probationAddr types.Address, g
 //	  log.Fatalf("failed to check dispute resolution transaction: %s", err)
 //	}
 func IsBeginDisputeResolutionTx(tx *types.Transaction) (bool, error) {
-	method, ok := abi.MustNewABI(staking_contract.StakingABI).Methods["BeginDisputeResolution"]
-	if !ok {
-		panic("BeginDisputeResolution method doesn't exist in Staking contract ABI. Contract is broken.")
-	}
-
-	fnSelector := method.ID()
-
-	if len(fnSelector) >= len(tx.Input) {
-		return false, fmt.Errorf("invalid transaction input bytes: length too short")
-	}
-
-	splitIdx := len(fnSelector)
-	s := tx.Input[:splitIdx]
-	if !bytes.Equal(s, fnSelector) {
-		return false, fmt.Errorf("smart contract function selector doesn't match")
-	}
-
-	decodedInput, err := method.Inputs.Decode(tx.Input[splitIdx:])
+	stakingAbi, err := eth_abi.JSON(strings.NewReader(staking_contract.StakingMetaData.ABI))
 	if err != nil {
-		return false, err
+		panic(fmt.Sprintf("Failed to resolve staking contract abi: %s", err))
 	}
 
-	m, ok := decodedInput.(map[string]interface{})
-	if !ok {
-		return false, fmt.Errorf("unrecognizable type decoded from dispute resolution tx: %T", decodedInput)
+	// Make sure not to process tx as it's not really ready, however DO NOT return error as it's spamming the hell
+	// out of the stdout
+	if tx == nil || len(tx.Input) < 4 {
+		return false, nil
 	}
 
-	_, exists := m["sequencerAddr"]
-	if !exists {
-		return false, fmt.Errorf("invalid parameters for BeginDisputeResolution")
+	method, err := stakingAbi.MethodById(tx.Input[:4])
+	if err == nil && method != nil && method.RawName == "BeginDisputeResolution" {
+		return true, nil
 	}
 
-	return true, nil
+	return false, nil
 }
 
 // EndDisputeResolutionTx constructs a transaction to conclude the dispute resolution process on the Staking contract.

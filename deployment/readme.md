@@ -39,7 +39,7 @@ To deploy your own DevNet for testing purposes, follow these steps:
 terraform {
   backend "s3" {
     bucket = "availsl-tf-states"
-    key    = "state/avail-settlement/<deployment-name>"
+    key    = "state/op-evm/<deployment-name>"
     region = "<region>"
   }
 }

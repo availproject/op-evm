@@ -1,4 +1,4 @@
 [submodule "third_party/avail-settlement-contracts"]
 	path = third_party/avail-settlement-contracts
-	url = git@github.com:maticnetwork/avail-settlement-contracts.git
+	url = git@github.com:availproject/avail-settlement-contracts.git
 	branch = main

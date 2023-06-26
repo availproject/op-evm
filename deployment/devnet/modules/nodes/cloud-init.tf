@@ -28,7 +28,7 @@ data "cloudinit_config" "cloud_init" {
         public_dns   = var.lb_dns_name
         node_type    = var.node_type
       }))
-      avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/avail-settlement.service", {
+      avail_settlement_service_base64 = base64encode(templatefile("${path.module}/templates/op-evm.service", {
         workspace  = local.workspace
         avail_addr = var.avail_addr
         node_type  = var.node_type

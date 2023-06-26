@@ -1,5 +1,5 @@
 {
-    "name": "polygon-avail-settlement",
+    "name": "op-evm",
     "genesis": {
         "nonce": "0x0000000000000000",
         "timestamp": "0x0",

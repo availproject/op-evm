@@ -3,7 +3,7 @@ variable "github_token" {}
 terraform {
   backend "s3" {
     bucket = "availsl-tf-states"
-    key    = "state/avail-settlement/devnet01"
+    key    = "state/op-evm/devnet01"
     region = "eu-central-1"
   }
 }

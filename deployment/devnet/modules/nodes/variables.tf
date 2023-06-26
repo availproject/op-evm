@@ -49,7 +49,7 @@ variable "base_ami" {
 }
 
 variable "avail_settlement_artifact_url" {
-  description = "The artifact url for `avail-settlement` binary"
+  description = "The artifact url for `op-evm` binary"
   type        = string
 }
 

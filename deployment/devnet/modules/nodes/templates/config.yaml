@@ -10,7 +10,7 @@ network:
   no_discover: false
   libp2p_addr: 0.0.0.0:${p2p_port}
   nat_addr: ""
-  dns_addr: "dns/${public_dns}"
+  dns_addr: ""
   max_peers: 40
   max_outbound_peers: 8
   max_inbound_peers: 32

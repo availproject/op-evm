@@ -73,7 +73,6 @@ data/avail-bootnode-1/trie
 data/avail-watchtower-1/trie
 tools/staking/staking
 tools/accounts/accounts
-assm/assm
 
 # Testing account sequencer/watchtower secrets
 config/account-*

@@ -34,12 +34,6 @@ variable "github_repository" {
   default     = "avail-settlement"
 }
 
-variable "genesis_bucket_prefix" {
-  description = "The prefix for the bucket to store the genesis.json file"
-  type        = string
-  default     = "genesis"
-}
-
 variable "release" {
   description = "The avail settlement release (will match a tag from the github.com/availproject/avail-settlement repository)"
   type        = string
@@ -55,18 +49,6 @@ variable "avail_settlement_artifact_name" {
   description = "The artifact name for `avail-settlement` binary"
   type        = string
   default     = "avail-settlement-linux-arm64.zip"
-}
-
-variable "accounts_artifact_name" {
-  description = "The artifact name for `accounts` binary"
-  type        = string
-  default     = "accounts-linux-arm64.zip"
-}
-
-variable "assm_artifact_name" {
-  description = "The artifact name for `assm` binary"
-  type        = string
-  default     = "assm-linux-amd64.zip"
 }
 
 variable "deployment_name" {

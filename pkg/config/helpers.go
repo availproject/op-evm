@@ -93,7 +93,7 @@ func ParseSecretsConfig(cfg *Config) (*secrets.SecretsManagerConfig, error) {
 // Otherwise, it parses the node type using the avail.ParseType function.
 func ParseNodeType(cfg *Config) (avail.MechanismType, error) {
 	if cfg.NodeType == "" {
-		return avail.Validator, nil
+		return avail.Sequencer, nil
 	}
 
 	return avail.ParseType(cfg.NodeType)

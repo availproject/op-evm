@@ -4,9 +4,12 @@ import (
 	avail_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/maticnetwork/avail-settlement/consensus/avail/validator"
 	"github.com/maticnetwork/avail-settlement/pkg/avail"
-	"github.com/maticnetwork/avail-settlement/pkg/block"
 )
 
+// getNextAvailBlockNumber determines the next Avail block number to be processed.
+// It starts from the first block if the current blockchain is new, otherwise,
+// it searches for the block in the Avail chain that corresponds to the last block in
+// the local chain. In case of any failure, it returns 0.
 func (d *Avail) getNextAvailBlockNumber() uint64 {
 	head := d.blockchain.Header()
 
@@ -29,6 +32,10 @@ func (d *Avail) getNextAvailBlockNumber() uint64 {
 	return uint64(blk.Block.Header.Number)
 }
 
+// syncNode synchronizes the local node with the Avail chain until it reaches
+// the latest block. It fetches the latest block from the Avail chain and syncs
+// the local node until it catches up to this block. In case of any error, it
+// logs the error message and returns the error.
 func (d *Avail) syncNode() (uint64, error) {
 	hdr, err := d.availClient.GetLatestHeader()
 	if err != nil {
@@ -44,6 +51,11 @@ func (d *Avail) syncNode() (uint64, error) {
 	return d.syncNodeUntil(fn)
 }
 
+// syncNodeUntil synchronizes the local node with the Avail chain until a
+// specified condition is met. It fetches the Avail blocks and validates
+// and writes them to the local blockchain. It continues this process until
+// the provided stopConditionFn function returns true. In case of any error,
+// it returns the number of the next Avail block to be fetched along with the error.
 func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock) bool) (uint64, error) {
 	availNextBlockNumber := d.getNextAvailBlockNumber()
 
@@ -74,9 +86,9 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 			return 0, nil
 		}
 
-		edgeBlks, err := block.FromAvail(blk, d.availAppID, callIdx, d.logger)
+		edgeBlks, err := avail.BlockFromAvail(blk, d.availAppID, callIdx, d.logger)
 		if len(edgeBlks) == 0 && err != nil {
-			if err != block.ErrNoExtrinsicFound {
+			if err != avail.ErrNoExtrinsicFound {
 				d.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
 				continue
 			}
@@ -87,11 +99,6 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 		for _, edgeBlk := range edgeBlks {
 			if !fraudResolver.IsFraudProofBlock(edgeBlk) {
 				if err := validator.Check(edgeBlk); err == nil {
-
-					if len(edgeBlk.Transactions) > 0 {
-						d.logger.Warn("WE HAVE TRANSACTIONS INSIDE")
-					}
-
 					if err := d.blockchain.WriteBlock(edgeBlk, d.nodeType.String()); err != nil {
 						d.logger.Warn(
 							"failed to write edge block received from avail",
@@ -120,11 +127,16 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 	return availNextBlockNumber, nil
 }
 
-// Searches for the edge block in the Avail and returns back avail block for future catch up by the node.
+// syncFunc generates a function that, given an Avail block, calculates the
+// offset to the target Edge block. The generated function finds the Edge blocks
+// in the Avail block and determines the offset to the target Edge block for
+// each Edge block found. It then returns the smallest offset and a boolean
+// indicating whether the target Edge block was found in the Avail block. In
+// case of any error during the process, it returns the error.
 func (d *Avail) syncFunc(targetEdgeBlock int64, callIdx avail_types.CallIndex) avail.SearchFunc {
 	return func(availBlk *avail_types.SignedBlock) (int64, bool, error) {
-		blks, err := block.FromAvail(availBlk, d.availAppID, callIdx, d.logger)
-		if err != nil && err != block.ErrNoExtrinsicFound {
+		blks, err := avail.BlockFromAvail(availBlk, d.availAppID, callIdx, d.logger)
+		if err != nil && err != avail.ErrNoExtrinsicFound {
 			return -1, false, err
 		}
 
@@ -166,6 +178,7 @@ func (d *Avail) syncFunc(targetEdgeBlock int64, callIdx avail_types.CallIndex) a
 	}
 }
 
+// abs returns the absolute value of the given int64 value.
 func abs(x int64) int64 {
 	if x < 0 {
 		return -x

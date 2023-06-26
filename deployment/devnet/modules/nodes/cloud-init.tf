@@ -15,13 +15,11 @@ data "cloudinit_config" "cloud_init" {
     filename     = "02-cloud-init.sh"
     content      = templatefile("${path.module}/templates/cloud-init.sh", {
       workspace                       = local.workspace
-      s3_bucket_name                  = var.s3_bucket_genesis_name
       avail_addr                      = var.avail_addr
       github_token_ssm_parameter_path = var.github_token_ssm_parameter_path
       user                            = local.user
       region                          = data.aws_region.current.name
       avail_settlement_artifact_url   = var.avail_settlement_artifact_url
-      accounts_artifact_url           = var.accounts_artifact_url
       config_yaml_base64              = base64encode(templatefile("${path.module}/templates/config.yaml", {
         workspace    = local.workspace
         grpc_port    = var.grpc_port
@@ -36,6 +34,7 @@ data "cloudinit_config" "cloud_init" {
         node_type  = var.node_type
         user       = local.user
       }))
+      genesis_json_base64 = base64encode(var.genesis_json)
     })
   }
 }

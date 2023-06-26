@@ -15,6 +15,11 @@ import (
 	"github.com/maticnetwork/avail-settlement/pkg/staking"
 )
 
+// ensureStaked verifies whether a node is staked in the network.
+// It takes as arguments a WaitGroup and an ActiveParticipants object.
+// It determines the node type and checks if the node is under probation.
+// If the node is not under probation and not already staked, the function tries to stake it
+// and returns an error if staking fails.
 func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staking.ActiveParticipants) error {
 	var nodeType staking.NodeType
 
@@ -29,7 +34,7 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 
 	inProbation, err := activeParticipantsQuerier.InProbation(d.minerAddr)
 	if err != nil {
-		d.logger.Error("Failed to check if participant is currently in probation", "error", err)
+		d.logger.Error("failed to check if participant is currently in probation", "error", err)
 		return err
 	}
 
@@ -40,7 +45,7 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 
 	staked, err := activeParticipantsQuerier.Contains(d.minerAddr, nodeType)
 	if err != nil {
-		d.logger.Error("Failed to check if participant exists...", "error", err)
+		d.logger.Error("failed to check if participant exists...", "error", err)
 		return err
 	}
 
@@ -69,6 +74,12 @@ func (d *Avail) ensureStaked(wg *sync.WaitGroup, activeParticipantsQuerier staki
 	return nil
 }
 
+// stakeParticipant stakes a participant in the network.
+// It takes as arguments a boolean value indicating whether to wait for discovery of additional peers
+// before pushing the block towards the rest of the community, and a string representing the node type.
+// It first builds a staking block, signs it, and then submits it to the Avail network.
+// After a successful submission, it writes the block to the local blockchain.
+// Function is used only if staked participant is bootstrap sequencer.
 func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 	// Bootnode does not need to wait for any additional peers to be discovered prior pushing the
 	// block towards rest of the community, however, sequencers and watchtowers must!
@@ -132,6 +143,13 @@ func (d *Avail) stakeParticipant(shouldWait bool, nodeType string) error {
 	return nil
 }
 
+// stakeParticipantThroughTxPool stakes a participant through the transaction pool.
+// It takes as argument an ActiveParticipants object.
+// Before proceeding, it checks for network connection.
+// It creates and signs a staking transaction, and attempts to add it to the transaction pool,
+// retrying up to 10 times if unsuccessful. If successful, it waits for the main sequencer loop
+// to do the synchronization.
+// Function is used only if staked participant is sequencer or watchtower.
 func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.ActiveParticipants) (bool, error) {
 	// We need to have at least one node available to be able successfully push tx
 	// to the neighborhood peers.
@@ -162,7 +180,7 @@ func (d *Avail) stakeParticipantThroughTxPool(activeParticipantsQuerier staking.
 		d.logger.Info("Submitting stake to the tx pool", "retry", retries)
 		// Submit staking transaction for execution by active sequencer.
 		if err := d.txpool.AddTx(tx); err != nil {
-			d.logger.Error("Failure to add staking tx to the txpool err: %s", err)
+			d.logger.Error("failure to add staking tx to the txpool err: %s", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}

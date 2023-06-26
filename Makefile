@@ -1,4 +1,4 @@
-STAKING_CONTRACT_PATH=.$(pwd)/third_party/avail-settlement-contracts/staking/
+STAKING_CONTRACT_PATH=.$(pwd)/../op-emv-contracts/staking/
 GOOS=
 GOARCH=
 

@@ -113,17 +113,17 @@ To export the private key from your MetaMask wallet, follow these steps:
 1. Clone the Avail settlement contracts repository:
 ```shell
 git clone https://$G_TOKEN@github.com/availproject/op-evm-contracts.git
-cd avail-settlement-contracts/testing
+cd op-evm-contracts/testing
 ```
 2. Install dependencies and copy the environment file:
 ```shell
-cd avail-settlement-contracts/testing
+cd op-evm-contracts/testing
 npm install
 cp .env.example .env
 ```
 3. Set the appropriate values for the environment variables in the .env file. In this demo, the values should be as follows:
 ```shell
-AVAIL_SL_URL=http://127.0.0.1:49601/
+OPEVM_SL_URL=http://127.0.0.1:49601/
 ACC_PRIVATE_KEY=<private key>
 ```
 

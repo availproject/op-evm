@@ -123,7 +123,7 @@ cp .env.example .env
 ```
 3. Set the appropriate values for the environment variables in the .env file. In this demo, the values should be as follows:
 ```shell
-OPEVM_SL_URL=http://127.0.0.1:49601/
+OPEVM_URL=http://127.0.0.1:49601/
 ACC_PRIVATE_KEY=<private key>
 ```
 

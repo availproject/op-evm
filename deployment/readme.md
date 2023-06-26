@@ -50,7 +50,7 @@ module "devnet" {
   region          = "<region>"
   base_ami        = "<ami>" # Latest ubuntu ami 
   avail_hostname  = "internal-rpc.testnetsl.avail.private"
-  release         = "v0.0.0-test5" # Use latest release
+  release         = "v0.0.1" # Use latest release
   avail_peer      = {
     route53_zone_private_id = "<route53-zone>"
     route_table_private_ids = [ 

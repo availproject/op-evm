@@ -28,7 +28,7 @@ func GetCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&availAddr, "avail-addr", "ws://127.0.0.1:9944/v1/json-rpc", "Avail JSON-RPC URL")
-	cmd.Flags().StringVar(&jsonrpcAddr, "jsonrpc-addr", "http://127.0.0.1:10002/v1/json-rpc", "Avail Settlement Layer JSON-RPC URL")
+	cmd.Flags().StringVar(&jsonrpcAddr, "jsonrpc-addr", "http://127.0.0.1:10002/v1/json-rpc", "Optimistic EVM Rollup JSON-RPC URL")
 	cmd.Flags().Int64Var(&offset, "offset", 1, "Block offset; defaults to first block")
 	return cmd
 }

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// MechanismType represents the type of a mechanism in the settlement layer system. It is used to categorize and manipulate
+// MechanismType represents the type of mechanism in the optimistic EVM rollup system. It is used to categorize and manipulate
 // mechanisms based on their types.
 type MechanismType string
 

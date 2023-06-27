@@ -35,7 +35,7 @@ variable "github_repository" {
 }
 
 variable "release" {
-  description = "The avail settlement release (will match a tag from the github.com/availproject/op-evm repository)"
+  description = "The Optimistic EVM Rollup release (will match a tag from the github.com/availproject/op-evm repository)"
   type        = string
 }
 

@@ -36,7 +36,7 @@ The Staking component handles the staking mechanisms within OpEVM. It manages st
 
 ### Demo Deployment
 
-For detailed instructions on installation, configuration, and usage, refer to the [DEMO DEPLOYMENT](/docs/demo-deployment.md).
+For detailed instructions on installation, configuration, and usage, refer to the [DEMO DEPLOYMENT](/docs/demo.md).
 
 ### Devnet/Testnet Deployment
 

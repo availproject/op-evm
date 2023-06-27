@@ -22,7 +22,7 @@ func GetCommand() *cobra.Command {
 	var offset int64
 	cmd := &cobra.Command{
 		Use:   "tail",
-		Short: "Follow Avail SL blockstream from Avail",
+		Short: "Follow OpEVM blockstream from Avail",
 		Run: func(cmd *cobra.Command, args []string) {
 			Run(availAddr, jsonrpcAddr, offset)
 		},

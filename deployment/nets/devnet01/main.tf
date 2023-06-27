@@ -14,7 +14,7 @@ module "devnet" {
   region          = "eu-central-1"
   base_ami        = "ami-0329d3839379bfd15"
   avail_hostname  = "internal-rpc.testnetopevm.avail.private"
-  release         = "v0.0.1"
+  release         = "v0.1.0"
   avail_peer      = {
     route53_zone_private_id = "Z0862640EX4LNUFXIE04"
     route_table_private_ids = [

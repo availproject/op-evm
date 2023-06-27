@@ -89,7 +89,7 @@ func (d *Avail) syncNodeUntil(stopConditionFn func(blk *avail_types.SignedBlock)
 		edgeBlks, err := avail.BlockFromAvail(blk, d.availAppID, callIdx, d.logger)
 		if len(edgeBlks) == 0 && err != nil {
 			if err != avail.ErrNoExtrinsicFound {
-				d.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
+				d.logger.Warn("unexpected error while extracting OpEVM blocks from Avail block", "error", err)
 				continue
 			}
 		}

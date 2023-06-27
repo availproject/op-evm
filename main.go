@@ -14,7 +14,7 @@ import (
 
 func main() {
 	cmd := &cobra.Command{
-		Short: "Avail settlement layer",
+		Short: "Optimistic EVM Rollup",
 	}
 	cmd.AddCommand(
 		server.GetCommand(),

@@ -1,8 +1,8 @@
 # Demo
 
 This demonstration will encompass the following topics:
-1. Initiating a local Avail + Avail Settlement Layer development network.
-2. Establishing a connection between the MetaMask wallet and the Settlement Layer chain.
+1. Initiating a local Avail + Optimistic EVM Rollup development network.
+2. Establishing a connection between the MetaMask wallet and the Optimistic EVM Rollup chain.
 3. Deploying and minting ERC20 tokens and NFT tokens.
 4. Importing assets into the MetaMask wallet.
 
@@ -53,7 +53,7 @@ tar -xzvf data-avail-linux-aarch64.tar.gz
 To set up a local DevNet, follow these steps:
 1. Generate an auth token from [github.com/settings/tokens](github.com/settings/tokens).
 2. Save the generated token as the G_TOKEN environment variable.
-3. Run the following commands to download the Avail Settlement Layer binary, unzip it, and start a DevNet:
+3. Run the following commands to download the Optimistic EVM Rollup binary, unzip it, and start a DevNet:
 ```shell
 ASSET_ID=$(curl -H "Authorization: token $G_TOKEN" https://api.github.com/repos/availproject/op-evm/releases/tags/v0.0.1 | jq '.assets[] | select(.name == "op-evm-linux-arm64.zip") | .id')
 curl -LJO -H "Authorization: token $G_TOKEN" -H 'Accept: application/octet-stream' https://api.github.com/repos/availproject/op-evm/releases/assets/$ASSET_ID
@@ -110,7 +110,7 @@ To export the private key from your MetaMask wallet, follow these steps:
 
 ## Setting up Hardhat
 
-1. Clone the Avail settlement contracts repository:
+1. Clone the Optimistic EVM Rollup contracts repository:
 ```shell
 git clone https://$G_TOKEN@github.com/availproject/op-evm-contracts.git
 cd op-evm-contracts/testing

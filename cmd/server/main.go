@@ -16,7 +16,7 @@ import (
 	"github.com/availproject/op-evm/server"
 )
 
-// GetCommand returns a Cobra command for running the settlement layer server.
+// GetCommand returns a Cobra command for running the optimistic EVM rollup.
 // It takes no arguments and returns a pointer to a cobra.Command.
 // Example usage:
 // cmd := GetCommand()
@@ -29,7 +29,7 @@ func GetCommand() *cobra.Command {
 	var availAddr, path, accountPath, fraudListenAddr string
 	cmd := &cobra.Command{
 		Use:   "server",
-		Short: "Run the settlement layer server",
+		Short: "Run the Optimistic EVM Rollup",
 		Run: func(cmd *cobra.Command, args []string) {
 			Run(availAddr, path, accountPath, fraudListenAddr, bootnode)
 		},
@@ -42,7 +42,7 @@ func GetCommand() *cobra.Command {
 	return cmd
 }
 
-// Run initializes and starts the settlement layer server. It takes the Avail JSON-RPC URL, a file path for
+// Run initializes and starts the optimistic EVM rollup server. It takes the Avail JSON-RPC URL, a file path for
 // the configuration file, a file path for the account mnemonic file, a fraud server listen address and a bootnode
 // flag. It does not return a value.
 // Example usage:

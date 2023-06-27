@@ -48,7 +48,7 @@ tar -xzvf data-avail-linux-aarch64.tar.gz
 ./data-avail-linux-aarch64 --dev
 ```
 
-## Setting up a Local SL DevNet
+## Setting up a Local OpEVM DevNet
 
 To set up a local DevNet, follow these steps:
 1. Generate an auth token from [github.com/settings/tokens](github.com/settings/tokens).
@@ -82,11 +82,11 @@ To deploy a devnet or a testnet in AWS using terraform follow the instructions [
 1. Open your MetaMask wallet.
 2. Go to **Settings > Networks > Add Network > Add a network manually**.
 3. Fill in the following network details:
-    - Network name: `Avail SL`
+    - Network name: `OpEVM devnet`
     - New RPC URL: `http://127.0.0.1:49601/` (use your bootstrap sequencer rpc link)
     - Chain ID: `100`
     - Currency symbol: `ETH`
-4. Click "Save" and switch to the `Avail Sl` network.
+4. Click "Save" and switch to the `OpEVM devnet` network.
 
 ## Transferring Tokens from the Faucet Account
 

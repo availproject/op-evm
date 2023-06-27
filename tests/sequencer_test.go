@@ -46,9 +46,6 @@ func Test_MultipleSequencers(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Shutdown all nodes once test finishes.
-		t.Cleanup(ctx.StopAll)
-
 		t.Log("nodes started")
 
 		ethClient, err = ctx.GethClient(avail.BootstrapSequencer)

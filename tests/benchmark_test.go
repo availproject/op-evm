@@ -23,7 +23,7 @@ import (
 const privateKeyBytes = "e29fc399e151b829ca68ba811108965aeec52c21f2ac1744cb28f203231dc085"
 
 func Benchmark_SendingTransactions(b *testing.B) {
-	//b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
+	b.Skip("multi-sequencer benchmarks disabled in CI/CD due to lack of Avail")
 
 	flag.Parse()
 

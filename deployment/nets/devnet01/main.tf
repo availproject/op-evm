@@ -13,16 +13,16 @@ module "devnet" {
   deployment_name = "devnet01"
   region          = "eu-central-1"
   base_ami        = "ami-0329d3839379bfd15"
-  avail_hostname  = "internal-rpc.testnetsl.avail.private"
+  avail_hostname  = "internal-rpc.testnetopevm.avail.private"
   release         = "v0.0.1"
   avail_peer      = {
-    route53_zone_private_id = "Z0203299HDIO94TVIKOE"
+    route53_zone_private_id = "Z0862640EX4LNUFXIE04"
     route_table_private_ids = [
-      "rtb-09ccd6e9861b75348",
-      "rtb-04322cec80f3852fe",
-      "rtb-093f19237360b723b",
+      "rtb-08cf5bd8611e433b2",
+      "rtb-0fea1adae5499b243",
+      "rtb-0cfce2eb657f6eb28",
     ]
-    vpc_id = "vpc-0104686bd6c7cd394"
+    vpc_id = "vpc-03a641408742d0e21"
   }
   github_token = var.github_token
 }

@@ -1,0 +1,13 @@
+[Unit]
+Description=
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStart=${workspace}/op-evm server --bootstrap --config-file=${workspace}/config.yaml --avail-addr="ws://${avail_addr}/v1/json-rpc" --account-config-file="${workspace}/account-mnemonic"
+User=${user}
+
+[Install]
+WantedBy=multi-user.target

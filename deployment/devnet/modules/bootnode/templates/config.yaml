@@ -1,0 +1,32 @@
+chain_config: "${workspace}/genesis.json"
+secrets_config: "${workspace}/secrets-config.json"
+data_dir: "${workspace}/data"
+block_gas_target: "0x0"
+grpc_addr: :${grpc_port}
+jsonrpc_addr: :${jsonrpc_port}
+telemetry:
+  prometheus_addr: ""
+network:
+  no_discover: false
+  libp2p_addr: 0.0.0.0:${p2p_port}
+  nat_addr: ""
+  dns_addr: "dns/${public_dns}"
+  max_peers: 40
+  max_outbound_peers: 8
+  max_inbound_peers: 32
+seal: true
+tx_pool:
+  price_limit: 0
+  max_slots: 4096
+  max_account_enqueued: 128
+log_level: ERROR
+restore_file: ""
+block_time_s: 2
+headers:
+  access_control_allow_origins:
+    - '*'
+log_to: ""
+json_rpc_batch_request_limit: 20
+json_rpc_block_range_limit: 1000
+node_type: "bootstrap-sequencer"
+json_log_format: false

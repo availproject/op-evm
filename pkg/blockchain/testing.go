@@ -1,0 +1,399 @@
+package blockchain
+
+import (
+	"errors"
+	"fmt"
+	"math/big"
+	"testing"
+
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
+// defaultBlockGasTarget is the default value for the block gas target for new blocks
+var defaultBlockGasTarget uint64 = 8000000
+
+var (
+	errInvalidTypeAssertion  = errors.New("invalid type assertion")
+	errRecoveryAddressFailed = errors.New("failed to recover from field")
+)
+
+// NewTestHeadersWithSeed creates a new chain with a seed factor.
+// It takes the genesis header, the number of headers to generate, and a seed as parameters.
+// It returns a slice of generated headers.
+func NewTestHeadersWithSeed(genesis *types.Header, n int, seed uint64) []*types.Header {
+	// head returns a new header with the given number and seed.
+	head := func(i int64) *types.Header {
+		return &types.Header{
+			Number:       uint64(i),
+			GasLimit:     seed,
+			TxRoot:       types.EmptyRootHash,
+			Sha3Uncles:   types.EmptyUncleHash,
+			ReceiptsRoot: types.EmptyRootHash,
+			Difficulty:   uint64(i),
+		}
+	}
+
+	if genesis == nil {
+		genesis = head(0)
+		genesis.ComputeHash()
+	}
+
+	headers := []*types.Header{genesis}
+
+	count := int64(genesis.Number) + 1
+	for i := 1; i < n; i++ {
+		header := head(count)
+		header.ParentHash = headers[i-1].Hash
+		header.ComputeHash()
+		headers = append(headers, header)
+		count++
+	}
+
+	return headers
+}
+
+// NewTestHeaders creates a chain of valid headers.
+// It takes the number of headers to generate as a parameter.
+// It returns a slice of generated headers.
+func NewTestHeaders(n int) []*types.Header {
+	return NewTestHeadersWithSeed(nil, n, 0)
+}
+
+// AppendNewTestHeaders creates n new headers from an already existing chain.
+// It takes the existing headers and the number of headers to generate as parameters.
+// It returns a slice of appended headers.
+func AppendNewTestHeaders(headers []*types.Header, n int) []*types.Header {
+	return AppendNewTestheadersWithSeed(headers, n, 0)
+}
+
+// AppendNewTestheadersWithSeed creates n new headers from an already existing chain.
+// It takes the existing headers, the number of headers to generate, and a seed as parameters.
+// It returns a slice of appended headers.
+func AppendNewTestheadersWithSeed(headers []*types.Header, n int, seed uint64) []*types.Header {
+	// We do +1 because the first header will be the genesis we supplied
+	newHeaders := NewTestHeadersWithSeed(headers[len(headers)-1], n+1, seed)
+
+	preHeaders := make([]*types.Header, len(headers))
+	copy(preHeaders, headers)
+
+	return append(preHeaders, newHeaders[1:]...)
+}
+
+// HeadersToBlocks converts a slice of headers to a slice of blocks.
+// It takes the headers as a parameter and returns the corresponding blocks.
+func HeadersToBlocks(headers []*types.Header) []*types.Block {
+	blocks := make([]*types.Block, len(headers))
+	for indx, i := range headers {
+		blocks[indx] = &types.Block{Header: i}
+	}
+
+	return blocks
+}
+
+// NewTestBlockchain creates a new dummy blockchain for testing.
+// It takes a testing context and a slice of headers as parameters.
+// It returns a new Blockchain instance.
+func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
+	t.Helper()
+
+	genesis := &chain.Genesis{
+		Number:   0,
+		GasLimit: 0,
+	}
+	forksAvail := &chain.Forks{
+		chain.EIP155:    chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
+	}
+	config := &chain.Chain{
+		Genesis: genesis,
+		Params: &chain.Params{
+			Forks:          forksAvail,
+			BlockGasTarget: defaultBlockGasTarget,
+		},
+	}
+
+	st := itrie.NewState(itrie.NewMemoryStorage())
+	b, err := newBlockChain(config, state.NewExecutor(config.Params, st, hclog.NewNullLogger()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if headers != nil {
+		if _, err := b.advanceHead(headers[0]); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.WriteHeaders(headers[1:]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return b
+}
+
+// TestCallbackType defines the type of callback used in NewMockBlockchain.
+type TestCallbackType string
+
+const (
+	VerifierCallback TestCallbackType = "VerifierCallback"
+	ExecutorCallback TestCallbackType = "ExecutorCallback"
+	ChainCallback    TestCallbackType = "ChainCallback"
+	StorageCallback  TestCallbackType = "StorageCallback"
+)
+
+// NewMockBlockchain constructs a new mock blockchain.
+// It takes a map of callback types to corresponding callback functions as a parameter.
+// It returns a new Blockchain instance or an error if construction fails.
+func NewMockBlockchain(callbackMap map[TestCallbackType]interface{}) (*Blockchain, error) {
+	var (
+		mockVerifier = &MockVerifier{}
+		executor     = &mockExecutor{}
+		config       = &chain.Chain{
+			Genesis: &chain.Genesis{
+				Number:   0,
+				GasLimit: 0,
+			},
+			Params: &chain.Params{
+				Forks: chain.AllForksEnabled,
+			},
+		}
+		mockStorage = storage.NewMockStorage()
+	)
+
+	// Set up the mocks and callbacks
+	if callbackMap != nil {
+		// Execute the verifier callback
+		if verifierCallback, ok := callbackMap[VerifierCallback]; ok {
+			callback, ok := verifierCallback.(func(verifier *MockVerifier))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(mockVerifier)
+		}
+
+		// Execute the executor callback
+		if executorCallback, ok := callbackMap[ExecutorCallback]; ok {
+			callback, ok := executorCallback.(func(executor *mockExecutor))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(executor)
+		}
+
+		// Execute the chain config callback
+		if chainCallback, ok := callbackMap[ChainCallback]; ok {
+			callback, ok := chainCallback.(func(chain *chain.Chain))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(config)
+		}
+
+		// Execute the storage callback
+		if storageCallback, ok := callbackMap[StorageCallback]; ok {
+			callback, ok := storageCallback.(func(storage *storage.MockStorage))
+			if !ok {
+				return nil, errInvalidTypeAssertion
+			}
+
+			callback(mockStorage)
+		}
+	}
+
+	blockchain := &Blockchain{
+		logger:    hclog.NewNullLogger(),
+		db:        mockStorage,
+		consensus: mockVerifier,
+		executor:  executor,
+		config:    config,
+		stream:    &eventStream{},
+		gpAverage: &gasPriceAverage{
+			price: big.NewInt(0),
+			count: big.NewInt(0),
+		},
+	}
+
+	if err := blockchain.initCaches(10); err != nil {
+		return nil, err
+	}
+
+	return blockchain, nil
+}
+
+// Verifier delegators
+
+type (
+	verifyHeaderDelegate    func(*types.Header) error
+	processHeadersDelegate  func([]*types.Header) error
+	getBlockCreatorDelegate func(*types.Header) (types.Address, error)
+	preStateCommitDelegate  func(*types.Header, *state.Transition) error
+)
+
+// MockVerifier is a mock implementation of the Verifier interface.
+type MockVerifier struct {
+	verifyHeaderFn    verifyHeaderDelegate
+	processHeadersFn  processHeadersDelegate
+	getBlockCreatorFn getBlockCreatorDelegate
+	preStateCommitFn  preStateCommitDelegate
+}
+
+// VerifyHeader verifies the given header.
+// It takes the header as a parameter and returns an error if verification fails.
+func (m *MockVerifier) VerifyHeader(header *types.Header) error {
+	if m.verifyHeaderFn != nil {
+		return m.verifyHeaderFn(header)
+	}
+
+	return nil
+}
+
+// HookVerifyHeader sets the verifyHeader callback function.
+// It takes the callback function as a parameter.
+func (m *MockVerifier) HookVerifyHeader(fn verifyHeaderDelegate) {
+	m.verifyHeaderFn = fn
+}
+
+// ProcessHeaders processes the given headers.
+// It takes the headers as a parameter and returns an error if processing fails.
+func (m *MockVerifier) ProcessHeaders(headers []*types.Header) error {
+	if m.processHeadersFn != nil {
+		return m.processHeadersFn(headers)
+	}
+
+	return nil
+}
+
+// HookProcessHeaders sets the processHeaders callback function.
+// It takes the callback function as a parameter.
+func (m *MockVerifier) HookProcessHeaders(fn processHeadersDelegate) {
+	m.processHeadersFn = fn
+}
+
+// GetBlockCreator returns the address of the block creator based on the header.
+// It takes the header as a parameter and returns the block creator address and an error if retrieval fails.
+func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, error) {
+	if m.getBlockCreatorFn != nil {
+		return m.getBlockCreatorFn(header)
+	}
+
+	return types.BytesToAddress(header.Miner), nil
+}
+
+// HookGetBlockCreator sets the getBlockCreator callback function.
+// It takes the callback function as a parameter.
+func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
+	m.getBlockCreatorFn = fn
+}
+
+// PreCommitState is a hook called before finalizing the state transition on inserting a block.
+// It takes the header and transition as parameters and returns an error if pre-committing fails.
+func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition) error {
+	if m.preStateCommitFn != nil {
+		return m.preStateCommitFn(header, txn)
+	}
+
+	return nil
+}
+
+// HookPreCommitState sets the preStateCommit callback function.
+// It takes the callback function as a parameter.
+func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
+	m.preStateCommitFn = fn
+}
+
+// Executor delegators
+
+type processBlockDelegate func(types.Hash, *types.Block, types.Address) (*state.Transition, error)
+
+// mockExecutor is a mock implementation of the Executor interface.
+type mockExecutor struct {
+	processBlockFn processBlockDelegate
+}
+
+// ProcessBlock processes the given block.
+// It takes the parent root, block, and block creator as parameters.
+// It returns the state transition and an error if processing fails.
+func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error) {
+	if m.processBlockFn != nil {
+		return m.processBlockFn(parentRoot, block, blockCreator)
+	}
+
+	return nil, nil
+}
+
+// HookProcessBlock sets the processBlock callback function.
+// It takes the callback function as a parameter.
+func (m *mockExecutor) HookProcessBlock(fn processBlockDelegate) {
+	m.processBlockFn = fn
+}
+
+type mockSigner struct {
+	txFromByTxHash map[types.Hash]types.Address
+}
+
+func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	if from, ok := m.txFromByTxHash[tx.Hash]; ok {
+		return from, nil
+	}
+
+	return types.ZeroAddress, errRecoveryAddressFailed
+}
+
+// TestBlockchain creates a new Blockchain for testing.
+// It takes a testing context and the genesis configuration as parameters.
+// It returns a new Blockchain instance.
+func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
+	if genesis == nil {
+		genesis = &chain.Genesis{}
+	}
+
+	config := &chain.Chain{
+		Genesis: genesis,
+		Params: &chain.Params{
+			BlockGasTarget: defaultBlockGasTarget,
+		},
+	}
+
+	b, err := newBlockChain(config, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return b
+}
+
+// newBlockChain creates a new Blockchain instance.
+// It takes the chain configuration and the executor as parameters.
+// It returns a new Blockchain instance or an error if creation fails.
+func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) {
+	if executor == nil {
+		executor = &mockExecutor{}
+	}
+
+	db, err := memory.NewMemoryStorage(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := NewBlockchain(hclog.NewNullLogger(), db, config, &MockVerifier{}, executor, &mockSigner{})
+	if err != nil {
+		return nil, err
+	}
+	// if we are using mock consensus we can compute right away the genesis since
+	// this consensus does not change the header hash
+	if err = b.ComputeGenesis(); err != nil {
+		return nil, fmt.Errorf("compute genisis: %w", err)
+	}
+
+	return b, nil
+}

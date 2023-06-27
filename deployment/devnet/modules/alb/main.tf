@@ -1,5 +1,5 @@
 resource "aws_lb" "op_evm_nodes" {
-  name               = "avl-sl-lb-${var.deployment_name}"
+  name               = "op-evm-lb-${var.deployment_name}"
   load_balancer_type = "network"
   internal           = false
   subnets            = [var.public_subnets_id[0]]

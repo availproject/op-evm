@@ -156,10 +156,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 		edgeBlks, err := avail.BlockFromAvail(blk, sw.availAppID, callIdx, sw.logger)
 		if len(edgeBlks) == 0 && err != nil {
 			sw.logger.Error("cannot extract Edge block from Avail block", "block_number", blk.Block.Header.Number, "error", err)
-			// It is expected that not all Avail blocks contain a SL block. On any other error,
+			// It is expected that not all Avail blocks contain an OpEVM block. On any other error,
 			// log the error and wait for a next one.
 			if err != avail.ErrNoExtrinsicFound {
-				sw.logger.Warn("unexpected error while extracting SL blocks from Avail block", "error", err)
+				sw.logger.Warn("unexpected error while extracting OpEVM blocks from Avail block", "error", err)
 				continue
 			}
 		}

@@ -142,6 +142,7 @@ func StartNodes(logger hclog.Logger, bindAddr netip.Addr, availAddr, accountsPat
 		ctx.servers[i].server = srv
 
 		logger.Info("started node", "i", i, "nodeType", si.nodeType)
+		time.Sleep(60 * time.Second) // give some time for p2p to start and sync
 	}
 
 	logger.Info("all nodes started", "servers_count", len(ctx.servers))

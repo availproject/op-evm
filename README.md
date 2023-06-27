@@ -46,19 +46,18 @@ To deploy a devnet or a testnet in AWS using terraform follow the instructions [
 
 Testing fraudproof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraudproof block, which leads to dispute resolution process.
 
-### To test fraudproof, perform following actions:
+### To Evaluate the Fraudproof Mechanism, Execute the Following Procedures:
 
-1. Run at least one sequencer with fraud server enabled
-   - To do this, run sequencer with `--fraud-srv-listen-addr "<address>:<port>"` (e.g.: `op-evm server --fraud-srv-listen-addr ":9990"`)
-2. Run at least one watchtower that has staked
-3. Optionally `tail` rollup blocks from Avail to easily see the process:
-   - Run `op-evm tail --jsonrpc-addr "<sequencer's JSON-RPC address>"`
-4. Make an HTTP request to fraud server:
-   - e.g. `curl http://localhost:9990/fraud/prime`
+1. Initiate a minimum of one sequencer with the fraud server function activated.
+   - This can be accomplished by launching the sequencer with the `--fraud-srv-listen-addr "<address>:<port>"` command (for instance: `op-evm server --fraud-srv-listen-addr ":9990"`).
+2. Initiate at least one watchtower that possesses staked assets.
+3. Optionally, you may monitor rollup blocks from Avail to facilitate a clear understanding of the process. This can be done by executing the `op-evm tail --jsonrpc-addr "<sequencer's JSON-RPC address>"` command.
+4. Generate an HTTP request to the fraud server:
+   - For instance, `curl http://localhost:9990/fraud/prime`.
 
-The "malicius" sequencer will try to inject a begin dispute resolution transaction into the block, without chain inclusion, and watchtower will catch this and slash the sequencer.
+The sequencer, acting in a "malicious" capacity, will attempt to incorporate a begin dispute resolution transaction into the block, without chain inclusion. The watchtower will detect this action and penalize the sequencer accordingly.
 
-Everytime the "malicious" sequencer has produced one fraudulent block, it will resume normal operation, until the fraud server has been _primed_ again.
+Following the production of a fraudulent block by the "malicious" sequencer, normal operations will be resumed until the fraud server is _primed_ once more.
 
 ## Contributing
 
@@ -66,7 +65,7 @@ We welcome contributions to the OpEVM project. If you find any issues, have sugg
 
 ## Contributors
 
-OpEVM was built as a joint project by two Equilibrium Group companies, Equilibrium Labs & Eiger and Avail.
+OpEVM was built in collaboration between Avail and Equilibrium Group (Equilibrium Labs & Eiger).
 
 [Avail](https://www.availproject.org/) creates the base layer for future blockchains, enabling developers to build rollups and appchains with scalability, flexibility, and ease.
 

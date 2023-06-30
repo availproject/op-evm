@@ -1,16 +1,18 @@
 # Optimistic EVM Rollup
 
-OpEVM is a blockchain settlement system designed for efficient and secure transaction processing. It provides a decentralized infrastructure for settlement and enables high-throughput, low-latency transaction processing on the blockchain. OpEVM is built on top of the [Avail](https://www.availproject.org/), extending [Polygon Edge](https://github.com/0xPolygon/polygon-edge) and offers advanced features for block validation, fraudproof detection, and transaction verification.
+OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/), extending [Polygon Edge](https://github.com/0xPolygon/polygon-edge) and offers advanced features for block validation, fraud-proof detection, and transaction verification.
 
 ## Features
 
+- Sovereign: OpEVM is uniquely built to provide an working optimistic rollup design without access to a base layer which supports execution. This means there is no need for a smart contract to perform fraud-proof checks to determine the canonical state of the chain. OpEVM completely relies on the node operators to determine the state of the chain, making it completely sovereign, while still inheriting the security of the base layer. 
+- Optimistic Rollup: OpEVM is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
 - Block Validation: OpEVM ensures that incoming blocks conform to the specified structure and contain valid transaction data.
-- Fraudproof Detection: The system is equipped with fraudproof detection mechanisms to identify and handle malicious blocks.
+- Security: OpEVM relies on honest minority assumption. Under the assumption there is a watchtower which catches invalid blocks and produces fraud-proof, the system inherits the security of the base layer. 
+- Fraud-proof Detection: The system is equipped with fraud-proof detection mechanisms to identify and handle malicious blocks.
 - Transaction Verification: OpEVM verifies the integrity and correctness of transactions, ensuring the accuracy of settlement processes.
 - High Throughput: The system is optimized for high throughput, enabling fast and efficient transaction processing.
 - Low Latency: OpEVM minimizes transaction confirmation times, reducing latency and enabling near-instantaneous settlement.
-- Decentralized Infrastructure: OpEVM operates on a decentralized infrastructure, ensuring the security and resilience of the settlement system.
-- Optimistic Rollup: OpEVM is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
+- Decentralized Infrastructure: OpEVM operates on a decentralized infrastructure, ensuring the security and resilience of the settlement system. This includes support for a decentralized sequencer set, creating way for much stronger decentralization and censorship-resistant properties. 
 
 
 ## Components
@@ -44,9 +46,9 @@ To deploy a devnet or a testnet in AWS using terraform follow the instructions [
 
 ## Testing Fraudproof
 
-Testing fraudproof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraudproof block, which leads to dispute resolution process.
+Testing fraud-proof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraud-proof block, which leads to dispute resolution process.
 
-### To Evaluate the Fraudproof Mechanism, Execute the Following Procedures:
+### To Evaluate the Fraud-proof Mechanism, Execute the Following Procedures:
 
 1. Initiate a minimum of one sequencer with the fraud server function activated.
    - This can be accomplished by launching the sequencer with the `--fraud-srv-listen-addr "<address>:<port>"` command (for instance: `op-evm server --fraud-srv-listen-addr ":9990"`).
@@ -65,7 +67,7 @@ We welcome contributions to the OpEVM project. If you find any issues, have sugg
 
 ## Contributors
 
-OpEVM was built in collaboration between Avail and Equilibrium Group (Equilibrium Labs & Eiger).
+OpEVM was built in collaboration between [Avail](https://www.availproject.org/) and [Equilibrium Group](https://www.eqg.co/) ([Equilibrium Labs](https://equilibrium.co/) & [Eiger](https://www.eiger.co/)).
 
 [Avail](https://www.availproject.org/) creates the base layer for future blockchains, enabling developers to build rollups and appchains with scalability, flexibility, and ease.
 

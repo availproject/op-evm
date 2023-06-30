@@ -1,6 +1,6 @@
 # Optimistic EVM Rollup
 
-OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/)and offers advanced features for block validation, fraud-proof detection, and transaction verification.
+OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/) and offers advanced features for block validation, fraud-proof detection, and transaction verification.
 
 ## Features
 

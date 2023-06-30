@@ -1,12 +1,12 @@
 # Optimistic EVM Rollup
 
-OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/), extending [Polygon Edge](https://github.com/0xPolygon/polygon-edge) and offers advanced features for block validation, fraud-proof detection, and transaction verification.
+OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/)and offers advanced features for block validation, fraud-proof detection, and transaction verification.
 
 ## Features
 
 - Sovereign: OpEVM is uniquely built to provide an working optimistic rollup design without access to a base layer which supports execution. This means there is no need for a smart contract to perform fraud-proof checks to determine the canonical state of the chain. OpEVM completely relies on the node operators to determine the state of the chain, making it completely sovereign, while still inheriting the security of the base layer. 
 - Optimistic Rollup: OpEVM is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
-- Block Validation: OpEVM ensures that incoming blocks conform to the specified structure and contain valid transaction data.
+- Block Validation: OpEVM ensures that incoming blocks conform to the specified structure and contain valid transaction data. It extends [Polygon Edge](https://github.com/0xPolygon/polygon-edge) framework as the blockchain engine.
 - Security: OpEVM relies on honest minority assumption. Under the assumption there is a watchtower which catches invalid blocks and produces fraud-proof, the system inherits the security of the base layer. 
 - Fraud-proof Detection: The system is equipped with fraud-proof detection mechanisms to identify and handle malicious blocks.
 - Transaction Verification: OpEVM verifies the integrity and correctness of transactions, ensuring the accuracy of settlement processes.

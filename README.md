@@ -44,6 +44,7 @@ For detailed instructions on installation, configuration, and usage, refer to th
 
 To deploy a devnet or a testnet in AWS using terraform follow the instructions [here](/deployment/readme.md).
 
+**NOTE:** The current `OpEVM` binaries are compiled in `arm64` architecture. If you'd like to run `OpEVM` on a different build please check the instructions [here](https://github.com/availproject/op-evm/blob/%40feature/different-binary-setup/docs/demo.md#setting-up-devnet-on-amd64-machine).
 ## Testing Fraudproof
 
 Testing fraud-proof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraud-proof block, which leads to dispute resolution process.

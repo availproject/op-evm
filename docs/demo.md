@@ -75,10 +75,9 @@ Copy the first json url from the table. (in our case it's `http://127.0.0.1:4960
 
 ## Setting up DevNet on amd64 machine
 
-To set up a DevNet on amd64 machine follow these steps:
+To set up a DevNet on an amd64 machine, run the following:
 
-1. Clone the github repo on your local machine
-2. Run on the root directory:
+Run on the root directory:
 ```shell
 make build GOOS=linux GOARCH=amd64
 ````

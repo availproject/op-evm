@@ -27,7 +27,7 @@ The Sequencer component is the main transaction processor in OpEVM. It receives 
 
 ### WatchTower
 
-The WatchTower component is responsible for block validation, fraudproof detection, and transaction verification. It ensures the integrity of incoming blocks and identifies potential fraud or malicious activities.
+The WatchTower component is responsible for block validation, fraud-proof detection, and transaction verification. It ensures the integrity of incoming blocks and identifies potential fraud or malicious activities.
 
 ### Staking
 
@@ -66,7 +66,7 @@ Following the production of a fraudulent block by the "malicious" sequencer, nor
 A list of limitations is present in the [issues](https://github.com/availproject/op-evm/issues). However, here are a few core limitations of this prototype:
 - Transaction replay: If a valid fraud proof arrives and rolls back the chain, the transactions that are rolled back are not replayed. Transactions from invalid block are essentially invalidated without any notification to the user.
 - Light client support: The prototype does not support execution light clients (LC), as it is expensive for LCs to re-execute blocks. However, in the future, we can produce validity proof of correct block execution as fraud proofs which will allow LCs to follow chain very easily. NOTE: This is not about DA light clients. The design does support Avail LCs and may be included in the prototype in a future iteration. 
-- Bridging: The rollup uses native tokens for staking and user transactions. The operators use AVL to submit blocks to Avail. The sovereign nature of the rollup does not allow a clear bi-directional bridge design from the rollup to another chain.
+- Bridging: The rollup uses native tokens for staking and user transactions. The operators use AVL to submit blocks to Avail. The Sovereign nature of the rollup does not allow a clear bi-directional bridge design from the rollup to another chain.
 - Data compression: The prototype already implements state diffs propagation on the p2p in the optimistic case. However, the blocks that are posted on Avail are not compressed. There is a big scope for cost optimization there.
 
 If you feel some important limitations are not covered, please check out our [Contributing section](https://github.com/availproject/op-evm#contributing) and open an issue or a PR. 
@@ -90,6 +90,6 @@ OpEVM was built in collaboration between [Avail](https://www.availproject.org/) 
 ## Warning
 This is a prototype. It contains known vulnerabilities and missing essential features. It should not be used in production, in its current form, under any circumstances.
 
-## License
+## Licence
 
 OpEVM is released under the Apache 2.0 License. See the [LICENSE](LICENSE) file for more details.

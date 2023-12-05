@@ -90,6 +90,6 @@ OpEVM was built in collaboration between [Avail](https://www.availproject.org/) 
 ## Warning
 This is a prototype. It contains known vulnerabilities and missing essential features. It should not be used in production, in its current form, under any circumstances.
 
-## Licence
+## License
 
 OpEVM is released under the Apache 2.0 License. See the [LICENSE](LICENSE) file for more details.

@@ -79,7 +79,7 @@ Avail welcomes contributors from anywhere and from any kind of education or skil
 
 1. Before asking any questions regarding how the project works, please read through all the documentation and install the project on your own local machine to try it and understand how it basically works. Please ask your questions in open channels (Github and TG).
 
-2. Before starting to work on an issue, you need to get the approval of one of the maintainers/team members. Therefore please ask to be assigned to an issue. If you don't but you still raise a PR for that issue, your PR can be rejected. This is a form of respect for the other contributors who could have already started to work on the same problem.
+2. To work on an issue, first, get approval from a maintainer or team member. You can request to be assigned by commenting on the issue in GitHub. This respects the efforts of others who may already be working on the same issue. Unapproved PRs may be declined.
 
 3. When you ask to be assigned to an issue, it means that you are ready to work on it. When you get assigned, take the lock and then you disappear, you are not respecting the other contributors who could be able to work on that. So, after having been assigned, you have a week of time to deliver your first draft PR or reach out with any issues regrading the issue. After that time has passed without any notice, you will be unassigned.
 

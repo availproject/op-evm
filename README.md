@@ -71,9 +71,22 @@ A list of limitations is present in the [issues](https://github.com/availproject
 
 If you feel some important limitations are not covered, please check out our [Contributing section](https://github.com/availproject/op-evm#contributing) and open an issue or a PR. 
 
-## Contributing
+## Contribution Guidelines
 
-We welcome contributions to the OpEVM project. If you find any issues, have suggestions for improvements, or would like to contribute new features, please open a GitHub issue or submit a pull request.
+### Rules
+
+Avail welcomes contributors from every background and skill level. Our mission is to build a community that's not only welcoming and friendly but also aligned with the best development practices. Interested in contributing to the OpEVM project? Whether you've spotted an issue, have improvement ideas, or want to add new features, we'd love to have your input. Simply open a GitHub issue or submit a pull request to get started.
+
+1. Before asking any questions regarding how the project works, please read through all the documentation and install the project on your own local machine to try it and understand how it basically works. Please ask your questions in open channels (Github and TG).
+
+2. To work on an issue, first, get approval from a maintainer or team member. You can request to be assigned by commenting on the issue in GitHub. This respects the efforts of others who may already be working on the same issue. Unapproved PRs may be declined.
+
+3. When assigned to an issue, it's expected that you're ready to actively work on it. After assignment, please provide a draft PR or update within one week. If you encounter delays, communicate with us to maintain your assignment.
+
+4. Got an idea or found a bug? Open an issue with the tags [New Feature] or [Bug]. Provide detailed information like reproduction steps (for bugs) or a basic feature proposal. The team will review and potentially assign you to it.
+
+5. Start a draft PR early in your development process, even with incomplete changes. This allows us to track progress, provide timely reviews, and assist you. Expect feedback on your drafts periodically.
+
 
 ## Contributors
 

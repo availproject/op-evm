@@ -81,7 +81,7 @@ Avail welcomes contributors from anywhere and from any kind of education or skil
 
 2. To work on an issue, first, get approval from a maintainer or team member. You can request to be assigned by commenting on the issue in GitHub. This respects the efforts of others who may already be working on the same issue. Unapproved PRs may be declined.
 
-3. When you ask to be assigned to an issue, it means that you are ready to work on it. When you get assigned, take the lock and then you disappear, you are not respecting the other contributors who could be able to work on that. So, after having been assigned, you have a week of time to deliver your first draft PR or reach out with any issues regrading the issue. After that time has passed without any notice, you will be unassigned.
+3. When assigned to an issue, it's expected that you're ready to actively work on it. After assignment, please provide a draft PR or update within one week. If you encounter delays, communicate with us to maintain your assignment.
 
 4. If you have a new feature idea or you spot a bug you would like to fix, feel free to open up an issue with the tag [New Feature] or [Bug], someone from the team would review it and you'll get assigned to work on it.
 

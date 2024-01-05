@@ -4,7 +4,7 @@ OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for 
 
 ## Features
 
-- Sovereign: OpEVM is uniquely built to provide an working optimistic rollup design without access to a base layer which supports execution. This means there is no need for a smart contract to perform fraud-proof checks to determine the canonical state of the chain. OpEVM completely relies on the node operators to determine the state of the chain, making it completely sovereign, while still inheriting the security of the base layer. 
+- Sovereign: OpEVM is uniquely built to provide a working optimistic rollup design without access to a base layer which supports execution. This means there is no need for a smart contract to perform fraud-proof checks to determine the canonical state of the chain. OpEVM completely relies on the node operators to determine the state of the chain, making it completely sovereign, while still inheriting the security of the base layer. 
 - Optimistic Rollup: OpEVM is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
 - Block Validation: OpEVM ensures that incoming blocks conform to the specified structure and contain valid transaction data. It extends [Polygon Edge](https://github.com/0xPolygon/polygon-edge) framework as the blockchain engine.
 - Security: OpEVM relies on honest minority assumption. Under the assumption there is a watchtower which catches invalid blocks and produces fraud-proof, the system inherits the security of the base layer. 
@@ -46,7 +46,7 @@ To deploy a devnet or a testnet in AWS using terraform follow the instructions [
 
 ## Testing Fraudproof
 
-Testing fraud-proof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface which can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraud-proof block, which leads to dispute resolution process.
+Testing fraud-proof processing is relatively straightforward. Sequencer implementation contains so called fraud server, which provides an HTTP interface that can be used to trigger a one time fraud construction into next produced block. Watchtower will then catch this and produce a fraud-proof block, which leads to dispute resolution process.
 
 ### To Evaluate the Fraud-proof Mechanism, Execute the Following Procedures:
 
@@ -64,7 +64,7 @@ Following the production of a fraudulent block by the "malicious" sequencer, nor
 ## Limitations
 
 A list of limitations is present in the [issues](https://github.com/availproject/op-evm/issues). However, here are a few core limitations of this prototype:
-- Transaction replay: If a valid fraud proof arrives and rolls back the chain, the transactions that are rolled back are not replayed. Transactions from invalid block are essentially invalidated without any notification to the user.
+- Transaction replay: If a valid fraud proof arrives and rolls back the chain, the transactions that are rolled back are not replayed. Transactions from invalid blocks are essentially invalidated without any notification to the user.
 - Light client support: The prototype does not support execution light clients (LC), as it is expensive for LCs to re-execute blocks. However, in the future, we can produce validity proof of correct block execution as fraud proofs which will allow LCs to follow chain very easily. NOTE: This is not about DA light clients. The design does support Avail LCs and may be included in the prototype in a future iteration. 
 - Bridging: The rollup uses native tokens for staking and user transactions. The operators use AVL to submit blocks to Avail. The sovereign nature of the rollup does not allow a clear bi-directional bridge design from the rollup to another chain.
 - Data compression: The prototype already implements state diffs propagation on the p2p in the optimistic case. However, the blocks that are posted on Avail are not compressed. There is a big scope for cost optimization there.

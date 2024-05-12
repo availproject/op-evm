@@ -94,7 +94,7 @@ func Run(availAddr, path string, balance uint64, retry bool) {
 		panic(err)
 	}
 
-	log.Printf("Successfuly written mnemonic into '%s'", path)
+	log.Printf("Successfully written mnemonic into '%s'", path)
 }
 
 // deposit is a helper function used to deposit a specified balance into an Avail account.

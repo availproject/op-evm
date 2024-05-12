@@ -113,7 +113,7 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 	// Check if block production should be stopped due to inbound dispute resolution tx found in txpool.
 	go fraudResolver.ShouldStopProducingBlocks(sw.apq)
 
-	// Write blocks to the local blockchain and avail in intervals uless block production is stopped.
+	// Write blocks to the local blockchain and avail in intervals unless block production is stopped.
 	go sw.runWriteBlocksLoop(activeSequencersQuerier, fraudResolver, account, key)
 
 	// BlockStream watcher must be started after the staking is done. Otherwise
@@ -249,10 +249,10 @@ func (sw *SequencerWorker) Run(account accounts.Account, key *keystore.Key) erro
 			}
 		}
 
-		// Will check the block for fraudlent behaviour and slash parties accordingly.
+		// Will check the block for fraudulent behaviour and slash parties accordingly.
 		// WARN: Continue will hard stop whole network from producing blocks until dispute is resolved.
 		// If we do not stop the network from processing, blocks will continue to be built from other sequencers
-		// resulting in block number missmatches and fraud will potentially be corrupted.
+		// resulting in block number mismatches and fraud will potentially be corrupted.
 		if _, err := fraudResolver.CheckAndSlash(); err != nil {
 			continue
 		}
@@ -592,7 +592,7 @@ func (sw *SequencerWorker) writeTransactions(fraudResolver *Fraud, gasLimit uint
 
 		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
-				sw.logger.Warn("transaction reached gas limit during excution", "hash", tx.Hash.String())
+				sw.logger.Warn("transaction reached gas limit during execution", "hash", tx.Hash.String())
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
 				sw.logger.Warn("transaction caused application error", "hash", tx.Hash.String())

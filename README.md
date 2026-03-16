@@ -4,7 +4,7 @@
 
 OpEVM is a sovereign EVM-compatible optimistic rollup construction designed for efficient and secure transaction processing. It provides a decentralized infrastructure for running a layer-2 (L2) blockchain and enables high-throughput, low-latency transaction processing. OpEVM is built on top of the [Avail](https://www.availproject.org/) and offers advanced features for block validation, fraud-proof detection, and transaction verification.
 
-## Features
+## Features;
 
 - Sovereign: OpEVM is uniquely built to provide an working optimistic rollup design without access to a base layer which supports execution. This means there is no need for a smart contract to perform fraud-proof checks to determine the canonical state of the chain. OpEVM completely relies on the node operators to determine the state of the chain, making it completely sovereign, while still inheriting the security of the base layer. 
 - Optimistic Rollup: OpEVM is built as an optimistic rollup solution, leveraging Layer 2 scalability techniques to achieve high transaction throughput while maintaining the security guarantees of the underlying blockchain.
@@ -40,7 +40,7 @@ The Staking component handles the staking mechanisms within OpEVM. It manages st
 
 ### Demo Deployment
 
-For detailed instructions on installation, configuration, and usage, refer to the [DEMO DEPLOYMENT](/docs/demo.md).
+For more detailed instructions on installation, configuration, and usage, refer to the [DEMO DEPLOYMENT](/docs/demo.md).
 
 ### Devnet/Testnet Deployment
 

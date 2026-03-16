@@ -15,7 +15,7 @@ Before proceeding with the deployment, ensure the following prerequisites are me
 ## Provisioning the Avail Network
 To provision the Avail Network, follow these steps:
 - Deploy your avail network.
-- If your Avail Network is publicly available, pass the `avail_hostname` and `avail_port` variables to the Terraform script bellow using the `-var` or `-var-file` arguments.
+- If your Avail Network is publicly available, pass the `avail_hostname` and `avail_port` variables to the Terraform script below using the `-var` or `-var-file` arguments.
 - If your Avail Network is private and located in the same region and AWS account as this deployment, use the `avail_peer` variable to configure the peering. Typically, the `route53_zone_private_id`, `route_table_private_ids` and `vpc_id` will be outputted from the Avail deployment Terraform script.
 
 ## Provisioning AWS Resources and Deploying the Nodes

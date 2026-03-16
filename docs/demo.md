@@ -73,6 +73,15 @@ You should see logs similar to this:
 ```
 Copy the first json url from the table. (in our case it's `http://127.0.0.1:49601/`).
 
+## Setting up DevNet on amd64 machine
+
+To set up a DevNet on an amd64 machine, run the following:
+
+Run on the root directory:
+```shell
+make build GOOS=linux GOARCH=amd64
+````
+
 ## Set up an AWS network
 
 To deploy a devnet or a testnet in AWS using terraform follow the instructions [here](../deployment/readme.md).
@@ -170,3 +179,5 @@ To import ERC20 tokens into your MetaMask wallet, follow these steps:
     - Token symbol: `TEST`
     - Token decimal: `18`
 4. Click **Add custom token** and **Import tokens**.
+
+
